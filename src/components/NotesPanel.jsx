@@ -104,12 +104,14 @@ export default function NotesPanel({ selectedDate, phase, selectedEvent, setSele
         <div className="en-header" style={{ borderLeftColor: eventColor?.border }}>
           <div className="en-color-dot" style={{ background: eventColor?.border }} />
           <div className="en-header-info">
-            <h3 className="en-title">{selectedEvent.title}</h3>
-            <div className="en-time-row">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              <span>{formatTimeDisplay(selectedEvent.time)} – {formatTimeDisplay(selectedEvent.endTime)}</span>
-              <span className="en-separator">·</span>
-              <span>{new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+            <div className="en-title-row">
+              <h3 className="en-title">{selectedEvent.title}</h3>
+              <div className="en-time-row">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span>{formatTimeDisplay(selectedEvent.time)} – {formatTimeDisplay(selectedEvent.endTime)}</span>
+                <span className="en-separator">·</span>
+                <span>{new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+              </div>
             </div>
           </div>
         </div>

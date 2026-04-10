@@ -118,23 +118,12 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
           <button className="cal-arrow-btn" onClick={goToPrev}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
+          <h2 className="cal-date-title">{headerLabel}</h2>
           <button className="cal-arrow-btn" onClick={goToNext}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
-          <h2 className="cal-date-title">{headerLabel}</h2>
         </div>
-        <div className="cal-header-right">
-          <span className="cal-view-label">Day</span>
-        </div>
-      </div>
-
-      {/* Day label row */}
-      <div className="cal-day-label-row">
-        <div className="cal-gutter-space" />
-        <div className="cal-day-label">
-          <span className={`cal-day-name ${isToday ? 'today' : ''}`}>{dayName}</span>
-          <span className={`cal-day-num ${isToday ? 'today-num' : ''}`}>{dayNum}</span>
-        </div>
+        <div className="cal-header-right" />
       </div>
 
       {/* Time grid */}
