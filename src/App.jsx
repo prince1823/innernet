@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import CalendarPanel from './components/CalendarPanel'
 import NotesPanel from './components/NotesPanel'
+import { calendarTasks } from './data/sampleData'
 import './App.css'
 
 function App() {
@@ -10,6 +11,49 @@ function App() {
   const [bottomHeight, setBottomHeight] = useState(180)
   const [sidebarWidth, setSidebarWidth] = useState(380)
   const [thoughtsText, setThoughtsText] = useState('')
+  const [thoughts, setThoughts] = useState({})
+  const [quickSlot, setQuickSlot] = useState(null) // { time: '14:00', label: '2 PM' }
+  const inputRef = useRef(null)
+
+  // Auto-select first event of the day when date changes
+  useEffect(() => {
+    const dayEvents = calendarTasks[selectedDate] || []
+    if (dayEvents.length > 0) {
+      setSelectedEvent(dayEvents[0])
+    } else {
+      setSelectedEvent(null)
+    }
+    setQuickSlot(null)
+  }, [selectedDate])
+
+  const handleSlotClick = useCallback((time, label) => {
+    setSelectedEvent(null)
+    setQuickSlot({ time, label })
+    // Auto-focus the input after state updates
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }, [])
+
+  // Thoughts key: event-specific, quick-slot, or date-level
+  const thoughtsKey = selectedEvent ? `event-${selectedEvent.id}` : quickSlot ? `slot-${selectedDate}-${quickSlot.time}` : selectedDate
+
+  // Clear input text when switching context
+  useEffect(() => {
+    setThoughtsText('')
+  }, [thoughtsKey])
+
+  const addThought = useCallback(() => {
+    const text = thoughtsText.trim()
+    if (!text) return
+    const now = new Date()
+    const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+    setThoughts(prev => ({
+      ...prev,
+      [thoughtsKey]: [...(prev[thoughtsKey] || []), { text, time, id: Date.now() }]
+    }))
+    setThoughtsText('')
+  }, [thoughtsText, thoughtsKey])
+
+  const currentThoughts = thoughts[thoughtsKey] || []
 
   const handleResizeStart = useCallback((e) => {
     e.preventDefault()
@@ -63,7 +107,7 @@ function App() {
     <div className="app">
       {/* Left: Calendar sidebar */}
       <aside className="app-sidebar-calendar" style={{ width: `${sidebarWidth}px` }}>
-        <CalendarPanel selectedDate={selectedDate} setSelectedDate={setSelectedDate} selectedEvent={selectedEvent} setSelectedEvent={setSelectedEvent} />
+        <CalendarPanel selectedDate={selectedDate} setSelectedDate={setSelectedDate} selectedEvent={selectedEvent} setSelectedEvent={(ev) => { setSelectedEvent(ev); setQuickSlot(null) }} onSlotClick={handleSlotClick} quickSlot={quickSlot} thoughts={thoughts} />
       </aside>
 
       {/* Sidebar resize handle */}
@@ -73,7 +117,7 @@ function App() {
       <div className="app-main">
         {/* Top: Notes */}
         <div className="app-notes" style={{ flex: bottomCollapsed ? 1 : undefined, height: bottomCollapsed ? '100%' : undefined }}>
-          <NotesPanel selectedDate={selectedDate} phase="calendar-notes" selectedEvent={selectedEvent} setSelectedEvent={setSelectedEvent} />
+          <NotesPanel selectedDate={selectedDate} phase="calendar-notes" selectedEvent={selectedEvent} setSelectedEvent={setSelectedEvent} thoughts={currentThoughts} quickSlot={quickSlot} />
         </div>
 
         {/* Resize handle + Bottom: Agent */}
@@ -91,19 +135,41 @@ function App() {
                   </button>
                 </div>
                 <div className="bottom-header-right">
-                  <span className="thoughts-date">{new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                  <span className="thoughts-date">
+                    {selectedEvent ? selectedEvent.title : quickSlot ? quickSlot.label : new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                  </span>
                   <button className="bottom-collapse-btn" onClick={() => setBottomCollapsed(true)} title="Collapse">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 15 12 9 18 15"/></svg>
                   </button>
                 </div>
               </div>
-              <div className="bottom-content">
-                <textarea
-                  className="thoughts-textarea"
-                  placeholder="Write what you're thinking..."
-                  value={thoughtsText}
-                  onChange={(e) => setThoughtsText(e.target.value)}
-                />
+              <div className="bottom-content terminal-content">
+                <div className="terminal-scroll">
+                  {currentThoughts.map(t => (
+                    <div key={t.id} className="terminal-line">
+                      <span className="terminal-prompt-prefix">
+                        <span className="terminal-date">{t.time}</span>
+                        <span className="terminal-arrow">→</span>
+                      </span>
+                      <span className="terminal-output">{t.text}</span>
+                    </div>
+                  ))}
+                  <div className="terminal-line terminal-input-line">
+                    <span className="terminal-prompt-prefix">
+                      <span className="terminal-date">{new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>
+                      <span className="terminal-arrow">→</span>
+                    </span>
+                    <input
+                      ref={inputRef}
+                      className="terminal-input"
+                      type="text"
+                      placeholder="type your thought..."
+                      value={thoughtsText}
+                      onChange={(e) => setThoughtsText(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') addThought() }}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </>

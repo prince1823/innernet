@@ -383,6 +383,88 @@
   background: #ea4335;
 }
 
+/* ── Quick Thought Slot ── */
+.cal-quick-slot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 28px;
+  background: rgba(139, 92, 246, 0.08);
+  border-left: 3px solid var(--purple-400);
+  border-radius: 0 4px 4px 0;
+  display: flex;
+  align-items: center;
+  padding-left: 10px;
+  z-index: 5;
+  pointer-events: none;
+  animation: slotFadeIn 0.15s ease;
+}
+
+@keyframes slotFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.cal-quick-slot-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--purple-600);
+}
+
+/* ── Thought Blocks on Calendar ── */
+.cal-thought-block {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 28px;
+  background: var(--purple-50);
+  border-left: 3px solid var(--purple-300);
+  border-radius: 0 4px 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  z-index: 4;
+  cursor: pointer;
+  transition: all 0.15s;
+  overflow: hidden;
+}
+
+.cal-thought-block:hover {
+  background: var(--purple-100);
+  border-left-color: var(--purple-500);
+}
+
+.cal-thought-block.active {
+  background: rgba(139, 92, 246, 0.12);
+  border-left-color: var(--purple-500);
+}
+
+.cal-thought-block svg {
+  color: var(--purple-400);
+  flex-shrink: 0;
+}
+
+.cal-thought-preview {
+  font-size: 11px;
+  color: var(--purple-600);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.cal-thought-count {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--purple-500);
+  background: var(--purple-100);
+  padding: 1px 5px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
 /* ── Event Detail Drawer ── */
 .cal-event-drawer {
   position: absolute;

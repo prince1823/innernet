@@ -33,7 +33,7 @@ function formatHourLabel(hour) {
   return `${hour - 12} PM`
 }
 
-export default function CalendarPanel({ selectedDate, setSelectedDate, selectedEvent, setSelectedEvent }) {
+export default function CalendarPanel({ selectedDate, setSelectedDate, selectedEvent, setSelectedEvent, onSlotClick, quickSlot, thoughts = {} }) {
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 9))
   const gridRef = useRef(null)
 
@@ -45,13 +45,24 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
 
   const tasks = calendarTasks[dateStr] || []
 
+  // Collect thought slots for this date to render on the calendar
+  const thoughtSlots = useMemo(() => {
+    const prefix = `slot-${dateStr}-`
+    return Object.keys(thoughts)
+      .filter(key => key.startsWith(prefix) && thoughts[key].length > 0)
+      .map(key => {
+        const time = key.replace(prefix, '')
+        const items = thoughts[key]
+        return { time, items, label: formatTimeDisplay(time) }
+      })
+  }, [dateStr, thoughts])
+
   const goToPrev = () => {
     setCurrentDate(prev => {
       const d = new Date(prev)
       d.setDate(d.getDate() - 1)
       return d
     })
-    setSelectedEvent(null)
   }
 
   const goToNext = () => {
@@ -60,12 +71,10 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
       d.setDate(d.getDate() + 1)
       return d
     })
-    setSelectedEvent(null)
   }
 
   const goToToday = () => {
     setCurrentDate(new Date(2026, 3, 9))
-    setSelectedEvent(null)
   }
 
   // Scroll to ~7am on mount / date change
@@ -82,6 +91,22 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const handleEventClick = (e, event) => {
     e.stopPropagation()
     setSelectedEvent(event)
+  }
+
+  const handleSlotClick = (e) => {
+    if (!onSlotClick) return
+    // Account for scroll offset of the grid container
+    const scrollContainer = gridRef.current
+    const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0
+    const rect = e.currentTarget.getBoundingClientRect()
+    const y = e.clientY - rect.top + scrollTop
+    const totalMinutes = Math.floor((y / 56) * 60)
+    const hour = Math.floor(totalMinutes / 60)
+    const minute = Math.floor(totalMinutes / 30) * 30 % 60 // snap to 30min
+    const clampedHour = Math.max(0, Math.min(23, hour))
+    const timeStr = `${String(clampedHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+    const label = formatTimeDisplay(timeStr)
+    onSlotClick(timeStr, label)
   }
 
   return (
@@ -124,11 +149,41 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
             ))}
           </div>
 
-          <div className="cal-day-col">
+          <div className="cal-day-col" onClick={handleSlotClick}>
             {/* Hour slots */}
             {HOURS.map(hour => (
               <div key={hour} className="cal-hour-slot" />
             ))}
+
+            {/* Saved thought blocks */}
+            {thoughtSlots.map(slot => {
+              const [h, m] = slot.time.split(':').map(Number)
+              const topOffset = ((h * 60 + m) / 60) * 56
+              const isActive = quickSlot?.time === slot.time
+              return (
+                <div
+                  key={slot.time}
+                  className={`cal-thought-block ${isActive ? 'active' : ''}`}
+                  style={{ top: `${topOffset}px` }}
+                  onClick={(e) => { e.stopPropagation(); onSlotClick(slot.time, slot.label) }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg>
+                  <span className="cal-thought-preview">{slot.items[slot.items.length - 1].text}</span>
+                  {slot.items.length > 1 && <span className="cal-thought-count">+{slot.items.length - 1}</span>}
+                </div>
+              )
+            })}
+
+            {/* Quick thought slot indicator (empty, no thoughts yet) */}
+            {quickSlot && !thoughtSlots.some(s => s.time === quickSlot.time) && (() => {
+              const [h, m] = quickSlot.time.split(':').map(Number)
+              const topOffset = ((h * 60 + m) / 60) * 56
+              return (
+                <div className="cal-quick-slot" style={{ top: `${topOffset}px` }}>
+                  <div className="cal-quick-slot-label">{quickSlot.label}</div>
+                </div>
+              )
+            })()}
 
             {/* Event blocks */}
             {tasks.map((task) => {
