@@ -369,6 +369,33 @@ export const taskCategories = {
   perf: { color: '#06b6d4', bg: '#ecfeff', icon: '⚙️', label: 'Performance' },
 }
 
+export const initialQuickNotes = [
+  {
+    id: 'qn-1',
+    type: 'quicknote',
+    date: '2026-04-09',
+    time: '08:00',
+    content: 'Need to think about how the agent panel should handle context from both calendar and notes. Maybe a unified context API that merges both data sources?',
+    createdAt: 1744171200000,
+  },
+  {
+    id: 'qn-2',
+    type: 'quicknote',
+    date: '2026-04-09',
+    time: '13:00',
+    content: 'Lunch break idea: what if quick notes could be voice-recorded and auto-transcribed? Would make capturing thoughts much faster.',
+    createdAt: 1744189200000,
+  },
+  {
+    id: 'qn-3',
+    type: 'quicknote',
+    date: '2026-04-09',
+    time: '15:30',
+    content: 'The bidirectional linking idea from the brainstorm is really promising. Should prototype this weekend.',
+    createdAt: 1744198200000,
+  },
+]
+
 export const notes = [
   {
     id: 1,

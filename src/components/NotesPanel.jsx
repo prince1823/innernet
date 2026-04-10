@@ -9,7 +9,7 @@ function formatTimeDisplay(timeStr) {
   return m === 0 ? `${hour12} ${period}` : `${hour12}:${String(m).padStart(2, '0')} ${period}`
 }
 
-export default function NotesPanel({ selectedDate, phase, selectedEvent, setSelectedEvent }) {
+export default function NotesPanel({ selectedDate, phase, selectedEvent, setSelectedEvent, activeQuickNote, setActiveQuickNote, quickNotes = [], setQuickNotes }) {
   const [expandedNote, setExpandedNote] = useState(null)
   const [expandedTopic, setExpandedTopic] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -36,6 +36,72 @@ export default function NotesPanel({ selectedDate, phase, selectedEvent, setSele
   const allActionTasks = selectedEvent?.actionItems?.flatMap(g => g.tasks) || []
   const doneCount = allActionTasks.filter(t => t.done).length
   const totalTodos = allActionTasks.length
+
+  const handleQuickNoteChange = (newContent) => {
+    if (!activeQuickNote) return
+    const updated = { ...activeQuickNote, content: newContent }
+    setActiveQuickNote(updated)
+    setQuickNotes(prev => prev.map(qn => qn.id === updated.id ? updated : qn))
+  }
+
+  const handleDeleteQuickNote = () => {
+    if (!activeQuickNote) return
+    setQuickNotes(prev => prev.filter(qn => qn.id !== activeQuickNote.id))
+    setActiveQuickNote(null)
+  }
+
+  // QUICK NOTE EDITOR VIEW
+  if (activeQuickNote) {
+    return (
+      <div className="notes-panel">
+        <div className="notes-header">
+          <div className="notes-header-top">
+            <h2 className="notes-title">Quick Note</h2>
+            <button className="notes-back-btn" onClick={() => setActiveQuickNote(null)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div className="qn-header">
+          <div className="qn-time-badge">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>{formatTimeDisplay(activeQuickNote.time)}</span>
+            <span className="qn-separator">·</span>
+            <span>{new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+          </div>
+        </div>
+
+        <div className="qn-editor-area">
+          <textarea
+            className="qn-textarea"
+            placeholder="What's on your mind?"
+            value={activeQuickNote.content}
+            onChange={(e) => handleQuickNoteChange(e.target.value)}
+            autoFocus
+          />
+        </div>
+
+        <div className="notes-footer">
+          <button className="qn-delete-btn" onClick={handleDeleteQuickNote}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Delete
+          </button>
+          <button className="qn-done-btn" onClick={() => {
+            // Auto-delete empty notes on close
+            if (!activeQuickNote.content.trim()) {
+              handleDeleteQuickNote()
+            } else {
+              setActiveQuickNote(null)
+            }
+          }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Done
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   // EVENT VIEW
   if (selectedEvent) {
@@ -81,6 +147,10 @@ export default function NotesPanel({ selectedDate, phase, selectedEvent, setSele
           <button className={`en-subtab ${eventSubTab === 'todos' ? 'active' : ''}`} onClick={() => setEventSubTab('todos')}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
             Tasks
+          </button>
+          <button className={`en-subtab thoughts ${eventSubTab === 'thoughts' ? 'active' : ''}`} onClick={() => setEventSubTab('thoughts')}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg>
+            My Thoughts
           </button>
         </div>
 
@@ -166,6 +236,40 @@ export default function NotesPanel({ selectedDate, phase, selectedEvent, setSele
               )}
             </div>
           )}
+
+          {/* My Thoughts tab */}
+          {eventSubTab === 'thoughts' && (() => {
+            const eventThought = quickNotes.find(qn => qn.date === selectedDate && qn.time === selectedEvent.time)
+            return (
+              <div className="en-tab-content en-thoughts-tab">
+                <div className="en-thoughts-label">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg>
+                  Your thoughts during this meeting
+                </div>
+                <textarea
+                  className="en-thoughts-textarea"
+                  placeholder="Write what you're thinking..."
+                  value={eventThought?.content || ''}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    if (eventThought) {
+                      setQuickNotes(prev => prev.map(qn => qn.id === eventThought.id ? { ...qn, content: val } : qn))
+                    } else {
+                      const newNote = {
+                        id: `qn-${Date.now()}`,
+                        type: 'quicknote',
+                        date: selectedDate,
+                        time: selectedEvent.time,
+                        content: val,
+                        createdAt: Date.now(),
+                      }
+                      setQuickNotes(prev => [...prev, newNote])
+                    }
+                  }}
+                />
+              </div>
+            )
+          })()}
 
           {/* Action Items tab */}
           {eventSubTab === 'todos' && (

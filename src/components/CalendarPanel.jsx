@@ -33,7 +33,7 @@ function formatHourLabel(hour) {
   return `${hour - 12} PM`
 }
 
-export default function CalendarPanel({ selectedDate, setSelectedDate, selectedEvent, setSelectedEvent }) {
+export default function CalendarPanel({ selectedDate, setSelectedDate, selectedEvent, setSelectedEvent, quickNotes = [], activeQuickNote, onSlotClick }) {
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 9))
   const gridRef = useRef(null)
 
@@ -127,7 +127,16 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
           <div className="cal-day-col">
             {/* Hour slots */}
             {HOURS.map(hour => (
-              <div key={hour} className="cal-hour-slot" />
+              <div
+                key={hour}
+                className="cal-hour-slot"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect()
+                  const clickY = e.clientY - rect.top
+                  const minutes = clickY < 28 ? '00' : '30'
+                  onSlotClick && onSlotClick(dateStr, `${String(hour).padStart(2, '0')}:${minutes}`)
+                }}
+              />
             ))}
 
             {/* Event blocks */}
@@ -198,6 +207,32 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                 </div>
               )
             })}
+
+            {/* Quick note blocks */}
+            {quickNotes
+              .filter(qn => qn.date === dateStr)
+              .map(qn => {
+                const startMin = timeToMinutes(qn.time)
+                const topOffset = (startMin / 60) * 56
+                const isActive = activeQuickNote?.id === qn.id
+                return (
+                  <div
+                    key={qn.id}
+                    className={`cal-quicknote-block ${isActive ? 'active' : ''}`}
+                    style={{ top: `${topOffset}px` }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onSlotClick && onSlotClick(qn.date, qn.time)
+                    }}
+                  >
+                    <svg className="cal-quicknote-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg>
+                    <span className="cal-quicknote-preview">
+                      {qn.content ? qn.content.substring(0, 35) + (qn.content.length > 35 ? '...' : '') : 'Empty note'}
+                    </span>
+                  </div>
+                )
+              })
+            }
 
             {/* Current time line */}
             {isToday && (

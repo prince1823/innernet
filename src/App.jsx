@@ -2,12 +2,39 @@ import { useState } from 'react'
 import CalendarPanel from './components/CalendarPanel'
 import NotesPanel from './components/NotesPanel'
 import AgentPanel from './components/AgentPanel'
+import { initialQuickNotes } from './data/sampleData'
 import './App.css'
 
 function App() {
   const [phase, setPhase] = useState('calendar-notes')
   const [selectedDate, setSelectedDate] = useState('2026-04-09')
   const [selectedEvent, setSelectedEvent] = useState(null)
+  const [quickNotes, setQuickNotes] = useState(initialQuickNotes)
+  const [activeQuickNote, setActiveQuickNote] = useState(null)
+
+  const handleSlotClick = (dateStr, timeStr) => {
+    const existing = quickNotes.find(qn => qn.date === dateStr && qn.time === timeStr)
+    if (existing) {
+      setActiveQuickNote(existing)
+    } else {
+      const newNote = {
+        id: `qn-${Date.now()}`,
+        type: 'quicknote',
+        date: dateStr,
+        time: timeStr,
+        content: '',
+        createdAt: Date.now(),
+      }
+      setQuickNotes(prev => [...prev, newNote])
+      setActiveQuickNote(newNote)
+    }
+    setSelectedEvent(null)
+  }
+
+  const handleSelectEvent = (event) => {
+    setSelectedEvent(event)
+    setActiveQuickNote(null)
+  }
 
   return (
     <div className="app">
@@ -42,10 +69,10 @@ function App() {
         <div className="panels-viewport">
           <div className={`panels-track phase-${phase}`}>
             <div className={`panel panel-calendar ${phase === 'calendar-notes' ? 'active' : ''}`}>
-              <CalendarPanel selectedDate={selectedDate} setSelectedDate={setSelectedDate} selectedEvent={selectedEvent} setSelectedEvent={setSelectedEvent} />
+              <CalendarPanel selectedDate={selectedDate} setSelectedDate={setSelectedDate} selectedEvent={selectedEvent} setSelectedEvent={handleSelectEvent} quickNotes={quickNotes} activeQuickNote={activeQuickNote} onSlotClick={handleSlotClick} />
             </div>
             <div className="panel panel-notes active">
-              <NotesPanel selectedDate={selectedDate} phase={phase} selectedEvent={selectedEvent} setSelectedEvent={setSelectedEvent} />
+              <NotesPanel selectedDate={selectedDate} phase={phase} selectedEvent={selectedEvent} setSelectedEvent={setSelectedEvent} activeQuickNote={activeQuickNote} setActiveQuickNote={setActiveQuickNote} quickNotes={quickNotes} setQuickNotes={setQuickNotes} />
             </div>
             <div className={`panel panel-agent ${phase === 'notes-agent' ? 'active' : ''}`}>
               <AgentPanel />
