@@ -1,41 +1,15 @@
 import { useState, useCallback } from 'react'
 import CalendarPanel from './components/CalendarPanel'
 import NotesPanel from './components/NotesPanel'
-import { initialQuickNotes } from './data/sampleData'
 import './App.css'
 
 function App() {
   const [selectedDate, setSelectedDate] = useState('2026-04-09')
   const [selectedEvent, setSelectedEvent] = useState(null)
-  const [quickNotes, setQuickNotes] = useState(initialQuickNotes)
-  const [activeQuickNote, setActiveQuickNote] = useState(null)
   const [bottomCollapsed, setBottomCollapsed] = useState(false)
   const [bottomHeight, setBottomHeight] = useState(180)
+  const [sidebarWidth, setSidebarWidth] = useState(380)
   const [thoughtsText, setThoughtsText] = useState('')
-
-  const handleSlotClick = (dateStr, timeStr) => {
-    const existing = quickNotes.find(qn => qn.date === dateStr && qn.time === timeStr)
-    if (existing) {
-      setActiveQuickNote(existing)
-    } else {
-      const newNote = {
-        id: `qn-${Date.now()}`,
-        type: 'quicknote',
-        date: dateStr,
-        time: timeStr,
-        content: '',
-        createdAt: Date.now(),
-      }
-      setQuickNotes(prev => [...prev, newNote])
-      setActiveQuickNote(newNote)
-    }
-    setSelectedEvent(null)
-  }
-
-  const handleSelectEvent = (event) => {
-    setSelectedEvent(event)
-    setActiveQuickNote(null)
-  }
 
   const handleResizeStart = useCallback((e) => {
     e.preventDefault()
@@ -51,24 +25,55 @@ function App() {
     const onMouseUp = () => {
       document.removeEventListener('mousemove', onMouseMove)
       document.removeEventListener('mouseup', onMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
     }
 
+    document.body.style.cursor = 'ns-resize'
+    document.body.style.userSelect = 'none'
     document.addEventListener('mousemove', onMouseMove)
     document.addEventListener('mouseup', onMouseUp)
   }, [bottomHeight])
 
+  const handleSidebarResizeStart = useCallback((e) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startWidth = sidebarWidth
+
+    const onMouseMove = (moveEvent) => {
+      const delta = moveEvent.clientX - startX
+      const newWidth = Math.min(Math.max(startWidth + delta, 260), 600)
+      setSidebarWidth(newWidth)
+    }
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+
+    document.body.style.cursor = 'ew-resize'
+    document.body.style.userSelect = 'none'
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+  }, [sidebarWidth])
+
   return (
     <div className="app">
       {/* Left: Calendar sidebar */}
-      <aside className="app-sidebar-calendar">
-        <CalendarPanel selectedDate={selectedDate} setSelectedDate={setSelectedDate} selectedEvent={selectedEvent} setSelectedEvent={handleSelectEvent} quickNotes={quickNotes} activeQuickNote={activeQuickNote} onSlotClick={handleSlotClick} />
+      <aside className="app-sidebar-calendar" style={{ width: `${sidebarWidth}px` }}>
+        <CalendarPanel selectedDate={selectedDate} setSelectedDate={setSelectedDate} selectedEvent={selectedEvent} setSelectedEvent={setSelectedEvent} />
       </aside>
+
+      {/* Sidebar resize handle */}
+      <div className="sidebar-resize-handle" onMouseDown={handleSidebarResizeStart} />
 
       {/* Right: Notes + Agent stacked */}
       <div className="app-main">
         {/* Top: Notes */}
         <div className="app-notes" style={{ flex: bottomCollapsed ? 1 : undefined, height: bottomCollapsed ? '100%' : undefined }}>
-          <NotesPanel selectedDate={selectedDate} phase="calendar-notes" selectedEvent={selectedEvent} setSelectedEvent={setSelectedEvent} activeQuickNote={activeQuickNote} setActiveQuickNote={setActiveQuickNote} quickNotes={quickNotes} setQuickNotes={setQuickNotes} />
+          <NotesPanel selectedDate={selectedDate} phase="calendar-notes" selectedEvent={selectedEvent} setSelectedEvent={setSelectedEvent} />
         </div>
 
         {/* Resize handle + Bottom: Agent */}
