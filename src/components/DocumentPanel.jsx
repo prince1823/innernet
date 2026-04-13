@@ -1,139 +1,160 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { featureDocItems } from '../data/sampleData'
+import { askAI } from '../utils/askAI'
 import './DocumentPanel.css'
 
-const initialFeatures = featureDocItems.map(f => ({ ...f }))
-
-// SVG icons as inline HTML strings for embedding in contentEditable
-const playIcon = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>`
-const starIcon = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`
+function renderMd(text) {
+  if (!text) return ''
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+}
 
 export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
-  const [features, setFeatures] = useState(initialFeatures)
-  const editorRef = useRef(null)
+  const [aiResponses, setAiResponses] = useState({}) // key: "featId-bulletIdx" or "featId-title"
+  const [loadingKeys, setLoadingKeys] = useState(new Set())
 
-  // Protect inline action buttons from being deleted by backspace/delete
-  useEffect(() => {
-    const editor = editorRef.current
-    if (!editor) return
+  const handleAskInline = async (featId, bulletIdx, lineText, featTitle, featContext) => {
+    const key = bulletIdx !== null ? `${featId}-${bulletIdx}` : `${featId}-title`
 
-    const keyHandler = (e) => {
-      if (e.key !== 'Backspace' && e.key !== 'Delete') return
-
-      const sel = window.getSelection()
-      if (!sel.rangeCount) return
-
-      const range = sel.getRangeAt(0)
-
-      // If selection covers inline actions, prevent deletion
-      if (!range.collapsed) {
-        const fragment = range.cloneContents()
-        if (fragment.querySelector('.doc-inline-actions, .doc-inline-btn')) {
-          e.preventDefault()
-          return
-        }
-      }
-
-      // Check if cursor is right next to an inline-actions span
-      const node = sel.anchorNode
-      if (!node) return
-
-      if (e.key === 'Backspace') {
-        // Check if the previous sibling or adjacent node is an inline-actions span
-        const prev = node.nodeType === 3
-          ? (sel.anchorOffset === 0 ? node.previousSibling : null)
-          : node.childNodes[sel.anchorOffset - 1]
-        if (prev && (prev.classList?.contains('doc-inline-actions') || prev.closest?.('.doc-inline-actions'))) {
-          e.preventDefault()
-          return
-        }
-      }
-
-      if (e.key === 'Delete') {
-        // Check if the next sibling or adjacent node is an inline-actions span
-        const next = node.nodeType === 3
-          ? (sel.anchorOffset === node.length ? node.nextSibling : null)
-          : node.childNodes[sel.anchorOffset]
-        if (next && (next.classList?.contains('doc-inline-actions') || next.closest?.('.doc-inline-actions'))) {
-          e.preventDefault()
-          return
-        }
-      }
+    // Also notify parent for activity log
+    if (onAskAI) {
+      onAskAI(featId, featTitle, featContext)
     }
 
-    const clickHandler = (e) => {
-      const btn = e.target.closest('.doc-inline-btn')
-      if (!btn) return
-      e.preventDefault()
-      e.stopPropagation()
+    setLoadingKeys(prev => new Set([...prev, key]))
 
-      const featId = btn.dataset.featId
-      const action = btn.dataset.action
-      const feat = features.find(f => f.id === featId)
-      if (!feat) return
+    const prompt = bulletIdx !== null
+      ? `For the feature "${featTitle}", suggest improvements or implementation details for this specific point: "${lineText}"`
+      : `For the feature "${featTitle}", give a concise implementation plan or suggestions.`
 
-      if (action === 'implement' || action === 'ask-ai') {
-        const bulletTexts = feat.bullets?.map(b => typeof b === 'string' ? b : b.text).join('\n')
-        onAskAI(featId, feat.title, bulletTexts)
-      }
-    }
+    const response = await askAI(prompt, featContext)
 
-    editor.addEventListener('keydown', keyHandler)
-    editor.addEventListener('click', clickHandler)
-    return () => {
-      editor.removeEventListener('keydown', keyHandler)
-      editor.removeEventListener('click', clickHandler)
-    }
-  }, [features, onAskAI])
-
-  // Build initial HTML with inline action icons on each line
-  const buildInitialHTML = useCallback(() => {
-    let html = ''
-    features.forEach((feat, fi) => {
-      // Title line — gets both Implement and Ask AI icons
-      html += `<h2 class="doc-title" data-feat-id="${feat.id}" data-feat-idx="${fi}">`
-      html += feat.title
-      html += `<span class="doc-inline-actions" contenteditable="false">`
-      html += `<span class="doc-inline-btn doc-inline-implement" data-feat-id="${feat.id}" data-action="implement" title="Implement">${playIcon}</span>`
-      html += `<span class="doc-inline-btn doc-inline-ai" data-feat-id="${feat.id}" data-action="ask-ai" title="Ask AI">${starIcon}</span>`
-      html += `</span></h2>`
-
-      // Description — gets Ask AI icon
-      if (feat.description) {
-        html += `<p class="doc-desc" data-feat-id="${feat.id}">`
-        html += feat.description
-        html += `<span class="doc-inline-actions" contenteditable="false">`
-        html += `<span class="doc-inline-btn doc-inline-ai" data-feat-id="${feat.id}" data-action="ask-ai" title="Ask AI">${starIcon}</span>`
-        html += `</span></p>`
-      }
-
-      // Bullets — each gets Ask AI icon
-      feat.bullets.forEach((b, bi) => {
-        const bulletText = typeof b === 'string' ? b : b.text
-        html += `<p class="doc-bullet" data-feat-id="${feat.id}" data-bullet-idx="${bi}">`
-        html += `<span class="doc-bullet-marker" contenteditable="false">&#8226;</span> ${bulletText}`
-        html += `<span class="doc-inline-actions" contenteditable="false">`
-        html += `<span class="doc-inline-btn doc-inline-ai" data-feat-id="${feat.id}" data-action="ask-ai" title="Ask AI">${starIcon}</span>`
-        html += `</span></p>`
-      })
+    setAiResponses(prev => ({ ...prev, [key]: response }))
+    setLoadingKeys(prev => {
+      const next = new Set(prev)
+      next.delete(key)
+      return next
     })
-    return html
-  }, [])
+  }
 
-  const [initialHTML] = useState(buildInitialHTML)
+  const dismissResponse = (key) => {
+    setAiResponses(prev => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  }
 
   return (
     <div className="doc-panel">
-
-      {/* ── Single contentEditable document ── */}
       <div className="doc-body">
-        <div
-          ref={editorRef}
-          className="doc-editor"
-          contentEditable
-          suppressContentEditableWarning
-          dangerouslySetInnerHTML={{ __html: initialHTML }}
-        />
+        {featureDocItems.map((feat) => {
+          const titleKey = `${feat.id}-title`
+          const titleLoading = loadingKeys.has(titleKey)
+          const titleResponse = aiResponses[titleKey]
+          const featContext = feat.bullets.map(b => typeof b === 'string' ? b : b.text).join('\n')
+
+          return (
+            <div key={feat.id} className="doc-feature">
+              {/* Feature title */}
+              <div className="doc-feat-title">
+                <span className="doc-feat-title-text" contentEditable suppressContentEditableWarning>
+                  {feat.title}
+                </span>
+                <div className="doc-feat-actions">
+                  <button
+                    className="doc-implement-btn"
+                    onClick={() => {
+                      if (onAskAI) onAskAI(feat.id, feat.title, featContext)
+                    }}
+                    title="Implement"
+                  >
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  </button>
+                  <button
+                    className="doc-ask-ai-btn"
+                    onClick={() => handleAskInline(feat.id, null, feat.title, feat.title, featContext)}
+                    disabled={titleLoading}
+                  >
+                    {titleLoading ? (
+                      <span className="doc-ai-spinner" />
+                    ) : (
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    )}
+                    Ask AI
+                  </button>
+                </div>
+              </div>
+
+              {/* AI response for title */}
+              {titleResponse && (
+                <div className="doc-ai-inline">
+                  <div className="doc-ai-inline-header">
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    <span>AI</span>
+                    <button className="doc-ai-dismiss" onClick={() => dismissResponse(titleKey)}>✕</button>
+                  </div>
+                  <div className="doc-ai-inline-text" dangerouslySetInnerHTML={{ __html: renderMd(titleResponse) }} />
+                </div>
+              )}
+
+              {/* Description */}
+              {feat.description && (
+                <p className="doc-feat-desc" contentEditable suppressContentEditableWarning>
+                  {feat.description}
+                </p>
+              )}
+
+              {/* Bullets */}
+              <div className="doc-bullets">
+                {feat.bullets.map((bullet, bi) => {
+                  const bulletText = typeof bullet === 'string' ? bullet : bullet.text
+                  const bulletKey = `${feat.id}-${bi}`
+                  const isLoading = loadingKeys.has(bulletKey)
+                  const response = aiResponses[bulletKey]
+
+                  return (
+                    <div key={bi} className="doc-bullet-block">
+                      <div className="doc-bullet-row">
+                        <span className="doc-bullet-marker">•</span>
+                        <span className="doc-bullet-text" contentEditable suppressContentEditableWarning>
+                          {bulletText}
+                        </span>
+                        <button
+                          className="doc-bullet-ai-btn"
+                          onClick={() => handleAskInline(feat.id, bi, bulletText, feat.title, featContext)}
+                          disabled={isLoading}
+                          title="Ask AI about this"
+                        >
+                          {isLoading ? (
+                            <span className="doc-ai-spinner" />
+                          ) : (
+                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                          )}
+                        </button>
+                      </div>
+
+                      {/* AI response inline below this bullet */}
+                      {response && (
+                        <div className="doc-ai-inline">
+                          <div className="doc-ai-inline-header">
+                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                            <span>AI</span>
+                            <button className="doc-ai-dismiss" onClick={() => dismissResponse(bulletKey)}>✕</button>
+                          </div>
+                          <div className="doc-ai-inline-text" dangerouslySetInnerHTML={{ __html: renderMd(response) }} />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

@@ -5,120 +5,242 @@
   background: #fff;
 }
 
-
-/* ══════════════════════════════════════════════
-   Document Body — single contentEditable editor
-   ══════════════════════════════════════════════ */
 .doc-body {
   flex: 1;
   overflow-y: auto;
-  background: #fff;
+  padding: 16px 18px;
 }
 
-.doc-editor {
-  min-height: 100%;
-  padding: 28px 24px;
-  outline: none;
-  font-family: Arial, sans-serif;
-  color: var(--text-primary);
-  line-height: 1.6;
-  cursor: text;
+/* ── Feature Block ── */
+.doc-feature {
+  margin-bottom: 18px;
 }
 
-/* Styles for elements inside the editor */
-.doc-editor h2.doc-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 20px 0 4px 0;
-  padding: 4px 2px;
-  line-height: 1.4;
+.doc-feat-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  padding-bottom: 6px;
   border-bottom: 1px solid #f1f3f4;
-  padding-bottom: 8px;
 }
 
-.doc-editor h2.doc-title:first-child {
-  margin-top: 0;
+.doc-feat-title-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary, #1a1a2e);
+  outline: none;
+  flex: 1;
+  line-height: 1.4;
 }
 
-.doc-editor p.doc-desc {
-  font-size: 13px;
-  color: #5f6368;
-  margin: 2px 0;
-  padding: 2px 2px;
-  line-height: 1.7;
-}
-
-.doc-editor p.doc-bullet {
-  font-size: 13px;
-  color: var(--text-primary);
-  margin: 1px 0;
-  padding: 2px 2px 2px 8px;
-  line-height: 1.7;
-}
-
-.doc-editor .doc-bullet-marker {
-  color: #5f6368;
-  margin-right: 6px;
-  user-select: none;
-}
-
-/* Focus/selection highlight in editor */
-.doc-editor ::selection {
-  background: #a8c7fa;
-}
-
-
-/* ── Inline Action Icons (always visible) ── */
-.doc-inline-actions {
-  display: inline-flex;
+.doc-feat-actions {
+  display: flex;
   align-items: center;
   gap: 4px;
-  margin-left: 8px;
-  vertical-align: middle;
-  user-select: none;
+  flex-shrink: 0;
 }
 
-.doc-inline-btn {
+.doc-implement-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 22px;
   height: 22px;
-  border-radius: 4px;
+  border: none;
+  border-radius: 5px;
+  background: var(--purple-50, #f3f0ff);
+  color: var(--purple-500, #8b5cf6);
   cursor: pointer;
   transition: all 0.15s;
-  opacity: 0.4;
 }
 
-.doc-inline-btn:hover {
-  opacity: 1;
-}
-
-.doc-inline-implement {
-  color: var(--purple-500);
-  background: var(--purple-50);
-}
-
-.doc-inline-implement:hover {
-  background: linear-gradient(135deg, var(--purple-500), var(--purple-600));
-  color: white;
+.doc-implement-btn:hover {
+  background: linear-gradient(135deg, var(--purple-500, #8b5cf6), var(--purple-600, #7c3aed));
+  color: #fff;
   box-shadow: 0 1px 4px rgba(139, 92, 246, 0.3);
 }
 
-.doc-inline-ai {
-  color: var(--purple-400);
+.doc-ask-ai-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 10px;
+  background: var(--purple-50, #f3f0ff);
+  color: var(--purple-500, #8b5cf6);
+  font-size: 9px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.doc-ask-ai-btn:hover {
+  background: linear-gradient(135deg, var(--purple-500, #8b5cf6), var(--purple-600, #7c3aed));
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(139, 92, 246, 0.3);
+}
+
+.doc-ask-ai-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.doc-feat-desc {
+  font-size: 12px;
+  color: #5f6368;
+  margin: 0 0 6px 0;
+  padding: 2px 0;
+  line-height: 1.6;
+  outline: none;
+}
+
+/* ── Bullets ── */
+.doc-bullets {
+  padding-left: 2px;
+}
+
+.doc-bullet-block {
+  margin-bottom: 2px;
+}
+
+.doc-bullet-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.doc-bullet-marker {
+  color: #5f6368;
+  font-size: 12px;
+  line-height: 1.7;
+  user-select: none;
+  flex-shrink: 0;
+  width: 12px;
+  text-align: center;
+}
+
+.doc-bullet-text {
+  font-size: 12px;
+  color: var(--text-primary, #1a1a2e);
+  line-height: 1.7;
+  outline: none;
+  flex: 1;
+}
+
+.doc-bullet-ai-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 4px;
   background: transparent;
+  color: var(--purple-400, #a78bfa);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  margin-top: 1px;
 }
 
-.doc-inline-ai:hover {
-  color: var(--purple-600);
-  background: var(--purple-50);
-  box-shadow: 0 1px 4px rgba(139, 92, 246, 0.15);
+.doc-bullet-ai-btn:hover {
+  color: var(--purple-600, #7c3aed);
+  background: var(--purple-50, #f3f0ff);
 }
 
-.doc-inline-btn svg {
-  pointer-events: none;
+.doc-bullet-ai-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ── AI Inline Response ── */
+.doc-ai-inline {
+  margin: 4px 0 8px 14px;
+  padding: 8px 10px;
+  background: linear-gradient(135deg, #faf8ff 0%, #f3f0ff 100%);
+  border-left: 2px solid var(--purple-400, #a78bfa);
+  border-radius: 0 8px 8px 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-primary, #1a1a2e);
+  animation: docAiFadeIn 0.25s ease;
+}
+
+@keyframes docAiFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.doc-ai-inline-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+  color: var(--purple-500, #8b5cf6);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.doc-ai-inline-header svg {
+  flex-shrink: 0;
+}
+
+.doc-ai-dismiss {
+  margin-left: auto;
+  border: none;
+  background: none;
+  color: #999;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.doc-ai-dismiss:hover {
+  color: var(--text-primary, #1a1a2e);
+}
+
+.doc-ai-inline-text {
+  color: #333;
+}
+
+.doc-ai-inline-text strong {
+  color: var(--purple-600, #7c3aed);
+  font-weight: 600;
+}
+
+.doc-ai-inline-text code {
+  background: rgba(139, 92, 246, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.doc-ai-inline-text em {
+  font-style: italic;
+  color: #555;
+}
+
+/* ── Spinner ── */
+.doc-ai-spinner {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--purple-200, #ddd6fe);
+  border-top-color: var(--purple-500, #8b5cf6);
+  border-radius: 50%;
+  animation: docSpin 0.6s linear infinite;
+}
+
+@keyframes docSpin {
+  to { transform: rotate(360deg); }
 }
 
 /* ── Scrollbar ── */
