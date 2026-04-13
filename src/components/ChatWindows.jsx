@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { agentSessions } from '../data/sampleData'
+import { agentSessions, featureDocItems } from '../data/sampleData'
 import './ChatWindows.css'
 
 export default function ChatWindows({ featureWindows = [], onClose }) {
-  const [activeTab, setActiveTab] = useState(featureWindows[0]?.id || agentSessions[0]?.id)
+  const [activeTab, setActiveTab] = useState(featureWindows[0]?.id || featureDocItems[0]?.id)
   const [inputValues, setInputValues] = useState({})
 
-  // Combine feature-spawned windows with existing sessions
+  // Combine feature-spawned windows with default feature doc tabs
   const allWindows = [
     ...featureWindows.map(fw => ({
       id: fw.id,
@@ -18,7 +18,14 @@ export default function ChatWindows({ featureWindows = [], onClose }) {
         { role: 'assistant', content: `I'll start working on "${fw.title}". Let me analyze the requirements and create an implementation plan.\n\n**Analyzing:**\n- Feature scope and requirements\n- Dependencies and integration points\n- Implementation approach\n\nI'll begin with the core implementation...` },
       ]
     })),
-    ...agentSessions.map(s => ({ ...s, isFeature: false })),
+    ...featureDocItems
+      .filter(f => !featureWindows.some(fw => fw.id === f.id))
+      .map(f => ({
+        id: f.id,
+        title: f.title,
+        isFeature: false,
+        messages: agentSessions[0]?.messages || [],
+      })),
   ]
 
   const activeWindow = allWindows.find(w => w.id === activeTab) || allWindows[0]
@@ -56,18 +63,6 @@ export default function ChatWindows({ featureWindows = [], onClose }) {
       {/* Chat content */}
       {activeWindow && (
         <div className="cw-chat">
-          <div className="cw-chat-header">
-            <div className="cw-chat-header-left">
-              <span className="cw-chat-title">{activeWindow.title}</span>
-              {activeWindow.isFeature && <span className="cw-chat-badge">Feature Agent</span>}
-              {activeWindow.date && <span className="cw-chat-date">{activeWindow.date}</span>}
-            </div>
-            <div className="cw-chat-header-right">
-              <button className="cw-chat-action" title="Context">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              </button>
-            </div>
-          </div>
 
           <div className="cw-messages">
             {activeWindow.messages?.map((msg, i) => (

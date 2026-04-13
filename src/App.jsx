@@ -218,31 +218,6 @@ function App() {
           </div>
         )}
 
-        {/* Thoughts input bar (always at bottom) */}
-        <div className="thoughts-bar">
-          <div className="thoughts-bar-context">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg>
-            <span className="thoughts-bar-label">
-              {selectedEvent ? selectedEvent.title : quickSlot ? quickSlot.label : new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-            </span>
-          </div>
-          <div className="thoughts-bar-input-wrap">
-            <input
-              ref={inputRef}
-              className="thoughts-bar-input"
-              type="text"
-              placeholder="capture a thought..."
-              value={thoughtsText}
-              onChange={(e) => setThoughtsText(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') addThought() }}
-            />
-          </div>
-          {!bottomCollapsed && (
-            <button className="thoughts-bar-collapse" onClick={() => setBottomCollapsed(true)} title="Collapse bottom panels">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 15 12 9 18 15"/></svg>
-            </button>
-          )}
-        </div>
       </div>
     </div>
   )

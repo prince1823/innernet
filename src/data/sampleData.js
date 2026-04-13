@@ -34,28 +34,28 @@ export const calendarTasks = {
     },
   ],
   '2026-04-07': [
-    { id: 'MF-08', title: 'Architecture Discussion', time: '9:00', endTime: '10:00', colorIndex: 0, tags: ['architecture'], attendees: ['Jason', 'Sarah'], project: 'mindflow',
-      aiSummary: 'Discussed overall Mindflow architecture — three-panel layout, state management approach, and data flow patterns.',
+    { id: 'MF-08', title: 'Architecture Discussion', time: '9:00', endTime: '10:00', colorIndex: 0, tags: ['architecture'], attendees: ['Jason', 'Sarah'], project: 'innernet',
+      aiSummary: 'Discussed overall Innernet architecture — three-panel layout, state management approach, and data flow patterns.',
     },
-    { id: 'MF-08b', title: 'Team Standup', time: '11:00', endTime: '11:30', colorIndex: 2, tags: ['standup'], attendees: ['Jason', 'Sarah', 'Mike', 'Tanuj'], project: 'mindflow' },
+    { id: 'MF-08b', title: 'Team Standup', time: '11:00', endTime: '11:30', colorIndex: 2, tags: ['standup'], attendees: ['Jason', 'Sarah', 'Mike', 'Tanuj'], project: 'innernet' },
     { id: 'MF-08c', title: 'Colab91 Code Review', time: '14:00', endTime: '15:00', colorIndex: 3, tags: ['colab91', 'review'], attendees: ['Tanuj', 'Raj'], project: 'colab91',
       aiSummary: 'Reviewed initial Colab91 codebase — API layer and database schema. Found issues with query performance on taxonomy lookups.',
     },
-    { id: 'MF-08d', title: 'DevOps Sync', time: '16:00', endTime: '16:45', colorIndex: 5, tags: ['devops'], attendees: ['Mike'], project: 'mindflow' },
+    { id: 'MF-08d', title: 'DevOps Sync', time: '16:00', endTime: '16:45', colorIndex: 5, tags: ['devops'], attendees: ['Mike'], project: 'innernet' },
   ],
   '2026-04-08': [
-    { id: 'MF-09', title: 'Improve App Performance', time: '9:00', endTime: '10:30', colorIndex: 0, summary: 'Profiling and optimization session.', tags: ['perf', 'optimization'], project: 'mindflow' },
-    { id: 'MF-10', title: 'Design Jam — Notes UI', time: '13:00', endTime: '14:30', colorIndex: 1, summary: 'Collaborative session on the notes panel design.', tags: ['design', 'notes', 'UI'], attendees: ['Sarah', 'Tanuj'], project: 'mindflow' },
+    { id: 'MF-09', title: 'Improve App Performance', time: '9:00', endTime: '10:30', colorIndex: 0, summary: 'Profiling and optimization session.', tags: ['perf', 'optimization'], project: 'innernet' },
+    { id: 'MF-10', title: 'Design Jam — Notes UI', time: '13:00', endTime: '14:30', colorIndex: 1, summary: 'Collaborative session on the notes panel design.', tags: ['design', 'notes', 'UI'], attendees: ['Sarah', 'Tanuj'], project: 'innernet' },
     { id: 'MF-10b', title: 'Client Call', time: '15:00', endTime: '16:00', colorIndex: 3, summary: 'Demo\'d early prototype to client.', tags: ['client', 'demo'], attendees: ['Jason', 'Client Team'], project: 'colab91' },
   ],
   '2026-04-09': [
     {
       id: 'MF-12b', title: 'Morning Standup', time: '9:00', endTime: '9:30', colorIndex: 0,
-      tags: ['standup', 'team'], project: 'mindflow',
+      tags: ['standup', 'team'], project: 'innernet',
       attendees: ['Jason', 'Sarah', 'Mike'],
       aiSummary: 'The team shared progress updates on the three-panel layout implementation. All sprint items are on track. Two minor blockers were identified around state management, which the engineering lead will resolve by end of day.',
       notesTitle: 'Morning Standup Sync',
-      notesSummary: 'Quick team sync covering sprint progress, blockers, and daily priorities for the Mindflow app development.',
+      notesSummary: 'Quick team sync covering sprint progress, blockers, and daily priorities for the Innernet app development.',
       topicNotes: [
         { topic: 'Three-panel layout at 80% completion', timestamp: '9:03',
           bullets: [
@@ -97,7 +97,7 @@ export const calendarTasks = {
     },
     {
       id: 'MF-11', title: 'Build Three-Panel Layout', time: '10:00', endTime: '12:00', colorIndex: 4,
-      tags: ['dev', 'frontend', 'layout'], project: 'mindflow',
+      tags: ['dev', 'frontend', 'layout'], project: 'innernet',
       attendees: ['You'],
       aiSummary: 'Deep work session focused on implementing the core three-panel sliding layout using CSS transforms. Successfully built the phase-based panel switching mechanism where Calendar & Notes and Notes & Agent views toggle smoothly.',
       notesTitle: 'Three-Panel Layout Implementation',
@@ -137,7 +137,7 @@ export const calendarTasks = {
     },
     {
       id: 'MF-12', title: 'AI Integration Brainstorm', time: '14:30', endTime: '15:30', colorIndex: 2,
-      tags: ['AI', 'brainstorm', 'agent'], project: 'mindflow',
+      tags: ['AI', 'brainstorm', 'agent'], project: 'innernet',
       attendees: ['Priya', 'Raj'],
       aiSummary: 'Explored how the agent panel could leverage conversation context from notes and calendar events. Discussed real-time AI summaries, auto-linking, and contextual awareness across all three panels.',
       notesTitle: 'AI Integration Strategy',
@@ -175,7 +175,7 @@ export const calendarTasks = {
     },
     {
       id: 'MF-12c', title: 'Sprint Review', time: '16:00', endTime: '17:00', colorIndex: 5,
-      tags: ['sprint', 'review'], project: 'mindflow',
+      tags: ['sprint', 'review'], project: 'innernet',
       attendees: ['Jason', 'Sarah', 'Mike', 'Priya'],
       aiSummary: 'Reviewed sprint progress with the full team. Calendar MVP and notes scaffolding were delivered on time. The agent panel backend resource gap was flagged as a risk for next sprint.',
       notesTitle: 'Sprint Review — Week 2 Wrap',
@@ -188,7 +188,7 @@ export const calendarTasks = {
           bullets: ['Frontend is fully mocked with session sidebar and chat interface.', 'Backend API integration not yet started — needs dedicated resources.', 'Currently using mock data for agent sessions and messages.']
         },
         { topic: 'Sprint velocity trending upward at 34 story points', timestamp: '16:40',
-          bullets: ['34 story points completed, up 12% from previous sprint.', 'Team capacity at 90% next sprint due to planned PTO.', 'Velocity trend is positive — team is hitting stride on the Mindflow project.']
+          bullets: ['34 story points completed, up 12% from previous sprint.', 'Team capacity at 90% next sprint due to planned PTO.', 'Velocity trend is positive — team is hitting stride on the Innernet project.']
         },
       ],
       transcription: [
@@ -209,48 +209,48 @@ export const calendarTasks = {
     },
   ],
   '2026-04-10': [
-    { id: 'MF-13', title: 'Update API Integration', time: '9:00', endTime: '10:30', colorIndex: 3, project: 'mindflow', tags: ['api'] },
-    { id: 'MF-13b', title: 'Build Three-Panel Layout', time: '11:00', endTime: '12:30', colorIndex: 4, project: 'mindflow', tags: ['layout'] },
+    { id: 'MF-13', title: 'Update API Integration', time: '9:00', endTime: '10:30', colorIndex: 3, project: 'innernet', tags: ['api'] },
+    { id: 'MF-13b', title: 'Build Three-Panel Layout', time: '11:00', endTime: '12:30', colorIndex: 4, project: 'innernet', tags: ['layout'] },
     { id: 'MF-13c', title: 'Colab91 Product Sync', time: '14:00', endTime: '15:00', colorIndex: 2, project: 'colab91', tags: ['colab91', 'sync'], attendees: ['Tanuj', 'Raj'] },
   ],
   '2026-04-11': [
-    { id: 'MF-14', title: 'Testing & QA Session', time: '10:00', endTime: '11:30', colorIndex: 1, project: 'mindflow', tags: ['testing'] },
-    { id: 'MF-14b', title: 'Documentation Review', time: '13:00', endTime: '14:00', colorIndex: 6, project: 'mindflow', tags: ['docs'] },
-    { id: 'MF-14c', title: 'Deploy to Staging', time: '15:30', endTime: '16:30', colorIndex: 5, project: 'mindflow', tags: ['deploy'] },
+    { id: 'MF-14', title: 'Testing & QA Session', time: '10:00', endTime: '11:30', colorIndex: 1, project: 'innernet', tags: ['testing'] },
+    { id: 'MF-14b', title: 'Documentation Review', time: '13:00', endTime: '14:00', colorIndex: 6, project: 'innernet', tags: ['docs'] },
+    { id: 'MF-14c', title: 'Deploy to Staging', time: '15:30', endTime: '16:30', colorIndex: 5, project: 'innernet', tags: ['deploy'] },
   ],
   '2026-04-12': [
-    { id: 'MF-15', title: 'Weekend Planning', time: '10:00', endTime: '10:30', colorIndex: 7, project: 'mindflow', tags: ['planning'] },
+    { id: 'MF-15', title: 'Weekend Planning', time: '10:00', endTime: '10:30', colorIndex: 7, project: 'innernet', tags: ['planning'] },
   ],
   '2026-04-13': [
-    { id: 'MF-16', title: 'Adjust Responsive Layout', time: '11:00', endTime: '12:30', colorIndex: 4, project: 'mindflow', tags: ['layout', 'responsive'] },
-    { id: 'MF-16b', title: 'Team Retro', time: '14:00', endTime: '15:00', colorIndex: 0, project: 'mindflow', tags: ['retro'], attendees: ['Jason', 'Sarah', 'Mike', 'Tanuj'] },
+    { id: 'MF-16', title: 'Adjust Responsive Layout', time: '11:00', endTime: '12:30', colorIndex: 4, project: 'innernet', tags: ['layout', 'responsive'] },
+    { id: 'MF-16b', title: 'Team Retro', time: '14:00', endTime: '15:00', colorIndex: 0, project: 'innernet', tags: ['retro'], attendees: ['Jason', 'Sarah', 'Mike', 'Tanuj'] },
   ],
   '2026-04-14': [
-    { id: 'MF-17', title: 'Enhance Error Handling', time: '9:00', endTime: '10:30', colorIndex: 1, project: 'mindflow', tags: ['error-handling'] },
+    { id: 'MF-17', title: 'Enhance Error Handling', time: '9:00', endTime: '10:30', colorIndex: 1, project: 'innernet', tags: ['error-handling'] },
     { id: 'MF-18', title: 'Colab91 Review Code Quality', time: '15:00', endTime: '16:00', colorIndex: 3, project: 'colab91', tags: ['colab91', 'review'], attendees: ['Tanuj'] },
   ],
   '2026-04-15': [
-    { id: 'MF-19', title: 'Fix Navigation Issues', time: '10:00', endTime: '11:30', colorIndex: 1, project: 'mindflow', tags: ['bugfix'] },
-    { id: 'MF-19b', title: 'Design Review', time: '14:00', endTime: '15:00', colorIndex: 2, project: 'mindflow', tags: ['design'], attendees: ['Sarah'] },
+    { id: 'MF-19', title: 'Fix Navigation Issues', time: '10:00', endTime: '11:30', colorIndex: 1, project: 'innernet', tags: ['bugfix'] },
+    { id: 'MF-19b', title: 'Design Review', time: '14:00', endTime: '15:00', colorIndex: 2, project: 'innernet', tags: ['design'], attendees: ['Sarah'] },
   ],
   '2026-04-16': [
-    { id: 'MF-20', title: 'Sprint Planning', time: '9:30', endTime: '11:00', colorIndex: 0, project: 'mindflow', tags: ['planning'], attendees: ['Jason', 'Sarah', 'Mike'] },
-    { id: 'MF-20b', title: 'Backend Sync', time: '13:00', endTime: '14:00', colorIndex: 5, project: 'mindflow', tags: ['backend'] },
+    { id: 'MF-20', title: 'Sprint Planning', time: '9:30', endTime: '11:00', colorIndex: 0, project: 'innernet', tags: ['planning'], attendees: ['Jason', 'Sarah', 'Mike'] },
+    { id: 'MF-20b', title: 'Backend Sync', time: '13:00', endTime: '14:00', colorIndex: 5, project: 'innernet', tags: ['backend'] },
   ],
   '2026-04-17': [
-    { id: 'MF-21', title: 'Update State Management', time: '9:00', endTime: '10:30', colorIndex: 4, project: 'mindflow', tags: ['state'] },
-    { id: 'MF-21b', title: 'UX Research Review', time: '14:00', endTime: '15:30', colorIndex: 6, project: 'mindflow', tags: ['ux', 'research'] },
+    { id: 'MF-21', title: 'Update State Management', time: '9:00', endTime: '10:30', colorIndex: 4, project: 'innernet', tags: ['state'] },
+    { id: 'MF-21b', title: 'UX Research Review', time: '14:00', endTime: '15:30', colorIndex: 6, project: 'innernet', tags: ['ux', 'research'] },
   ],
   '2026-04-18': [
-    { id: 'MF-22', title: 'Performance Optimization', time: '10:00', endTime: '12:00', colorIndex: 3, project: 'mindflow', tags: ['perf'] },
+    { id: 'MF-22', title: 'Performance Optimization', time: '10:00', endTime: '12:00', colorIndex: 3, project: 'innernet', tags: ['perf'] },
   ],
   '2026-04-20': [
-    { id: 'MF-23', title: 'Weekly Sprint Review', time: '10:00', endTime: '11:00', colorIndex: 0, project: 'mindflow', tags: ['sprint'] },
+    { id: 'MF-23', title: 'Weekly Sprint Review', time: '10:00', endTime: '11:00', colorIndex: 0, project: 'innernet', tags: ['sprint'] },
     { id: 'MF-23b', title: 'Client Demo Prep', time: '14:00', endTime: '15:30', colorIndex: 2, project: 'colab91', tags: ['colab91', 'demo'], attendees: ['Jason', 'Tanuj'] },
   ],
   '2026-04-22': [
-    { id: 'MF-24', title: 'Implement Search Feature', time: '9:00', endTime: '11:00', colorIndex: 4, project: 'mindflow', tags: ['search'] },
-    { id: 'MF-24b', title: 'Team Lunch', time: '12:00', endTime: '13:00', colorIndex: 7, project: 'mindflow', tags: ['social'], attendees: ['Jason', 'Sarah', 'Mike', 'Tanuj', 'Priya', 'Raj'] },
+    { id: 'MF-24', title: 'Implement Search Feature', time: '9:00', endTime: '11:00', colorIndex: 4, project: 'innernet', tags: ['search'] },
+    { id: 'MF-24b', title: 'Team Lunch', time: '12:00', endTime: '13:00', colorIndex: 7, project: 'innernet', tags: ['social'], attendees: ['Jason', 'Sarah', 'Mike', 'Tanuj', 'Priya', 'Raj'] },
   ],
 }
 
@@ -358,7 +358,7 @@ export const featureDocItems = [
       { id: 'ai-1', text: 'Consider adding a "promise streak" indicator to gamify daily commitment tracking.', accepted: false },
     ],
     agentSessionId: null,
-    project: 'mindflow',
+    project: 'innernet',
   },
   {
     id: 'feat-2',
@@ -386,7 +386,7 @@ export const featureDocItems = [
     ],
     aiSuggestions: [],
     agentSessionId: null,
-    project: 'mindflow',
+    project: 'innernet',
   },
   {
     id: 'feat-4',
@@ -400,13 +400,13 @@ export const featureDocItems = [
     ],
     aiSuggestions: [],
     agentSessionId: null,
-    project: 'mindflow',
+    project: 'innernet',
   },
 ];
 
 // Activity logs for the Logs panel
 export const activityLogs = [
-  { id: 'log-1', time: '07:01', type: 'user', action: 'Opened Mindflow app', session: null },
+  { id: 'log-1', time: '07:01', type: 'user', action: 'Opened Innernet app', session: null },
   { id: 'log-2', time: '07:02', type: 'user', action: 'Navigated to Calendar view', session: null },
   { id: 'log-3', time: '07:05', type: 'user', action: 'Clicked "Implement Promises Feature" in document', session: null },
   { id: 'log-4', time: '07:06', type: 'user', action: 'Clicked "Ask AI" on Feature 1', session: 'feat-1' },
