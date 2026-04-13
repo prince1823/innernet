@@ -318,26 +318,41 @@ export const notes = [
 
 export const agentSessions = [
   {
-    id: 1, title: 'UI Architecture Planning', date: '2026-04-07', preview: 'State management for three-panel layout',
+    id: 'feat-1', title: 'Implement Promises Feature', date: '2026-04-09', preview: 'Promise tracking system',
     messages: [
-      { role: 'user', content: 'Help me think through the state management for the three-panel layout.' },
-      { role: 'assistant', content: 'For a three-panel layout with phase-based visibility, I\'d recommend a simple approach:\n\n**State Structure:**\n- `activePhase`: "calendar-notes" or "notes-agent"\n- `selectedDate`: current calendar date\n- `activeNoteTab`: "human" or "ai"\n- `activeSession`: current agent session ID\n\nThe phase determines which two panels are visible. The middle panel (Notes) is always visible, creating continuity between phases.\n\nWant me to sketch out the component hierarchy?' },
-      { role: 'user', content: 'Yes, and how should the panels animate when switching phases?' },
-      { role: 'assistant', content: 'Here\'s what I\'d suggest:\n\n**Transition approach:**\nUse CSS `transform: translateX()` for the sliding effect. The three panels live in a container wider than the viewport. Phase switch slides the container left/right.\n\n**Component tree:**\n```\nApp\n├── Sidebar (icon nav)\n├── PhaseToggle\n└── PanelContainer\n    ├── CalendarPanel\n    ├── NotesPanel\n    └── AgentPanel\n```\n\nThe Notes panel acts as the anchor — it\'s always in view.' },
+      { role: 'user', content: 'How should the promise status window look? I want to show what was planned vs what was actually done each day.' },
+      { role: 'assistant', content: 'I\'d suggest a **split-pane view**: left side shows planned items from morning, right side shows actual completion status.\n\n**Color coding:**\n- Green for done\n- Amber for partial\n- Red for missed\n\nAdd a `fulfillment score` percentage at the top. This gives an instant visual read of how the day went.' },
+      { role: 'user', content: 'Add a streak counter too — like how many consecutive days I hit my promises.' },
+      { role: 'assistant', content: 'Done. Here\'s the updated plan:\n\n**Streak Counter:**\n- Tracks consecutive days of **80%+ fulfillment**\n- Resets if score drops below threshold\n- Shows a flame icon with streak count in the header\n\n**Doc summary section:**\n- Side-by-side comparison of planned vs actual\n- Collapsed by default, expandable per day\n\nI\'ve added the streak counter to bullet point #1 in your doc. Want me to also spec out the AI analysis patterns for bullet #3?' },
+      { role: 'user', content: 'Yes, for the AI analysis — use a 7-day rolling average to detect patterns.' },
+      { role: 'assistant', content: 'Updated bullet #3 in your doc. Here\'s what the AI analysis will do:\n\n**Pattern Detection:**\n- `7-day rolling average` for fulfillment score\n- Flag if you consistently over-promise on certain task types\n- Generate **weekly insight cards** (e.g. "You complete design tasks 90% of the time but coding tasks only 60%")\n\n**Data model:**\n- `promise { planned: string, status: done|partial|missed, category: string }`\n- `dailyScore: number` (0-100)\n- `streakCount: number`' },
     ],
   },
   {
-    id: 2, title: 'AI Calendar Integration', date: '2026-04-08', preview: 'How should AI generate daily summaries?',
+    id: 'feat-2', title: 'Sync to Universe with Cloudflare Worker', date: '2026-04-09', preview: 'Cloudflare Worker sync setup',
     messages: [
-      { role: 'user', content: 'How should the AI generate daily summaries from calendar events?' },
-      { role: 'assistant', content: 'Here\'s a practical approach:\n\n**Data inputs per day:**\n1. Meeting titles, attendees, and notes\n2. User\'s own notes tagged to that date\n3. Previous day\'s context for continuity\n\n**Summary structure:**\n- **Headline**: One-sentence day characterization\n- **Key events**: Bulleted meeting summaries\n- **Mood/energy**: Inferred from meeting density and note sentiment\n- **Connections**: Links to related notes\n\nThe AI should write in second person ("You focused on...") to feel personal and reflective.' },
+      { role: 'user', content: 'How do I set up the Cloudflare Worker for syncing? I need it to sync local state to a cloud store.' },
+      { role: 'assistant', content: 'Here\'s the setup:\n\n**Step 1: Scaffold**\n- Run `wrangler init innernet-sync`\n- Create a KV namespace: `wrangler kv:namespace create SYNC_STORE`\n\n**Step 2: Worker endpoint**\n- Expose `/sync` POST endpoint\n- Accepts a diff payload and applies it to KV\n- Returns conflict resolution if needed\n\n**Step 3: Auth**\n- Use Cloudflare Access for auth\n- JWT token validation in the worker\n\nI\'ve added the setup steps to your doc under bullet #1.' },
+      { role: 'user', content: 'How should conflict resolution work between local and cloud state?' },
+      { role: 'assistant', content: '**Conflict Resolution Strategy:**\n\n- **Last-write-wins** for simple fields (titles, descriptions)\n- **CRDT-based merge** for lists (bullets, logs)\n- **Timestamp comparison** with `updatedAt` on every field\n\n**Sync Protocol:**\n1. Client sends diff with local timestamps\n2. Worker compares with KV timestamps\n3. If conflict → return both versions with `conflictType`\n4. Client shows merge UI for manual resolution\n\nFor Colab91 integration, the worker can proxy requests to their API and keep a local cache in KV.' },
     ],
   },
   {
-    id: 3, title: 'Notes Categorization', date: '2026-04-09', preview: 'Best UX for human vs AI notes',
+    id: 'feat-3', title: 'Multi-Agent Execution Engine', date: '2026-04-09', preview: 'Parallel agent sessions',
     messages: [
-      { role: 'user', content: 'Based on my notes from April 5-6, how should we differentiate human vs AI notes in the UI?' },
-      { role: 'assistant', content: 'Looking at your notes from those dates, here\'s what I recommend:\n\n**Visual System:**\n- **Human notes**: Blue left accent border, pen icon, clean white card\n- **AI notes**: Purple left accent with subtle gradient background, sparkle icon, "AI Generated" badge\n\n**Key Principle:**\nAI notes should feel like a helpful companion, not a replacement. They augment your thinking — they don\'t override it.' },
+      { role: 'user', content: 'When I click "Implement All", I want each feature to get its own agent session running in parallel. How should this work?' },
+      { role: 'assistant', content: 'Here\'s the architecture:\n\n**Spawning:**\n- "Implement All" iterates over `featureDocItems`\n- Each feature spawns an independent agent session\n- Sessions run in parallel, each in its own chat tab\n\n**Context per agent:**\n- Feature title + description + bullets\n- Any existing agent thread from the doc\n- Related calendar events (matched by project tag)\n\n**Result flow:**\n- Agent output → inserted back into doc under that feature\n- Highlighted with purple accent so you know it\'s AI-written\n- Each insertion logged in Activity panel with session ID' },
+      { role: 'user', content: 'What about rate limiting? If there are 10 features we can\'t hit the API 10 times at once.' },
+      { role: 'assistant', content: '**Concurrency control:**\n\n- Use a **semaphore** with `maxConcurrent: 3`\n- Queue remaining features, process as slots free up\n- Show progress in Activity panel: "Agent 1/4 running, 3 queued"\n\n**Batching strategy:**\n- Group features by project tag\n- Within a project, agents share context (reduces token usage)\n- Use `AbortController` to cancel if user navigates away\n\nThis keeps API costs manageable while still feeling parallel to the user.' },
+    ],
+  },
+  {
+    id: 'feat-4', title: 'Calendar Search & Filter', date: '2026-04-09', preview: 'Search by project or person',
+    messages: [
+      { role: 'user', content: 'I want to search #colab91 and see all meetings for that project. Also search by person name like "Tanuj".' },
+      { role: 'assistant', content: '**Search implementation:**\n\n**By project tag:**\n- Parse `#` prefix → filter `calendarTasks` where `project === tag`\n- Show results grouped by date in a schedule view\n- Example: `#colab91` → shows Apr 6, 7, 8, 10 meetings\n\n**By person:**\n- Search `attendees` array across all events\n- "Tanuj" → shows every meeting where Tanuj was present\n- Also search `transcription.speaker` for deeper matches\n\n**UI:**\n- Search bar in calendar header (already exists)\n- Results replace the day view temporarily\n- Click any result to jump to that date/event' },
+      { role: 'user', content: 'Can we add fuzzy matching? Sometimes I might type "tanu" instead of "Tanuj".' },
+      { role: 'assistant', content: '**Fuzzy search:**\n\n- Use **Levenshtein distance** with threshold of 2\n- Also support prefix matching (`tan` → `Tanuj`)\n- For project tags, match against both tag name and project description\n\n**Implementation:**\n- Simple scoring: exact match (100) > prefix (80) > fuzzy (60)\n- Show results sorted by score\n- Highlight matched portion in results\n\nNo external library needed — a 20-line fuzzy matcher will handle this scale. Want me to write it?' },
     ],
   },
 ];

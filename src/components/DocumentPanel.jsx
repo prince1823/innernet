@@ -76,7 +76,8 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
       const text = lineEl ? lineEl.textContent.replace(/[\u25B6\u2606]/g, '').trim() : feat.title
 
       if (action === 'implement' || action === 'ask-ai') {
-        onAskAI(featId, text, feat.bullets?.join('\n'))
+        const bulletTexts = feat.bullets?.map(b => typeof b === 'string' ? b : b.text).join('\n')
+        onAskAI(featId, text, bulletTexts)
       }
     }
 
@@ -111,8 +112,9 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
 
       // Bullets — each gets Ask AI icon
       feat.bullets.forEach((b, bi) => {
+        const bulletText = typeof b === 'string' ? b : b.text
         html += `<p class="doc-bullet" data-feat-id="${feat.id}" data-bullet-idx="${bi}">`
-        html += `<span class="doc-bullet-marker" contenteditable="false">&#8226;</span> ${b}`
+        html += `<span class="doc-bullet-marker" contenteditable="false">&#8226;</span> ${bulletText}`
         html += `<span class="doc-inline-actions" contenteditable="false">`
         html += `<span class="doc-inline-btn doc-inline-ai" data-feat-id="${feat.id}" data-action="ask-ai" title="Ask AI">${starIcon}</span>`
         html += `</span></p>`

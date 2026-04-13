@@ -36,12 +36,15 @@ export default function ChatWindows({ featureWindows = [], onClose }) {
     })),
     ...featureDocItems
       .filter(f => !featureWindows.some(fw => fw.id === f.id))
-      .map(f => ({
-        id: f.id,
-        title: f.title,
-        isFeature: false,
-        messages: agentSessions[0]?.messages || [],
-      })),
+      .map(f => {
+        const session = agentSessions.find(s => s.id === f.id)
+        return {
+          id: f.id,
+          title: f.title,
+          isFeature: false,
+          messages: session?.messages || [],
+        }
+      }),
   ]
 
   const activeWindow = allWindows.find(w => w.id === activeTab) || allWindows[0]

@@ -88,7 +88,7 @@ function App() {
     const windows = featureDocItems.map(f => ({
       id: f.id,
       title: f.title,
-      context: f.bullets.join('\n'),
+      context: f.bullets.map(b => typeof b === 'string' ? b : b.text).join('\n'),
     }))
     setFeatureWindows(windows)
     setActiveAgentFeatures(windows.map(w => w.id))
