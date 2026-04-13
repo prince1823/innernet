@@ -10,6 +10,7 @@ function App() {
   const [selectedDate, setSelectedDate] = useState('2026-04-09')
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [sidebarWidth, setSidebarWidth] = useState(340)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [thoughts, setThoughts] = useState({})
   const [quickSlot, setQuickSlot] = useState(null)
 
@@ -163,20 +164,42 @@ function App() {
   return (
     <div className="app">
       {/* Left: Calendar sidebar */}
-      <aside className="app-sidebar-calendar" style={{ width: `${sidebarWidth}px` }}>
-        <CalendarPanel
-          selectedDate={selectedDate}
-          setSelectedDate={setSelectedDate}
-          selectedEvent={selectedEvent}
-          setSelectedEvent={(ev) => { setSelectedEvent(ev); setQuickSlot(null) }}
-          onSlotClick={handleSlotClick}
-          quickSlot={quickSlot}
-          thoughts={thoughts}
-        />
-      </aside>
+      {!sidebarCollapsed && (
+        <aside className="app-sidebar-calendar" style={{ width: `${sidebarWidth}px` }}>
+          <CalendarPanel
+            selectedDate={selectedDate}
+            setSelectedDate={setSelectedDate}
+            selectedEvent={selectedEvent}
+            setSelectedEvent={(ev) => { setSelectedEvent(ev); setQuickSlot(null) }}
+            onSlotClick={handleSlotClick}
+            quickSlot={quickSlot}
+            thoughts={thoughts}
+          />
+        </aside>
+      )}
 
-      {/* Sidebar resize handle */}
-      <div className="sidebar-resize-handle" onMouseDown={handleSidebarResizeStart} />
+      {/* Sidebar toggle + resize handle */}
+      <div className={`sidebar-divider ${sidebarCollapsed ? 'collapsed' : ''}`}>
+        {!sidebarCollapsed && (
+          <div className="sidebar-resize-zone" onMouseDown={handleSidebarResizeStart} />
+        )}
+        <button
+          className="sidebar-toggle-btn"
+          onClick={() => setSidebarCollapsed(prev => !prev)}
+          title={sidebarCollapsed ? 'Show Calendar' : 'Hide Calendar'}
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            {sidebarCollapsed
+              ? <polyline points="9 18 15 12 9 6" />
+              : <polyline points="15 18 9 12 15 6" />
+            }
+          </svg>
+          {sidebarCollapsed && <span>Calendar</span>}
+        </button>
+        {!sidebarCollapsed && (
+          <div className="sidebar-resize-zone" onMouseDown={handleSidebarResizeStart} />
+        )}
+      </div>
 
       {/* Right: Main area */}
       <div className="app-main">
