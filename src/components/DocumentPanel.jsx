@@ -30,15 +30,15 @@ function renderMd(text) {
     .replace(/\n/g, '<br/>')
 }
 
+// text prop is always pre-rendered HTML — no renderMd inside this component
 function AiResponseText({ text, editKey, editingKey, setEditingKey, onSave, accepted }) {
   const ref = useRef(null)
   const isEditing = editingKey === editKey
 
   useEffect(() => {
     if (isEditing && ref.current) {
-      ref.current.innerHTML = renderMd(text)
+      ref.current.innerHTML = text  // already HTML
       ref.current.focus()
-      // place cursor at end
       const range = document.createRange()
       range.selectNodeContents(ref.current)
       range.collapse(false)
@@ -55,7 +55,7 @@ function AiResponseText({ text, editKey, editingKey, setEditingKey, onSave, acce
         className="doc-ai-inline-text editable"
         contentEditable
         suppressContentEditableWarning
-        onBlur={e => { onSave(e.currentTarget.textContent); setEditingKey(null) }}
+        onBlur={e => { onSave(e.currentTarget.innerHTML); setEditingKey(null) }}
         style={{ outline: 'none', cursor: 'text' }}
       />
     )
@@ -66,7 +66,7 @@ function AiResponseText({ text, editKey, editingKey, setEditingKey, onSave, acce
       className={`doc-ai-inline-text ${accepted ? 'editable' : ''}`}
       onClick={() => setEditingKey(editKey)}
       style={{ cursor: 'text' }}
-      dangerouslySetInnerHTML={{ __html: renderMd(text) }}
+      dangerouslySetInnerHTML={{ __html: text }}
     />
   )
 }
@@ -79,6 +79,19 @@ const QUICK_ACTIONS = [
 ]
 
 const STORAGE_KEY = 'innernet-doc-edits'
+const AI_RESPONSES_KEY = 'innernet-ai-responses'
+const AI_ACCEPTED_KEY = 'innernet-ai-accepted'
+const SEL_INSERTS_KEY = 'innernet-sel-inserts'
+
+function loadAiResponses() {
+  try { return JSON.parse(localStorage.getItem(AI_RESPONSES_KEY) || '{}') } catch { return {} }
+}
+function loadAcceptedKeys() {
+  try { return new Set(JSON.parse(localStorage.getItem(AI_ACCEPTED_KEY) || '[]')) } catch { return new Set() }
+}
+function loadSelInserts() {
+  try { return JSON.parse(localStorage.getItem(SEL_INSERTS_KEY) || '[]') } catch { return [] }
+}
 
 function loadFeatures() {
   const base = featureDocItems.map(f => ({
@@ -117,10 +130,10 @@ function saveFeature(featId, field, value) {
 
 export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
   const [features, setFeatures] = useState(loadFeatures)
-  const [aiResponses, setAiResponses] = useState({}) // key: "featId-bulletIdx" or "featId-title"
+  const [aiResponses, setAiResponses] = useState(loadAiResponses)
   const [loadingKeys, setLoadingKeys] = useState(new Set())
   const [editingKey, setEditingKey] = useState(null) // which field is in edit mode
-  const [selInserts, setSelInserts] = useState([]) // { id, featId, bulletIdx, text }
+  const [selInserts, setSelInserts] = useState(loadSelInserts) // { id, featId, bulletIdx, text }
 
   const updateField = (featId, field, value) => {
     saveFeature(featId, field, value)
@@ -163,9 +176,15 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
         let el = sel.anchorNode
         if (el && el.nodeType === 3) el = el.parentElement
         while (el && el !== docBodyRef.current) {
-          if (el.dataset?.featId) { featId = el.dataset.featId; bulletIdx = parseInt(el.dataset.bulletIdx ?? '-1'); break }
+          if (el.dataset?.featId) {
+            featId = el.dataset.featId
+            // doc-bullet-block has bulletIdx; doc-feature (fallback) does not
+            bulletIdx = el.dataset.bulletIdx !== undefined ? parseInt(el.dataset.bulletIdx) : 0
+            break
+          }
           el = el.parentElement
         }
+        console.log('[Selection] featId:', featId, 'bulletIdx:', bulletIdx)
 
         setSelPopup({
           x: rect.left - bodyRect.left + rect.width / 2,
@@ -226,13 +245,18 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
   }
 
   const handleSelInsertBelow = () => {
-    if (selResponse && selPopup?.featId && selPopup.bulletIdx >= 0) {
+    console.log('[Insert Below] selPopup:', selPopup, 'selResponse:', !!selResponse)
+    if (selResponse && selPopup?.featId) {
+      const bi = (selPopup.bulletIdx != null && selPopup.bulletIdx >= 0) ? selPopup.bulletIdx : 0
+      console.log('[Insert Below] inserting at', selPopup.featId, bi)
       setSelInserts(prev => [...prev, {
         id: `si-${Date.now()}`,
         featId: selPopup.featId,
-        bulletIdx: selPopup.bulletIdx,
-        text: selResponse.suggestion,
+        bulletIdx: bi,
+        text: renderMd(selResponse.suggestion),
       }])
+    } else {
+      console.warn('[Insert Below] blocked — featId:', selPopup?.featId, 'bulletIdx:', selPopup?.bulletIdx, 'hasResponse:', !!selResponse)
     }
     savedRangeRef.current = null
     setSelPopup(null)
@@ -255,7 +279,7 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
 
     const response = await askAI(prompt, featContext)
 
-    setAiResponses(prev => ({ ...prev, [key]: response }))
+    setAiResponses(prev => ({ ...prev, [key]: renderMd(response) }))
     setLoadingKeys(prev => {
       const next = new Set(prev)
       next.delete(key)
@@ -263,7 +287,7 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
     })
   }
 
-  const [acceptedKeys, setAcceptedKeys] = useState(new Set())
+  const [acceptedKeys, setAcceptedKeys] = useState(loadAcceptedKeys)
 
   const dismissResponse = (key) => {
     setAiResponses(prev => {
@@ -281,6 +305,18 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
   const acceptResponse = (key) => {
     setAcceptedKeys(prev => new Set([...prev, key]))
   }
+
+  useEffect(() => {
+    try { localStorage.setItem(AI_RESPONSES_KEY, JSON.stringify(aiResponses)) } catch {}
+  }, [aiResponses])
+
+  useEffect(() => {
+    try { localStorage.setItem(AI_ACCEPTED_KEY, JSON.stringify([...acceptedKeys])) } catch {}
+  }, [acceptedKeys])
+
+  useEffect(() => {
+    try { localStorage.setItem(SEL_INSERTS_KEY, JSON.stringify(selInserts)) } catch {}
+  }, [selInserts])
 
   return (
     <div className="doc-panel">
@@ -330,10 +366,6 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
               <div className="sel-popup-response">
                 <div className="sel-response-text" dangerouslySetInnerHTML={{ __html: renderMd(selResponse.suggestion) }} />
                 <div className="sel-response-actions">
-                  <button className="sel-res-btn accept" onClick={handleSelAccept}>
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                    Accept
-                  </button>
                   <button className="sel-res-btn insert" onClick={handleSelInsertBelow}>
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
                     Insert below
@@ -358,7 +390,7 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
           const featContext = feat.bullets.map(b => b.text).join('\n')
 
           return (
-            <div key={feat.id} className="doc-feature">
+            <div key={feat.id} className="doc-feature" data-feat-id={feat.id} data-feat-only="true">
               {/* Feature title */}
               <div className="doc-feat-title">
                 <span
