@@ -2,13 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { featureDocItems } from '../data/sampleData'
 import './DocumentPanel.css'
 
-const initialFeatures = featureDocItems.map(f => ({
-  ...f,
-  aiLines: f.id === 'feat-1' ? [
-    { text: 'Add a "promise streak" counter that gamifies daily commitment tracking with visual indicators', original: null, status: 'suggested' },
-    { text: 'Implement end-of-day comparison view: planned items (left) vs completed items (right) with color-coded diffs', original: null, status: 'accepted' },
-  ] : [],
-}))
+const initialFeatures = featureDocItems.map(f => ({ ...f }))
 
 // SVG icons as inline HTML strings for embedding in contentEditable
 const playIcon = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>`
@@ -129,19 +123,6 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
 
   const [initialHTML] = useState(buildInitialHTML)
 
-  const handleAiAction = useCallback((featId, aiIdx, action) => {
-    setFeatures(prev => prev.map(f => {
-      if (f.id !== featId) return f
-      const newAiLines = [...(f.aiLines || [])]
-      if (action === 'accept') {
-        newAiLines[aiIdx] = { ...newAiLines[aiIdx], status: 'accepted' }
-      } else {
-        newAiLines.splice(aiIdx, 1)
-      }
-      return { ...f, aiLines: newAiLines }
-    }))
-  }, [])
-
   return (
     <div className="doc-panel">
 
@@ -154,37 +135,7 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
           suppressContentEditableWarning
           dangerouslySetInnerHTML={{ __html: initialHTML }}
         />
-
-        {/* AI suggestion lines */}
-        {features.some(f => f.aiLines?.length > 0) && (
-          <div className="doc-ai-section">
-            {features.map(feat => feat.aiLines?.map((al, ai) => (
-              <div key={`${feat.id}-ai-${ai}`} className={`doc-ai-line ${al.status}`}>
-                <div className="doc-ai-line-left">
-                  <svg className="doc-ai-line-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                </div>
-                <div className="doc-ai-line-body">
-                  <span className="doc-ai-text">{al.text}</span>
-                  {al.status === 'suggested' && (
-                    <div className="doc-ai-line-actions">
-                      <button className="doc-ai-accept" onClick={() => handleAiAction(feat.id, ai, 'accept')}>
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-                        Accept
-                      </button>
-                      <button className="doc-ai-dismiss" onClick={() => handleAiAction(feat.id, ai, 'dismiss')}>
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                        Dismiss
-                      </button>
-                    </div>
                   )}
-                  {al.status === 'accepted' && (
-                    <span className="doc-ai-accepted-badge">Accepted</span>
-                  )}
-                </div>
-              </div>
-            )))}
-          </div>
-        )}
       </div>
     </div>
   )

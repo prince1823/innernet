@@ -183,6 +183,7 @@
   position: relative;
   z-index: 10;
   transition: background 0.15s;
+  display: none;
 }
 
 .bottom-split-handle::before {
@@ -197,6 +198,78 @@
 .bottom-split-handle:hover,
 .bottom-split-handle:active {
   background: var(--purple-400);
+}
+
+/* ── Activity Divider (resize + toggle) ── */
+.activity-divider {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  border-left: 1px solid var(--border-light);
+  background: var(--bg-body);
+}
+
+.activity-resize-zone {
+  flex: 1;
+  align-self: stretch;
+  cursor: ew-resize;
+  transition: background 0.15s;
+}
+
+.activity-resize-zone:hover {
+  background: var(--purple-50);
+}
+
+.activity-resize-zone:active {
+  background: var(--purple-100);
+}
+
+.activity-toggle-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 28px;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  background: var(--bg-white);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  padding: 0;
+  gap: 4px;
+}
+
+.activity-toggle-btn:hover {
+  background: var(--purple-50);
+  color: var(--purple-600);
+  border-color: var(--purple-200);
+}
+
+/* Collapsed activity: vertical strip with rotated label */
+.activity-divider.collapsed {
+  width: 28px;
+  border-left: 1px solid var(--border-light);
+  border-right: none;
+}
+
+.activity-divider.collapsed .activity-toggle-btn {
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
+  width: auto;
+  height: auto;
+  padding: 8px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+}
+
+.activity-divider.collapsed .activity-toggle-btn span {
+  letter-spacing: 0.5px;
 }
 
 

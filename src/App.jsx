@@ -18,6 +18,7 @@ function App() {
   const [bottomCollapsed, setBottomCollapsed] = useState(false)
   const [bottomHeight, setBottomHeight] = useState(280)
   const [bottomSplit, setBottomSplit] = useState(55) // % for doc panel
+  const [activityCollapsed, setActivityCollapsed] = useState(false)
 
   // Agent feature windows (spawned by "Implement All" or "Ask AI")
   const [featureWindows, setFeatureWindows] = useState([])
@@ -234,16 +235,41 @@ function App() {
         {/* Bottom area: Document + Logs */}
         {!bottomCollapsed && (
           <div className="app-bottom" style={{ height: `${bottomHeight}px` }}>
-            <div className="bottom-split" style={{ width: `${bottomSplit}%` }}>
+            <div className="bottom-split" style={{ flex: activityCollapsed ? 1 : undefined, width: activityCollapsed ? undefined : `${bottomSplit}%` }}>
               <DocumentPanel
                 onAskAI={handleAskAI}
                 activeAgentFeatures={activeAgentFeatures}
               />
             </div>
-            <div className="bottom-split-handle" onMouseDown={handleBottomSplitStart} />
-            <div className="bottom-split" style={{ width: `${100 - bottomSplit}%` }}>
-              <LogsPanel extraLogs={extraLogs} />
+            {!activityCollapsed && (
+              <div className="bottom-split-handle" onMouseDown={handleBottomSplitStart} />
+            )}
+            <div className={`activity-divider ${activityCollapsed ? 'collapsed' : ''}`}>
+              {!activityCollapsed && (
+                <div className="activity-resize-zone" onMouseDown={handleBottomSplitStart} />
+              )}
+              <button
+                className="activity-toggle-btn"
+                onClick={() => setActivityCollapsed(prev => !prev)}
+                title={activityCollapsed ? 'Show Activity' : 'Hide Activity'}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  {activityCollapsed
+                    ? <polyline points="15 18 9 12 15 6" />
+                    : <polyline points="9 18 15 12 9 6" />
+                  }
+                </svg>
+                {activityCollapsed && <span>Activity</span>}
+              </button>
+              {!activityCollapsed && (
+                <div className="activity-resize-zone" onMouseDown={handleBottomSplitStart} />
+              )}
             </div>
+            {!activityCollapsed && (
+              <div className="bottom-split" style={{ width: `${100 - bottomSplit}%` }}>
+                <LogsPanel extraLogs={extraLogs} />
+              </div>
+            )}
           </div>
         )}
 
