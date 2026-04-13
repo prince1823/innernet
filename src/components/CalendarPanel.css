@@ -12,21 +12,21 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 6px 8px;
   flex-shrink: 0;
   border-bottom: 1px solid #e0e0e0;
-  gap: 8px;
+  gap: 4px;
 }
 
 .cal-header-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 }
 
 .cal-today-btn {
-  padding: 5px 14px;
-  font-size: 12px;
+  padding: 3px 8px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--text-primary);
   border: 1px solid #dadce0;
@@ -39,8 +39,8 @@
 .cal-today-btn:hover { background: #f1f3f4; }
 
 .cal-arrow-btn {
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -55,8 +55,8 @@
 .cal-arrow-btn:hover { background: #f1f3f4; }
 
 .cal-date-title {
-  font-size: 15px;
-  font-weight: 400;
+  font-size: 12px;
+  font-weight: 500;
   color: #3c4043;
   white-space: nowrap;
   display: flex;
@@ -70,8 +70,8 @@
 }
 
 .cal-search-btn {
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -94,8 +94,8 @@
 }
 
 .cal-zoom-btn {
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -277,19 +277,19 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
         <div className="cal-header-left">
           <button className="cal-today-btn" onClick={goToToday}>Today</button>
           <button className="cal-arrow-btn" onClick={goToPrev}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
           <h2 className="cal-date-title" onClick={() => setShowMiniCal(!showMiniCal)} style={{ cursor: 'pointer' }}>
             {headerLabel}
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginLeft: 4, opacity: 0.5 }}><polyline points="6 9 12 15 18 9"/></svg>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginLeft: 3, opacity: 0.5 }}><polyline points="6 9 12 15 18 9"/></svg>
           </h2>
           <button className="cal-arrow-btn" onClick={goToNext}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
         </div>
         <div className="cal-header-right">
           <button className="cal-search-btn" onClick={() => { setSearchResults({}); setTimeout(() => searchRef.current?.focus(), 50) }} title="Search">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           </button>
           <div className="cal-zoom-btns">
             <button className="cal-zoom-btn" onClick={() => setZoomLevel(z => Math.max(z - 14, 28))} title="Zoom out">

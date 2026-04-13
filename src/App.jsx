@@ -185,12 +185,28 @@ function App() {
           <ChatWindows featureWindows={featureWindows} />
         </div>
 
-        {/* Resize handle */}
-        {!bottomCollapsed && (
-          <div className="resize-handle" onMouseDown={handleBottomResizeStart}>
-            <div className="resize-grip" />
-          </div>
-        )}
+        {/* Bottom toggle + resize */}
+        <div className="bottom-divider">
+          {!bottomCollapsed && (
+            <div className="resize-handle-left" onMouseDown={handleBottomResizeStart} />
+          )}
+          <button
+            className="bottom-toggle-btn"
+            onClick={() => setBottomCollapsed(prev => !prev)}
+            title={bottomCollapsed ? 'Show Document & Logs' : 'Hide Document & Logs'}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              {bottomCollapsed
+                ? <polyline points="18 15 12 9 6 15" />
+                : <polyline points="6 9 12 15 18 9" />
+              }
+            </svg>
+            <span>{bottomCollapsed ? 'Document & Logs' : ''}</span>
+          </button>
+          {!bottomCollapsed && (
+            <div className="resize-handle-right" onMouseDown={handleBottomResizeStart} />
+          )}
+        </div>
 
         {/* Bottom area: Document + Logs */}
         {!bottomCollapsed && (
@@ -198,7 +214,6 @@ function App() {
             <div className="bottom-split" style={{ width: `${bottomSplit}%` }}>
               <DocumentPanel
                 onAskAI={handleAskAI}
-                onImplementAll={handleImplementAll}
                 activeAgentFeatures={activeAgentFeatures}
               />
             </div>
@@ -206,15 +221,6 @@ function App() {
             <div className="bottom-split" style={{ width: `${100 - bottomSplit}%` }}>
               <LogsPanel extraLogs={extraLogs} />
             </div>
-          </div>
-        )}
-
-        {/* Collapsed bar */}
-        {bottomCollapsed && (
-          <div className="bottom-collapsed-bar" onClick={() => setBottomCollapsed(false)}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            <span>Document & Logs</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
           </div>
         )}
 
