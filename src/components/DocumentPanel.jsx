@@ -4,28 +4,15 @@ import { askAI } from '../utils/askAI'
 import './DocumentPanel.css'
 
 function AiIcon({ size = 12 }) {
+  // 4-pointed star path helper: big at center, small top-right, tiny bottom-right
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="currentColor">
-      {/* Chip */}
-      <rect x="18" y="4" width="28" height="28" rx="5" />
-      {/* Chip pins */}
-      <rect x="24" y="1" width="3" height="5" rx="1" />
-      <rect x="31" y="1" width="3" height="5" rx="1" />
-      <rect x="37" y="1" width="3" height="5" rx="1" />
-      <rect x="24" y="30" width="3" height="5" rx="1" />
-      <rect x="31" y="30" width="3" height="5" rx="1" />
-      <rect x="37" y="30" width="3" height="5" rx="1" />
-      <rect x="14" y="10" width="5" height="3" rx="1" />
-      <rect x="14" y="17" width="5" height="3" rx="1" />
-      <rect x="14" y="24" width="5" height="3" rx="1" />
-      <rect x="45" y="10" width="5" height="3" rx="1" />
-      <rect x="45" y="17" width="5" height="3" rx="1" />
-      <rect x="45" y="24" width="5" height="3" rx="1" />
-      {/* AI text */}
-      <text x="32" y="23" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold" fontFamily="Arial">AI</text>
-      {/* Hand */}
-      <path d="M14 54 C14 54 14 48 20 48 L38 48 C42 48 44 44 40 42 L36 40 C34 39 36 36 38 37 L52 44 C56 46 56 52 52 56 L40 62 C36 64 28 64 24 62 L14 56 Z" />
-      <rect x="4" y="48" width="10" height="16" rx="3" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      {/* Large sparkle */}
+      <path d="M9 2 C9 2 9.8 6.5 11 8 C12.2 9.5 17 10 17 10 C17 10 12.2 10.5 11 12 C9.8 13.5 9 18 9 18 C9 18 8.2 13.5 7 12 C5.8 10.5 1 10 1 10 C1 10 5.8 9.5 7 8 C8.2 6.5 9 2 9 2Z" />
+      {/* Small sparkle top-right */}
+      <path d="M18 2 C18 2 18.4 4.2 19 5 C19.6 5.8 22 6 22 6 C22 6 19.6 6.2 19 7 C18.4 7.8 18 10 18 10 C18 10 17.6 7.8 17 7 C16.4 6.2 14 6 14 6 C14 6 16.4 5.8 17 5 C17.6 4.2 18 2 18 2Z" />
+      {/* Tiny sparkle bottom-right */}
+      <path d="M18 14 C18 14 18.3 15.5 18.8 16.2 C19.3 16.9 21 17 21 17 C21 17 19.3 17.1 18.8 17.8 C18.3 18.5 18 20 18 20 C18 20 17.7 18.5 17.2 17.8 C16.7 17.1 15 17 15 17 C15 17 16.7 16.9 17.2 16.2 C17.7 15.5 18 14 18 14Z" />
     </svg>
   )
 }
@@ -43,9 +30,103 @@ function renderMd(text) {
     .replace(/\n/g, '<br/>')
 }
 
+const QUICK_ACTIONS = [
+  { label: 'Improve writing', prompt: (t) => `Improve the writing of this text, keep it concise: "${t}"` },
+  { label: 'Make shorter',    prompt: (t) => `Make this shorter while keeping the meaning: "${t}"` },
+  { label: 'Simplify',        prompt: (t) => `Simplify the language of this text: "${t}"` },
+  { label: 'Proofread',       prompt: (t) => `Proofread and fix any errors in: "${t}"` },
+]
+
 export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
   const [aiResponses, setAiResponses] = useState({}) // key: "featId-bulletIdx" or "featId-title"
   const [loadingKeys, setLoadingKeys] = useState(new Set())
+
+  // Selection popup
+  const [selPopup, setSelPopup] = useState(null) // { x, y, text }
+  const [selLoading, setSelLoading] = useState(false)
+  const [selResponse, setSelResponse] = useState(null) // { original, suggestion }
+  const [selInput, setSelInput] = useState('')
+  const docBodyRef = useRef(null)
+
+  useEffect(() => {
+    const handleMouseUp = (e) => {
+      if (e.target.closest('.sel-popup')) return // don't reset when clicking inside popup
+      setTimeout(() => {
+        const sel = window.getSelection()
+        const text = sel?.toString().trim()
+        if (!text || text.length < 3) { setSelPopup(null); return }
+        if (!docBodyRef.current?.contains(sel.anchorNode)) return
+        const range = sel.getRangeAt(0)
+        const rect = range.getBoundingClientRect()
+        const bodyRect = docBodyRef.current.getBoundingClientRect()
+        setSelPopup({
+          x: rect.left - bodyRect.left + rect.width / 2,
+          y: rect.top - bodyRect.top - 8 + docBodyRef.current.scrollTop,
+          text,
+        })
+        setSelResponse(null)
+        setSelInput('')
+      }, 10)
+    }
+    const handleMouseDown = (e) => {
+      if (!e.target.closest('.sel-popup')) {
+        setSelPopup(null)
+        setSelResponse(null)
+      }
+    }
+    document.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => {
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('mousedown', handleMouseDown)
+    }
+  }, [])
+
+  const handleSelAction = async (promptFn) => {
+    if (!selPopup) return
+    setSelLoading(true)
+    setSelResponse(null)
+    const response = await askAI(promptFn(selPopup.text), selPopup.text)
+    setSelResponse({ original: selPopup.text, suggestion: response })
+    setSelLoading(false)
+  }
+
+  const handleSelCustom = async (e) => {
+    e.preventDefault()
+    if (!selInput.trim() || !selPopup) return
+    setSelLoading(true)
+    setSelResponse(null)
+    const response = await askAI(`${selInput.trim()} — for this text: "${selPopup.text}"`, selPopup.text)
+    setSelResponse({ original: selPopup.text, suggestion: response })
+    setSelLoading(false)
+    setSelInput('')
+  }
+
+  const handleSelAccept = () => {
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount > 0 && selResponse) {
+      try {
+        const range = sel.getRangeAt(0)
+        range.deleteContents()
+        range.insertNode(document.createTextNode(selResponse.suggestion))
+        sel.removeAllRanges()
+      } catch {}
+    }
+    setSelPopup(null); setSelResponse(null)
+  }
+
+  const handleSelInsertBelow = () => {
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount > 0 && selResponse) {
+      try {
+        const range = sel.getRangeAt(0).cloneRange()
+        range.collapse(false)
+        range.insertNode(document.createTextNode(' ' + selResponse.suggestion))
+        sel.removeAllRanges()
+      } catch {}
+    }
+    setSelPopup(null); setSelResponse(null)
+  }
 
   const handleAskInline = async (featId, bulletIdx, lineText, featTitle, featContext) => {
     const key = bulletIdx !== null ? `${featId}-${bulletIdx}` : `${featId}-title`
@@ -92,7 +173,73 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
 
   return (
     <div className="doc-panel">
-      <div className="doc-body">
+      <div className="doc-body" ref={docBodyRef} style={{ position: 'relative' }}>
+
+        {/* Selection AI Popup */}
+        {selPopup && (
+          <div
+            className="sel-popup"
+            style={{ left: selPopup.x, top: selPopup.y }}
+          >
+            {!selResponse && !selLoading && (
+              <>
+                <div className="sel-popup-actions">
+                  {QUICK_ACTIONS.map(a => (
+                    <button key={a.label} className="sel-action-btn" onClick={() => handleSelAction(a.prompt)}>
+                      <AiIcon size={10} />
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+                <form className="sel-popup-input-row" onSubmit={handleSelCustom}>
+                  <input
+                    className="sel-popup-input"
+                    placeholder="Ask AI anything..."
+                    value={selInput}
+                    onChange={e => setSelInput(e.target.value)}
+                    autoFocus
+                  />
+                  <button type="submit" className="sel-popup-send">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  </button>
+                </form>
+              </>
+            )}
+
+            {selLoading && (
+              <div className="sel-popup-loading">
+                <div className="doc-ai-shimmer" style={{ padding: '4px 0' }}>
+                  <div className="shimmer-line" style={{ width: '90%' }} />
+                  <div className="shimmer-line" style={{ width: '70%', animationDelay: '0.15s' }} />
+                </div>
+              </div>
+            )}
+
+            {selResponse && !selLoading && (
+              <div className="sel-popup-response">
+                <div className="sel-response-text" dangerouslySetInnerHTML={{ __html: renderMd(selResponse.suggestion) }} />
+                <div className="sel-response-actions">
+                  <button className="sel-res-btn accept" onClick={handleSelAccept}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    Accept
+                  </button>
+                  <button className="sel-res-btn insert" onClick={handleSelInsertBelow}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+                    Insert below
+                  </button>
+                  <button className="sel-res-btn retry" onClick={() => handleSelAction(QUICK_ACTIONS[0].prompt)}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+                    Try again
+                  </button>
+                  <button className="sel-res-btn discard" onClick={() => { setSelPopup(null); setSelResponse(null) }}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    Discard
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         {featureDocItems.map((feat) => {
           const titleKey = `${feat.id}-title`
           const titleLoading = loadingKeys.has(titleKey)
@@ -103,7 +250,7 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
             <div key={feat.id} className="doc-feature">
               {/* Feature title */}
               <div className="doc-feat-title">
-                <span className="doc-feat-title-text" contentEditable suppressContentEditableWarning>
+                <span className="doc-feat-title-text">
                   {feat.title}
                 </span>
                 <div className="doc-feat-actions">
@@ -168,8 +315,6 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                   </div>
                   <div
                     className={`doc-ai-inline-text ${acceptedKeys.has(titleKey) ? 'editable' : ''}`}
-                    contentEditable={acceptedKeys.has(titleKey)}
-                    suppressContentEditableWarning
                     dangerouslySetInnerHTML={{ __html: renderMd(titleResponse) }}
                   />
                 </div>
@@ -177,7 +322,7 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
 
               {/* Description */}
               {feat.description && (
-                <p className="doc-feat-desc" contentEditable suppressContentEditableWarning>
+                <p className="doc-feat-desc">
                   {feat.description}
                 </p>
               )}
@@ -194,7 +339,7 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                     <div key={bi} className="doc-bullet-block">
                       <div className="doc-bullet-row">
                         <span className="doc-bullet-marker">•</span>
-                        <span className="doc-bullet-text" contentEditable suppressContentEditableWarning>
+                        <span className="doc-bullet-text">
                           {bulletText}
                         </span>
                         <button
@@ -248,8 +393,6 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                           </div>
                           <div
                             className={`doc-ai-inline-text ${acceptedKeys.has(bulletKey) ? 'editable' : ''}`}
-                            contentEditable={acceptedKeys.has(bulletKey)}
-                            suppressContentEditableWarning
                             dangerouslySetInnerHTML={{ __html: renderMd(response) }}
                           />
                         </div>

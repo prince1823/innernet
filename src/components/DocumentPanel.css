@@ -370,6 +370,136 @@
   to { transform: rotate(360deg); }
 }
 
+/* ── Selection AI Popup ── */
+.sel-popup {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  z-index: 100;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);
+  min-width: 240px;
+  max-width: 320px;
+  overflow: hidden;
+  animation: selPopupIn 0.15s cubic-bezier(0.22,1,0.36,1);
+}
+
+@keyframes selPopupIn {
+  from { opacity: 0; transform: translate(-50%, -92%); }
+  to   { opacity: 1; transform: translate(-50%, -100%); }
+}
+
+.sel-popup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 8px 8px 4px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.sel-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: none;
+  border-radius: 6px;
+  background: #f9fafb;
+  color: var(--text-primary, #1a1a2e);
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.sel-action-btn:hover {
+  background: var(--purple-50, #f3f0ff);
+  color: var(--purple-600, #7c3aed);
+}
+
+.sel-popup-input-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+}
+
+.sel-popup-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 10px;
+  color: var(--text-primary, #1a1a2e);
+  background: transparent;
+  placeholder-color: #999;
+}
+
+.sel-popup-input::placeholder { color: #aaa; }
+
+.sel-popup-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: var(--purple-500, #8b5cf6);
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sel-popup-loading {
+  padding: 8px 10px;
+}
+
+.sel-popup-response {
+  padding: 8px 10px;
+}
+
+.sel-response-text {
+  font-size: 11px;
+  color: #1a1a2e;
+  line-height: 1.6;
+  margin-bottom: 8px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.sel-response-text strong { color: var(--purple-600, #7c3aed); font-weight: 600; }
+.sel-response-text code { background: rgba(139,92,246,0.08); padding: 1px 4px; border-radius: 3px; font-size: 10px; }
+
+.sel-response-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.sel-res-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.sel-res-btn.accept  { color: #22c55e; border-color: #bbf7d0; }
+.sel-res-btn.accept:hover  { background: #22c55e; color: #fff; border-color: #22c55e; }
+.sel-res-btn.insert  { color: var(--purple-500, #8b5cf6); border-color: #ddd6fe; }
+.sel-res-btn.insert:hover  { background: var(--purple-500, #8b5cf6); color: #fff; border-color: var(--purple-500, #8b5cf6); }
+.sel-res-btn.retry   { color: #6b7280; border-color: #e5e7eb; }
+.sel-res-btn.retry:hover   { background: #f3f4f6; }
+.sel-res-btn.discard { color: #ef4444; border-color: #fecaca; }
+.sel-res-btn.discard:hover { background: #ef4444; color: #fff; border-color: #ef4444; }
+
 /* ── Scrollbar ── */
 .doc-body::-webkit-scrollbar { width: 6px; }
 .doc-body::-webkit-scrollbar-track { background: transparent; }
