@@ -292,14 +292,11 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           </button>
           <div className="cal-zoom-btns">
-            <button className={`cal-zoom-btn ${zoomLevel === 42 ? 'active' : ''}`} onClick={() => setZoomLevel(42)} title="Compact">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+            <button className="cal-zoom-btn" onClick={() => setZoomLevel(z => Math.max(z - 14, 28))} title="Zoom out">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
-            <button className={`cal-zoom-btn ${zoomLevel === 56 ? 'active' : ''}`} onClick={() => setZoomLevel(56)} title="Normal">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="4" x2="20" y2="4"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="20" x2="20" y2="20"/></svg>
-            </button>
-            <button className={`cal-zoom-btn ${zoomLevel === 84 ? 'active' : ''}`} onClick={() => setZoomLevel(84)} title="Expanded">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            <button className="cal-zoom-btn" onClick={() => setZoomLevel(z => Math.min(z + 14, 112))} title="Zoom in">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
           </div>
         </div>
