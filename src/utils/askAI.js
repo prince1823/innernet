@@ -23,7 +23,7 @@ export async function askAI(prompt, context = '') {
   if (context) console.log('%cContext:', 'color: #666; font-weight: bold', context)
   console.log('%cUser Prompt:', 'color: #22c55e; font-weight: bold', prompt)
   console.log('%cFull Messages Array:', 'color: #3b82f6; font-weight: bold', JSON.parse(JSON.stringify(messages)))
-  console.log('%cModel:', 'color: #f59e0b; font-weight: bold', 'anthropic/claude-3-haiku')
+  console.log('%cModel:', 'color: #f59e0b; font-weight: bold', 'openai/gpt-4o-mini')
   console.groupEnd()
 
   try {
@@ -36,7 +36,7 @@ export async function askAI(prompt, context = '') {
         'X-Title': 'Innernet',
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-3-haiku',
+        model: 'openai/gpt-4o-mini',
         messages,
         max_tokens: 300,
       }),
