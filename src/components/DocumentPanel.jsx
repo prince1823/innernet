@@ -109,16 +109,16 @@ const fontOptions = [
   { value: 'Verdana', label: 'Verdana', style: { fontFamily: 'Verdana' } },
 ]
 
+// SVG icons as inline HTML strings for embedding in contentEditable
+const playIcon = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>`
+const starIcon = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`
+
 export default function DocumentPanel({ onAskAI, onImplementAll, activeAgentFeatures = [] }) {
   const [features, setFeatures] = useState(initialFeatures)
-  const [aiLoadingLine, setAiLoadingLine] = useState(null)
   const [fontSize, setFontSize] = useState(11)
   const [currentFont, setCurrentFont] = useState('Arial')
   const [currentHeading, setCurrentHeading] = useState('Normal text')
   const editorRef = useRef(null)
-  const bodyRef = useRef(null)
-  const overlayRef = useRef(null)
-  const hoveredElRef = useRef(null)
 
   // Save selection whenever it changes inside the editor
   useEffect(() => {
@@ -132,115 +132,68 @@ export default function DocumentPanel({ onAskAI, onImplementAll, activeAgentFeat
     return () => document.removeEventListener('selectionchange', handler)
   }, [])
 
-  // Hover overlay — listen on the doc-body wrapper so overlay is included in hover zone
+  // Click handler for inline action icons
   useEffect(() => {
     const editor = editorRef.current
-    const overlay = overlayRef.current
-    const body = bodyRef.current
-    if (!editor || !overlay || !body) return
+    if (!editor) return
 
-    const getLineEl = (node) => {
-      let el = node
-      while (el && el !== editor) {
-        if (el.dataset?.featId !== undefined) return el
-        el = el.parentElement
-      }
-      return null
-    }
+    const handler = (e) => {
+      const btn = e.target.closest('.doc-inline-btn')
+      if (!btn) return
+      e.preventDefault()
+      e.stopPropagation()
 
-    const showOverlay = (lineEl) => {
-      if (hoveredElRef.current === lineEl) return
-      hoveredElRef.current = lineEl
-      const bodyRect = body.getBoundingClientRect()
-      const lineRect = lineEl.getBoundingClientRect()
-      const isTitle = lineEl.tagName === 'H2'
+      const featId = btn.dataset.featId
+      const action = btn.dataset.action
+      const feat = features.find(f => f.id === featId)
+      if (!feat) return
 
-      overlay.style.display = 'flex'
-      overlay.style.top = `${lineRect.top - bodyRect.top + body.scrollTop + (lineRect.height / 2) - 12}px`
-      overlay.style.right = '8px'
+      const lineEl = btn.closest('[data-feat-id]')
+      const text = lineEl ? lineEl.textContent.replace(/[\u25B6\u2606]/g, '').trim() : feat.title
 
-      const implBtn = overlay.querySelector('.doc-overlay-implement')
-      if (implBtn) implBtn.style.display = isTitle ? 'flex' : 'none'
-
-      overlay.dataset.featId = lineEl.dataset.featId
-      overlay.dataset.featIdx = lineEl.dataset.featIdx || ''
-      overlay.dataset.text = lineEl.textContent
-      overlay.dataset.isTitle = isTitle ? '1' : ''
-    }
-
-    const hideOverlay = () => {
-      hoveredElRef.current = null
-      overlay.style.display = 'none'
-    }
-
-    const isMouseOverOverlay = (e) => {
-      if (overlay.style.display === 'none') return false
-      const r = overlay.getBoundingClientRect()
-      // Add generous padding so the gap between text and buttons doesn't trigger hide
-      return (
-        e.clientX >= r.left - 20 &&
-        e.clientX <= r.right + 4 &&
-        e.clientY >= r.top - 4 &&
-        e.clientY <= r.bottom + 4
-      )
-    }
-
-    const onMouseMove = (e) => {
-      // If mouse is near or over the overlay, keep it visible
-      if (isMouseOverOverlay(e)) return
-
-      const lineEl = getLineEl(e.target)
-      if (lineEl) {
-        showOverlay(lineEl)
-      } else {
-        hideOverlay()
+      if (action === 'implement' || action === 'ask-ai') {
+        onAskAI(featId, text, feat.bullets?.join('\n'))
       }
     }
 
-    const onMouseLeave = () => {
-      hideOverlay()
-    }
+    editor.addEventListener('click', handler)
+    return () => editor.removeEventListener('click', handler)
+  }, [features, onAskAI])
 
-    body.addEventListener('mousemove', onMouseMove)
-    body.addEventListener('mouseleave', onMouseLeave)
-    return () => {
-      body.removeEventListener('mousemove', onMouseMove)
-      body.removeEventListener('mouseleave', onMouseLeave)
-    }
-  }, [])
-
-  // Build initial HTML for the editor
+  // Build initial HTML with inline action icons on each line
   const buildInitialHTML = useCallback(() => {
     let html = ''
     features.forEach((feat, fi) => {
-      html += `<h2 class="doc-title" data-feat-id="${feat.id}" data-feat-idx="${fi}">${feat.title}</h2>`
+      // Title line — gets both Implement and Ask AI icons
+      html += `<h2 class="doc-title" data-feat-id="${feat.id}" data-feat-idx="${fi}">`
+      html += feat.title
+      html += `<span class="doc-inline-actions" contenteditable="false">`
+      html += `<span class="doc-inline-btn doc-inline-implement" data-feat-id="${feat.id}" data-action="implement" title="Implement">${playIcon}</span>`
+      html += `<span class="doc-inline-btn doc-inline-ai" data-feat-id="${feat.id}" data-action="ask-ai" title="Ask AI">${starIcon}</span>`
+      html += `</span></h2>`
+
+      // Description — gets Ask AI icon
       if (feat.description) {
-        html += `<p class="doc-desc" data-feat-id="${feat.id}">${feat.description}</p>`
+        html += `<p class="doc-desc" data-feat-id="${feat.id}">`
+        html += feat.description
+        html += `<span class="doc-inline-actions" contenteditable="false">`
+        html += `<span class="doc-inline-btn doc-inline-ai" data-feat-id="${feat.id}" data-action="ask-ai" title="Ask AI">${starIcon}</span>`
+        html += `</span></p>`
       }
+
+      // Bullets — each gets Ask AI icon
       feat.bullets.forEach((b, bi) => {
-        html += `<p class="doc-bullet" data-feat-id="${feat.id}" data-bullet-idx="${bi}"><span class="doc-bullet-marker" contenteditable="false">&#8226;</span> ${b}</p>`
+        html += `<p class="doc-bullet" data-feat-id="${feat.id}" data-bullet-idx="${bi}">`
+        html += `<span class="doc-bullet-marker" contenteditable="false">&#8226;</span> ${b}`
+        html += `<span class="doc-inline-actions" contenteditable="false">`
+        html += `<span class="doc-inline-btn doc-inline-ai" data-feat-id="${feat.id}" data-action="ask-ai" title="Ask AI">${starIcon}</span>`
+        html += `</span></p>`
       })
     })
     return html
-  }, []) // only on mount
+  }, [])
 
   const [initialHTML] = useState(buildInitialHTML)
-
-  const handleLineAskAI = useCallback((line) => {
-    setAiLoadingLine(line.id)
-    setTimeout(() => {
-      setFeatures(prev => prev.map(f => {
-        if (f.id !== line.featId) return f
-        const aiLine = {
-          text: `[AI suggestion] Enhanced: ${line.text.substring(0, 60)}...`,
-          original: line.text,
-          status: 'suggested',
-        }
-        return { ...f, aiLines: [...(f.aiLines || []), aiLine] }
-      }))
-      setAiLoadingLine(null)
-    }, 800)
-  }, [])
 
   const handleAiAction = useCallback((featId, aiIdx, action) => {
     setFeatures(prev => prev.map(f => {
@@ -284,30 +237,6 @@ export default function DocumentPanel({ onAskAI, onImplementAll, activeAgentFeat
       })
     }
   }
-
-  // Overlay button click handlers
-  const handleOverlayAskAI = useCallback(() => {
-    const overlay = overlayRef.current
-    if (!overlay) return
-    const featId = overlay.dataset.featId
-    const text = overlay.dataset.text
-    const feat = features.find(f => f.id === featId)
-    if (overlay.dataset.isTitle === '1') {
-      onAskAI(featId, text, feat?.bullets?.join('\n'))
-    } else {
-      // For non-title lines, simulate inline AI
-      handleLineAskAI({ id: featId + '-line', featId, text })
-    }
-  }, [features, onAskAI, handleLineAskAI])
-
-  const handleOverlayImplement = useCallback(() => {
-    const overlay = overlayRef.current
-    if (!overlay) return
-    const featId = overlay.dataset.featId
-    const text = overlay.dataset.text
-    const feat = features.find(f => f.id === featId)
-    onAskAI(featId, text, feat?.bullets?.join('\n'))
-  }, [features, onAskAI])
 
   return (
     <div className="doc-panel">
@@ -401,8 +330,8 @@ export default function DocumentPanel({ onAskAI, onImplementAll, activeAgentFeat
         </div>
       </div>
 
-      {/* ── Document body with floating overlay ── */}
-      <div className="doc-body" ref={bodyRef}>
+      {/* ── Single contentEditable document ── */}
+      <div className="doc-body">
         <div
           ref={editorRef}
           className="doc-editor"
@@ -410,18 +339,6 @@ export default function DocumentPanel({ onAskAI, onImplementAll, activeAgentFeat
           suppressContentEditableWarning
           dangerouslySetInnerHTML={{ __html: initialHTML }}
         />
-
-        {/* Floating hover overlay — positioned via DOM, not React state */}
-        <div ref={overlayRef} className="doc-line-overlay" style={{ display: 'none' }}>
-          <button className="doc-overlay-implement doc-line-implement-btn" onClick={handleOverlayImplement}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            Implement
-          </button>
-          <button className="doc-line-ai-btn" onClick={handleOverlayAskAI}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-            Ask AI
-          </button>
-        </div>
 
         {/* AI suggestion lines */}
         {features.some(f => f.aiLines?.length > 0) && (

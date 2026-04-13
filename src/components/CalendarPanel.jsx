@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
-import { calendarTasks, eventColors, notes as allNotes } from '../data/sampleData'
+import { calendarTasks, eventColors, notes as allNotes, activityLogs, featureDocItems, agentSessions } from '../data/sampleData'
 import './CalendarPanel.css'
 
 const DAYS_SHORT = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
@@ -53,12 +53,47 @@ function getAllEvents() {
   return all
 }
 
+// Build concise summary data for an event
+function getEventSummaryData(event, dateStr) {
+  // Related feature docs
+  const features = featureDocItems.filter(f =>
+    f.project === event.project ||
+    (event.tags && event.tags.some(t => f.title.toLowerCase().includes(t)))
+  ).slice(0, 2)
+
+  // Build "planned vs actual" text summary from action items
+  let approachSummary = null
+  if (event.actionItems) {
+    const planned = event.actionItems.flatMap(g => g.tasks.map(t => t.text))
+    const done = event.actionItems.flatMap(g => g.tasks.filter(t => t.done).map(t => t.text))
+    const notDone = event.actionItems.flatMap(g => g.tasks.filter(t => !t.done).map(t => t.text))
+    if (planned.length > 0) {
+      const plannedText = planned.slice(0, 2).map(t => t.length > 45 ? t.slice(0, 45) + '...' : t).join('; ')
+      const doneText = done.length > 0 ? done.slice(0, 2).map(t => t.length > 45 ? t.slice(0, 45) + '...' : t).join('; ') : 'None yet'
+      approachSummary = { plannedText, doneText, doneCount: done.length, totalCount: planned.length }
+    }
+  }
+
+  // Related agent session — build concise summary
+  const agentSession = agentSessions.find(s =>
+    s.date === dateStr ||
+    (event.tags && event.tags.some(t => s.title.toLowerCase().includes(t)))
+  )
+  let agentSummary = null
+  if (agentSession) {
+    agentSummary = agentSession.preview || agentSession.title
+  }
+
+  return { features, approachSummary, agentSummary }
+}
+
 export default function CalendarPanel({ selectedDate, setSelectedDate, selectedEvent, setSelectedEvent, onSlotClick, quickSlot, thoughts = {}, onDatePanelOpen }) {
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 9))
   const [showMiniCal, setShowMiniCal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState(null)
   const [zoomLevel, setZoomLevel] = useState(56) // pixels per hour: 42, 56, 84
+  const [expandedEvent, setExpandedEvent] = useState(null) // event id to expand inline
   const gridRef = useRef(null)
   const searchRef = useRef(null)
 
@@ -143,6 +178,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const handleEventClick = (e, event) => {
     e.stopPropagation()
     setSelectedEvent(event)
+    setExpandedEvent(prev => prev === event.id ? null : event.id)
   }
 
   const handleSlotClick = (e) => {
@@ -305,20 +341,6 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
         </div>
       )}
 
-      {/* Day Info Bar */}
-      <div className="cal-day-info" onClick={handleDateClick}>
-        <div className="cal-day-info-left">
-          <span className={`cal-day-info-num ${isToday ? 'today' : ''}`}>{currentDate.getDate()}</span>
-          <div className="cal-day-info-text">
-            <span className="cal-day-info-name">{DAYS_SHORT[currentDate.getDay()]}</span>
-            <span className="cal-day-info-count">{tasks.length} event{tasks.length !== 1 ? 's' : ''}</span>
-          </div>
-        </div>
-        <div className="cal-day-info-right">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
-        </div>
-      </div>
-
       {/* Time grid */}
       <div className="cal-grid-scroll" ref={gridRef}>
         <div className="cal-time-grid">
@@ -369,62 +391,73 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               const topOffset = (startMin / 60) * zoomLevel
               const height = (duration / 60) * zoomLevel
               const color = eventColors[task.colorIndex] || eventColors[0]
+              const isExpanded = expandedEvent === task.id
+              const summary = isExpanded ? getEventSummaryData(task, dateStr) : null
 
               return (
                 <div
                   key={task.id}
-                  className={`cal-event-block ${selectedEvent?.id === task.id ? 'selected' : ''}`}
+                  className={`cal-event-block ${selectedEvent?.id === task.id ? 'selected' : ''} ${isExpanded ? 'expanded' : ''}`}
                   style={{
                     top: `${topOffset}px`,
-                    height: `${Math.max(height, 24)}px`,
+                    minHeight: `${Math.max(height, 24)}px`,
+                    height: isExpanded ? 'auto' : `${Math.max(height, 24)}px`,
                     backgroundColor: color.bg,
                     borderLeft: `4px solid ${color.border}`,
                   }}
                   onClick={(e) => handleEventClick(e, task)}
                 >
-                  <span className="cal-event-title" style={{ color: color.text }}>{task.title}</span>
+                  <div className="cal-event-top-row">
+                    <span className="cal-event-title" style={{ color: color.text }}>{task.title}</span>
+                    {isExpanded && (
+                      <span className="cal-event-collapse-hint" style={{ color: color.text }}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+                      </span>
+                    )}
+                  </div>
                   <span className="cal-event-time" style={{ color: color.text }}>
                     {formatTimeDisplay(task.time)} – {formatTimeDisplay(task.endTime)}
                   </span>
-                  <div className="cal-event-indicators">
-                    <div className="cal-event-icons">
-                      {task.topicNotes && (
-                        <span className="cal-ind-icon" title="Notes" style={{ color: color.text }}>
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                        </span>
+
+                  {/* Expanded inline summary */}
+                  {isExpanded && summary && (
+                    <div className="cal-inline-summary" onClick={(e) => e.stopPropagation()}>
+                      {/* AI Summary */}
+                      {task.aiSummary && (
+                        <div className="cal-is-row">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                          <span className="cal-is-text">{task.aiSummary}</span>
+                        </div>
                       )}
-                      {task.transcription && (
-                        <span className="cal-ind-icon" title="Transcript" style={{ color: color.text }}>
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
-                        </span>
+
+                      {/* Approach: Planned vs Actual — text only */}
+                      {summary.approachSummary && (
+                        <div className="cal-is-approach">
+                          <span className="cal-is-label">Approach</span>
+                          <p className="cal-is-approach-text">
+                            <strong>Planned:</strong> {summary.approachSummary.plannedText}
+                          </p>
+                          <p className="cal-is-approach-text">
+                            <strong>Done:</strong> {summary.approachSummary.doneText}
+                          </p>
+                        </div>
                       )}
-                      {task.actionItems && task.actionItems.length > 0 && (() => {
-                        const allTasks = task.actionItems.flatMap(g => g.tasks)
-                        const done = allTasks.filter(t => t.done).length
-                        return (
-                          <span className="cal-ind-tasks" title={`${done}/${allTasks.length} tasks`} style={{ color: color.text }}>
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                            <span className="cal-ind-tasks-count">{done}/{allTasks.length}</span>
-                          </span>
-                        )
-                      })()}
-                      {task.project && (
-                        <span className="cal-event-project" style={{ color: color.text }}>#{task.project}</span>
+
+                      {/* Feature docs — title only, no status */}
+                      {summary.features.length > 0 && (
+                        <div className="cal-is-features">
+                          <span className="cal-is-label">Feature Docs</span>
+                          {summary.features.map(f => (
+                            <div key={f.id} className="cal-is-feat-row">
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                              <span className="cal-is-feat-title">{f.title}</span>
+                            </div>
+                          ))}
+                        </div>
                       )}
+
                     </div>
-                    {task.attendees && task.attendees.length > 0 && (
-                      <div className="cal-event-avatars">
-                        {task.attendees.slice(0, 3).map((name, ai) => (
-                          <div key={ai} className="cal-avatar" title={name} style={{ background: color.border, zIndex: 3 - ai }}>
-                            {name.charAt(0)}
-                          </div>
-                        ))}
-                        {task.attendees.length > 3 && (
-                          <div className="cal-avatar cal-avatar-more" style={{ background: `${color.border}88` }}>+{task.attendees.length - 3}</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
               )
             })}

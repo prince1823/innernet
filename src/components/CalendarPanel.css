@@ -657,3 +657,144 @@
   border-radius: var(--radius-full);
   flex-shrink: 0;
 }
+
+/* ══════════════════════════════════════════════
+   Expanded Event Block — Inline Summary
+   ══════════════════════════════════════════════ */
+.cal-event-block.expanded {
+  z-index: 10;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  overflow: visible;
+  cursor: default;
+  padding-bottom: 10px;
+  background: white !important;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-left-width: 4px;
+  color: var(--text-primary);
+}
+
+.cal-event-block.expanded .cal-event-title,
+.cal-event-block.expanded .cal-event-time {
+  color: var(--text-primary) !important;
+}
+
+.cal-event-block.expanded .cal-event-time {
+  opacity: 0.6;
+}
+
+.cal-event-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cal-event-collapse-hint {
+  opacity: 0.5;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.cal-inline-summary {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: isSlideIn 0.2s ease;
+}
+
+@keyframes isSlideIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* AI Summary row */
+.cal-is-row {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.cal-is-row svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  opacity: 0.6;
+}
+
+.cal-is-text {
+  font-size: 11px;
+  line-height: 1.55;
+  opacity: 0.85;
+}
+
+/* Label */
+.cal-is-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.5;
+  display: block;
+  margin-bottom: 3px;
+}
+
+/* Approach: Planned vs Actual */
+.cal-is-approach {
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 5px;
+}
+
+.cal-is-approach-text {
+  font-size: 10.5px;
+  line-height: 1.5;
+  margin: 2px 0;
+  opacity: 0.8;
+}
+
+.cal-is-approach-text strong {
+  font-weight: 600;
+  opacity: 1;
+}
+
+/* Feature docs */
+.cal-is-features {
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 5px;
+}
+
+.cal-is-feat-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 0;
+}
+
+.cal-is-feat-row svg { opacity: 0.5; flex-shrink: 0; }
+
+.cal-is-feat-title {
+  font-size: 10.5px;
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Agent session */
+.cal-is-agent {
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 5px;
+}
+
+.cal-is-agent-text {
+  font-size: 10.5px;
+  line-height: 1.5;
+  opacity: 0.8;
+  margin: 2px 0 0;
+  font-style: italic;
+}
