@@ -36,15 +36,8 @@
   transition: background 0.15s;
 }
 
-.doc-feat-title-text:not([contenteditable="true"]):hover {
-  background: rgba(139, 92, 246, 0.05);
+.doc-feat-title-text:hover {
   cursor: text;
-}
-
-.doc-feat-title-text[contenteditable="true"] {
-  background: rgba(139, 92, 246, 0.06);
-  box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.2);
-  padding: 0 2px;
 }
 
 .doc-feat-actions {
@@ -112,15 +105,8 @@
   transition: background 0.15s;
 }
 
-.doc-feat-desc:not([contenteditable="true"]):hover {
-  background: rgba(139, 92, 246, 0.05);
+.doc-feat-desc:hover {
   cursor: text;
-}
-
-.doc-feat-desc[contenteditable="true"] {
-  background: rgba(139, 92, 246, 0.06);
-  box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.2);
-  padding: 2px 4px;
 }
 
 /* ── Bullets ── */
@@ -158,15 +144,8 @@
   transition: background 0.15s;
 }
 
-.doc-bullet-text:not([contenteditable="true"]):hover {
-  background: rgba(139, 92, 246, 0.05);
+.doc-bullet-text:hover {
   cursor: text;
-}
-
-.doc-bullet-text[contenteditable="true"] {
-  background: rgba(139, 92, 246, 0.06);
-  box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.2);
-  padding: 0 2px;
 }
 
 .doc-bullet-ai-btn {

@@ -324,10 +324,9 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                   className="doc-feat-title-text"
                   contentEditable={editingKey === `${feat.id}-title`}
                   suppressContentEditableWarning
-                  onDoubleClick={() => setEditingKey(`${feat.id}-title`)}
+                  onClick={() => setEditingKey(`${feat.id}-title`)}
                   onBlur={e => { updateField(feat.id, 'title', e.currentTarget.textContent); setEditingKey(null) }}
-                  title={editingKey === `${feat.id}-title` ? '' : 'Double-click to edit'}
-                >
+                                  >
                   {feat.title}
                 </span>
                 <div className="doc-feat-actions">
@@ -412,9 +411,8 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                 ) : (
                   <p
                     className="doc-feat-desc"
-                    onDoubleClick={() => setEditingKey(`${feat.id}-desc`)}
-                    title="Double-click to edit"
-                    dangerouslySetInnerHTML={{ __html: renderMd(feat.description) }}
+                    onClick={() => setEditingKey(`${feat.id}-desc`)}
+                                        dangerouslySetInnerHTML={{ __html: renderMd(feat.description) }}
                   />
                 )
               )}
@@ -444,9 +442,8 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                         ) : (
                           <span
                             className="doc-bullet-text"
-                            onDoubleClick={() => setEditingKey(`${feat.id}-bullet-${bi}`)}
-                            title="Double-click to edit"
-                            dangerouslySetInnerHTML={{ __html: renderMd(bulletText) }}
+                            onClick={() => setEditingKey(`${feat.id}-bullet-${bi}`)}
+                                                        dangerouslySetInnerHTML={{ __html: renderMd(bulletText) }}
                           />
                         )}
                         <button
