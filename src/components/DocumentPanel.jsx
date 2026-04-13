@@ -3,6 +3,33 @@ import { featureDocItems } from '../data/sampleData'
 import { askAI } from '../utils/askAI'
 import './DocumentPanel.css'
 
+function AiIcon({ size = 12 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="currentColor">
+      {/* Chip */}
+      <rect x="18" y="4" width="28" height="28" rx="5" />
+      {/* Chip pins */}
+      <rect x="24" y="1" width="3" height="5" rx="1" />
+      <rect x="31" y="1" width="3" height="5" rx="1" />
+      <rect x="37" y="1" width="3" height="5" rx="1" />
+      <rect x="24" y="30" width="3" height="5" rx="1" />
+      <rect x="31" y="30" width="3" height="5" rx="1" />
+      <rect x="37" y="30" width="3" height="5" rx="1" />
+      <rect x="14" y="10" width="5" height="3" rx="1" />
+      <rect x="14" y="17" width="5" height="3" rx="1" />
+      <rect x="14" y="24" width="5" height="3" rx="1" />
+      <rect x="45" y="10" width="5" height="3" rx="1" />
+      <rect x="45" y="17" width="5" height="3" rx="1" />
+      <rect x="45" y="24" width="5" height="3" rx="1" />
+      {/* AI text */}
+      <text x="32" y="23" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold" fontFamily="Arial">AI</text>
+      {/* Hand */}
+      <path d="M14 54 C14 54 14 48 20 48 L38 48 C42 48 44 44 40 42 L36 40 C34 39 36 36 38 37 L52 44 C56 46 56 52 52 56 L40 62 C36 64 28 64 24 62 L14 56 Z" />
+      <rect x="4" y="48" width="10" height="16" rx="3" />
+    </svg>
+  )
+}
+
 function renderMd(text) {
   if (!text) return ''
   return text
@@ -97,7 +124,7 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                     {titleLoading ? (
                       <span className="doc-ai-spinner" />
                     ) : (
-                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                      <AiIcon size={11} />
                     )}
                     Ask AI
                   </button>
@@ -108,7 +135,7 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
               {titleLoading && (
                 <div className="doc-ai-inline shimmer-container">
                   <div className="doc-ai-inline-header">
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    <AiIcon size={11} />
                     <span>AI is thinking...</span>
                   </div>
                   <div className="doc-ai-shimmer">
@@ -124,7 +151,7 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
               {titleResponse && (
                 <div className={`doc-ai-inline doc-ai-reveal ${acceptedKeys.has(titleKey) ? 'accepted' : ''}`}>
                   <div className="doc-ai-inline-header">
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    <AiIcon size={11} />
                     <span>AI</span>
                     {acceptedKeys.has(titleKey) ? (
                       <span className="doc-ai-accepted-badge">Added to doc</span>
@@ -139,7 +166,12 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                       </div>
                     )}
                   </div>
-                  <div className="doc-ai-inline-text" dangerouslySetInnerHTML={{ __html: renderMd(titleResponse) }} />
+                  <div
+                    className={`doc-ai-inline-text ${acceptedKeys.has(titleKey) ? 'editable' : ''}`}
+                    contentEditable={acceptedKeys.has(titleKey)}
+                    suppressContentEditableWarning
+                    dangerouslySetInnerHTML={{ __html: renderMd(titleResponse) }}
+                  />
                 </div>
               )}
 
@@ -174,7 +206,7 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                           {isLoading ? (
                             <span className="doc-ai-spinner" />
                           ) : (
-                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                            <AiIcon size={11} />
                           )}
                         </button>
                       </div>
@@ -183,7 +215,7 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                       {isLoading && (
                         <div className="doc-ai-inline shimmer-container">
                           <div className="doc-ai-inline-header">
-                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                            <AiIcon size={11} />
                             <span>AI is thinking...</span>
                           </div>
                           <div className="doc-ai-shimmer">
@@ -199,7 +231,7 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                       {response && (
                         <div className={`doc-ai-inline doc-ai-reveal ${acceptedKeys.has(bulletKey) ? 'accepted' : ''}`}>
                           <div className="doc-ai-inline-header">
-                            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                            <AiIcon size={11} />
                             <span>AI</span>
                             {acceptedKeys.has(bulletKey) ? (
                               <span className="doc-ai-accepted-badge">Added to doc</span>
@@ -214,7 +246,12 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                               </div>
                             )}
                           </div>
-                          <div className="doc-ai-inline-text" dangerouslySetInnerHTML={{ __html: renderMd(response) }} />
+                          <div
+                            className={`doc-ai-inline-text ${acceptedKeys.has(bulletKey) ? 'editable' : ''}`}
+                            contentEditable={acceptedKeys.has(bulletKey)}
+                            suppressContentEditableWarning
+                            dangerouslySetInnerHTML={{ __html: renderMd(response) }}
+                          />
                         </div>
                       )}
                     </div>

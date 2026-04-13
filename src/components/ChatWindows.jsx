@@ -84,14 +84,9 @@ export default function ChatWindows({ featureWindows = [], onClose }) {
         <div className="cw-chat">
 
           <div className="cw-messages">
-            {activeWindow.messages?.map((msg, i) => (
+            {activeWindow.messages?.filter(msg => msg.role !== 'system').map((msg, i) => (
               <div key={i} className={`cw-msg ${msg.role}`}>
-                {msg.role === 'system' ? (
-                  <div className="cw-msg-system">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                    <span>{msg.content}</span>
-                  </div>
-                ) : msg.role === 'user' ? (
+                {msg.role === 'user' ? (
                   <div className="cw-msg-user-row">
                     <div className="cw-msg-bubble user">{msg.content}</div>
                   </div>

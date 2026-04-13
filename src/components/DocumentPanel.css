@@ -252,6 +252,22 @@
 
 .doc-ai-inline-text {
   color: #333;
+  outline: none;
+}
+
+.doc-ai-inline-text.editable {
+  cursor: text;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.doc-ai-inline-text.editable:hover {
+  background: rgba(34, 197, 94, 0.05);
+}
+
+.doc-ai-inline-text.editable:focus {
+  background: rgba(34, 197, 94, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.2);
 }
 
 .doc-ai-inline-text strong {

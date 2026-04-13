@@ -18,6 +18,14 @@ export async function askAI(prompt, context = '') {
 
   messages.push({ role: 'user', content: prompt })
 
+  console.group('%c🤖 Ask AI Request', 'color: #8b5cf6; font-weight: bold')
+  console.log('%cSystem Prompt:', 'color: #666; font-weight: bold', systemPrompt)
+  if (context) console.log('%cContext:', 'color: #666; font-weight: bold', context)
+  console.log('%cUser Prompt:', 'color: #22c55e; font-weight: bold', prompt)
+  console.log('%cFull Messages Array:', 'color: #3b82f6; font-weight: bold', JSON.parse(JSON.stringify(messages)))
+  console.log('%cModel:', 'color: #f59e0b; font-weight: bold', 'anthropic/claude-3-haiku')
+  console.groupEnd()
+
   try {
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -41,7 +49,13 @@ export async function askAI(prompt, context = '') {
     }
 
     const data = await res.json()
-    return data.choices?.[0]?.message?.content || '**AI:** No response generated.'
+    const reply = data.choices?.[0]?.message?.content || '**AI:** No response generated.'
+    console.group('%c🤖 Ask AI Response', 'color: #22c55e; font-weight: bold')
+    console.log('%cResponse:', 'color: #666; font-weight: bold', reply)
+    console.log('%cTokens:', 'color: #f59e0b; font-weight: bold', `prompt: ${data.usage?.prompt_tokens}, completion: ${data.usage?.completion_tokens}, total: ${data.usage?.total_tokens}`)
+    console.log('%cCost:', 'color: #ef4444; font-weight: bold', `$${data.usage?.cost?.toFixed(6) || '?'}`)
+    console.groupEnd()
+    return reply
   } catch (err) {
     console.error('AI request failed:', err)
     return `**AI Error:** Network request failed.`
