@@ -2,6 +2,22 @@ import { useState } from 'react'
 import { agentSessions, featureDocItems } from '../data/sampleData'
 import './ChatWindows.css'
 
+function renderMarkdown(text) {
+  if (!text) return ''
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+    .replace(/(<\/ul>\s*<ul>)/g, '')
+    .replace(/\n\n/g, '<br/><br/>')
+    .replace(/\n/g, '<br/>')
+}
+
 export default function ChatWindows({ featureWindows = [], onClose }) {
   const [activeTab, setActiveTab] = useState(featureWindows[0]?.id || featureDocItems[0]?.id)
   const [inputValues, setInputValues] = useState({})
@@ -72,22 +88,14 @@ export default function ChatWindows({ featureWindows = [], onClose }) {
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
                     <span>{msg.content}</span>
                   </div>
+                ) : msg.role === 'user' ? (
+                  <div className="cw-msg-user-row">
+                    <div className="cw-msg-bubble user">{msg.content}</div>
+                  </div>
                 ) : (
-                  <>
-                    <div className="cw-msg-avatar">
-                      {msg.role === 'user' ? (
-                        <div className="cw-av-user">PS</div>
-                      ) : (
-                        <div className="cw-av-ai">
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                        </div>
-                      )}
-                    </div>
-                    <div className="cw-msg-body">
-                      <div className="cw-msg-role">{msg.role === 'user' ? 'You' : 'Agent'}</div>
-                      <div className={`cw-msg-content ${msg.role}`}>{msg.content}</div>
-                    </div>
-                  </>
+                  <div className="cw-msg-ai-row">
+                    <div className="cw-msg-ai-content" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
+                  </div>
                 )}
               </div>
             ))}
