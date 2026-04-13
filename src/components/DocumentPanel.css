@@ -219,6 +219,7 @@
   flex: 1;
   overflow-y: auto;
   background: #fff;
+  position: relative;
 }
 
 .doc-editor {
@@ -390,6 +391,72 @@
   display: inline-block;
   margin-top: 4px;
   width: fit-content;
+}
+
+/* ── Floating Hover Overlay (Ask AI / Implement) ── */
+.doc-line-overlay {
+  position: absolute;
+  display: none;
+  gap: 4px;
+  z-index: 10;
+  pointer-events: auto;
+  animation: fadeInOverlay 0.12s ease;
+}
+
+@keyframes fadeInOverlay {
+  from { opacity: 0; transform: translateX(4px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.doc-line-implement-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, var(--purple-500), var(--purple-600));
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(139, 92, 246, 0.25);
+  font-family: var(--font-sans);
+}
+
+.doc-line-implement-btn:hover {
+  opacity: 0.9;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.35);
+}
+
+.doc-line-ai-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--purple-600);
+  background: var(--purple-50);
+  border: 1px solid var(--purple-200);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(139, 92, 246, 0.12);
+  font-family: var(--font-sans);
+}
+
+.doc-line-ai-btn:hover {
+  background: var(--purple-100);
+  border-color: var(--purple-300);
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.2);
+}
+
+.doc-line-ai-btn svg {
+  color: var(--purple-500);
 }
 
 /* ── Scrollbar ── */
