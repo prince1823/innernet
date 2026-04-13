@@ -75,7 +75,6 @@ const QUICK_ACTIONS = [
   { label: 'Improve writing', prompt: (t) => `Improve the writing of this text, keep it concise: "${t}"` },
   { label: 'Make shorter',    prompt: (t) => `Make this shorter while keeping the meaning: "${t}"` },
   { label: 'Simplify',        prompt: (t) => `Simplify the language of this text: "${t}"` },
-  { label: 'Proofread',       prompt: (t) => `Proofread and fix any errors in: "${t}"` },
 ]
 
 const STORAGE_KEY = 'innernet-doc-edits'
@@ -387,7 +386,33 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
           const titleKey = `${feat.id}-title`
           const titleLoading = loadingKeys.has(titleKey)
           const titleResponse = aiResponses[titleKey]
-          const featContext = feat.bullets.map(b => b.text).join('\n')
+          // Build full context: description + bullets + any AI responses/inserts present
+          const featContext = [
+            feat.description ? `Description: ${feat.description}` : '',
+            ...feat.bullets.flatMap((b, bi) => {
+              const bulletKey = `${feat.id}-${bi}`
+              const lines = [`- ${b.text}`]
+              // include AI response for this bullet if present
+              const aiHtml = aiResponses[bulletKey]
+              if (aiHtml) {
+                // strip HTML tags to get plain text for the prompt
+                const plain = aiHtml.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim()
+                if (plain) lines.push(`  [AI note] ${plain}`)
+              }
+              // include any selection-inserted content anchored to this bullet
+              selInserts
+                .filter(ins => ins.featId === feat.id && ins.bulletIdx === bi)
+                .forEach(ins => {
+                  const plain = ins.text.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim()
+                  if (plain) lines.push(`  [inserted] ${plain}`)
+                })
+              return lines
+            }),
+            // include feature-level AI response if present
+            aiResponses[titleKey]
+              ? `[AI overview] ${aiResponses[titleKey].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim()}`
+              : '',
+          ].filter(Boolean).join('\n')
 
           return (
             <div key={feat.id} className="doc-feature" data-feat-id={feat.id} data-feat-only="true">
@@ -410,7 +435,7 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                     }}
                     title="Implement"
                   >
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                   </button>
                   <button
                     className="doc-ask-ai-btn"
@@ -523,18 +548,6 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                                                         dangerouslySetInnerHTML={{ __html: renderMd(bulletText) }}
                           />
                         )}
-                        <button
-                          className="doc-bullet-ai-btn"
-                          onClick={() => handleAskInline(feat.id, bi, bulletText, feat.title, featContext)}
-                          disabled={isLoading}
-                          title="Ask AI about this"
-                        >
-                          {isLoading ? (
-                            <span className="doc-ai-spinner" />
-                          ) : (
-                            <AiIcon size={11} />
-                          )}
-                        </button>
                       </div>
 
                       {/* AI shimmer loading for bullet */}
