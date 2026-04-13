@@ -116,6 +116,20 @@
 
 .doc-bullet-block {
   margin-bottom: 2px;
+  position: relative;
+}
+
+/* Vertical thread line: from below bullet down to card */
+.doc-bullet-block:has(.doc-ai-inline)::before,
+.doc-bullet-block:has(.shimmer-container)::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 20px;
+  bottom: 14px;
+  width: 1.5px;
+  background: #ddd6fe;
+  border-radius: 1px;
 }
 
 .doc-bullet-row {
@@ -176,15 +190,39 @@
 
 /* ── AI Inline Response ── */
 .doc-ai-inline {
-  margin: 4px 0 8px 14px;
-  padding: 8px 10px;
+  margin: 4px 0 10px 20px;
+  padding: 7px 10px;
   background: linear-gradient(135deg, #faf8ff 0%, #f3f0ff 100%);
-  border-left: 2px solid var(--purple-400, #a78bfa);
-  border-radius: 0 8px 8px 0;
+  border: 1px solid #e9e4ff;
+  border-radius: 8px;
   font-size: 11px;
   line-height: 1.6;
   color: var(--text-primary, #1a1a2e);
   animation: docAiFadeIn 0.25s ease;
+  position: relative;
+}
+
+/* └── horizontal connector from thread line to card */
+.doc-ai-inline::before {
+  content: '';
+  position: absolute;
+  left: -14px;
+  top: 13px;
+  width: 12px;
+  height: 1.5px;
+  background: #ddd6fe;
+}
+
+/* small corner dot where vertical meets horizontal */
+.doc-ai-inline::after {
+  content: '';
+  position: absolute;
+  left: -15px;
+  top: 7px;
+  width: 1.5px;
+  height: 8px;
+  background: #ddd6fe;
+  border-radius: 1px;
 }
 
 @keyframes docAiFadeIn {
@@ -253,8 +291,15 @@
 
 /* Accepted state */
 .doc-ai-inline.accepted {
-  border-left-color: #22c55e;
+  border-color: #bbf7d0;
   background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+}
+.doc-ai-inline.accepted::before,
+.doc-ai-inline.accepted::after {
+  background: #bbf7d0;
+}
+.doc-bullet-block:has(.doc-ai-inline.accepted)::before {
+  background: #bbf7d0;
 }
 
 .doc-ai-accepted-badge {
@@ -309,6 +354,33 @@
 /* ── Shimmer / Water-flow Loading ── */
 .shimmer-container {
   animation: docAiFadeIn 0.2s ease;
+  margin: 4px 0 10px 20px;
+  padding: 7px 10px;
+  background: linear-gradient(135deg, #faf8ff 0%, #f3f0ff 100%);
+  border: 1px solid #e9e4ff;
+  border-radius: 8px;
+  position: relative;
+}
+
+/* same connector for shimmer */
+.shimmer-container::before {
+  content: '';
+  position: absolute;
+  left: -14px;
+  top: 13px;
+  width: 12px;
+  height: 1.5px;
+  background: #ddd6fe;
+}
+.shimmer-container::after {
+  content: '';
+  position: absolute;
+  left: -15px;
+  top: 7px;
+  width: 1.5px;
+  height: 8px;
+  background: #ddd6fe;
+  border-radius: 1px;
 }
 
 .shimmer-container .doc-ai-inline-header span {
@@ -520,8 +592,15 @@
 
 /* ── Sel-insert card (already accepted, just dismissible) ── */
 .sel-insert-card {
-  border-left-color: #22c55e;
+  border-color: #bbf7d0;
   background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+}
+.sel-insert-card::before,
+.sel-insert-card::after {
+  background: #bbf7d0;
+}
+.doc-bullet-block:has(.sel-insert-card)::before {
+  background: #bbf7d0;
 }
 
 /* ── Scrollbar ── */
