@@ -37,9 +37,62 @@ const QUICK_ACTIONS = [
   { label: 'Proofread',       prompt: (t) => `Proofread and fix any errors in: "${t}"` },
 ]
 
+const STORAGE_KEY = 'innernet-doc-edits'
+
+function loadFeatures() {
+  const base = featureDocItems.map(f => ({
+    ...f,
+    bullets: f.bullets.map(b => typeof b === 'string' ? { text: b } : { ...b }),
+  }))
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
+    return base.map(f => {
+      const s = saved[f.id]
+      if (!s) return f
+      return {
+        ...f,
+        title: s.title ?? f.title,
+        description: s.description ?? f.description,
+        bullets: f.bullets.map((b, i) => ({ ...b, text: s.bullets?.[i] ?? b.text })),
+      }
+    })
+  } catch { return base }
+}
+
+function saveFeature(featId, field, value) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
+    if (!saved[featId]) saved[featId] = {}
+    if (field === 'title' || field === 'description') {
+      saved[featId][field] = value
+    } else if (field.startsWith('bullet-')) {
+      const idx = parseInt(field.replace('bullet-', ''))
+      if (!saved[featId].bullets) saved[featId].bullets = {}
+      saved[featId].bullets[idx] = value
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(saved))
+  } catch {}
+}
+
 export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
+  const [features, setFeatures] = useState(loadFeatures)
   const [aiResponses, setAiResponses] = useState({}) // key: "featId-bulletIdx" or "featId-title"
   const [loadingKeys, setLoadingKeys] = useState(new Set())
+
+  const updateField = (featId, field, value) => {
+    saveFeature(featId, field, value)
+    setFeatures(prev => prev.map(f => {
+      if (f.id !== featId) return f
+      if (field === 'title') return { ...f, title: value }
+      if (field === 'description') return { ...f, description: value }
+      if (field.startsWith('bullet-')) {
+        const idx = parseInt(field.replace('bullet-', ''))
+        const bullets = f.bullets.map((b, i) => i === idx ? { ...b, text: value } : b)
+        return { ...f, bullets }
+      }
+      return f
+    }))
+  }
 
   // Selection popup
   const [selPopup, setSelPopup] = useState(null) // { x, y, text }
@@ -240,17 +293,22 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
             )}
           </div>
         )}
-        {featureDocItems.map((feat) => {
+        {features.map((feat) => {
           const titleKey = `${feat.id}-title`
           const titleLoading = loadingKeys.has(titleKey)
           const titleResponse = aiResponses[titleKey]
-          const featContext = feat.bullets.map(b => typeof b === 'string' ? b : b.text).join('\n')
+          const featContext = feat.bullets.map(b => b.text).join('\n')
 
           return (
             <div key={feat.id} className="doc-feature">
               {/* Feature title */}
               <div className="doc-feat-title">
-                <span className="doc-feat-title-text">
+                <span
+                  className="doc-feat-title-text"
+                  contentEditable
+                  suppressContentEditableWarning
+                  onBlur={e => updateField(feat.id, 'title', e.currentTarget.textContent)}
+                >
                   {feat.title}
                 </span>
                 <div className="doc-feat-actions">
@@ -322,7 +380,12 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
 
               {/* Description */}
               {feat.description && (
-                <p className="doc-feat-desc">
+                <p
+                  className="doc-feat-desc"
+                  contentEditable
+                  suppressContentEditableWarning
+                  onBlur={e => updateField(feat.id, 'description', e.currentTarget.textContent)}
+                >
                   {feat.description}
                 </p>
               )}
@@ -330,7 +393,7 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
               {/* Bullets */}
               <div className="doc-bullets">
                 {feat.bullets.map((bullet, bi) => {
-                  const bulletText = typeof bullet === 'string' ? bullet : bullet.text
+                  const bulletText = bullet.text
                   const bulletKey = `${feat.id}-${bi}`
                   const isLoading = loadingKeys.has(bulletKey)
                   const response = aiResponses[bulletKey]
@@ -339,7 +402,12 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                     <div key={bi} className="doc-bullet-block">
                       <div className="doc-bullet-row">
                         <span className="doc-bullet-marker">•</span>
-                        <span className="doc-bullet-text">
+                        <span
+                          className="doc-bullet-text"
+                          contentEditable
+                          suppressContentEditableWarning
+                          onBlur={e => updateField(feat.id, `bullet-${bi}`, e.currentTarget.textContent)}
+                        >
                           {bulletText}
                         </span>
                         <button
