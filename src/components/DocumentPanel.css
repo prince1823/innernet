@@ -32,6 +32,19 @@
   outline: none;
   flex: 1;
   line-height: 1.4;
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+
+.doc-feat-title-text:not([contenteditable="true"]):hover {
+  background: rgba(139, 92, 246, 0.05);
+  cursor: text;
+}
+
+.doc-feat-title-text[contenteditable="true"] {
+  background: rgba(139, 92, 246, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.2);
+  padding: 0 2px;
 }
 
 .doc-feat-actions {
@@ -95,6 +108,19 @@
   padding: 2px 0;
   line-height: 1.6;
   outline: none;
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+
+.doc-feat-desc:not([contenteditable="true"]):hover {
+  background: rgba(139, 92, 246, 0.05);
+  cursor: text;
+}
+
+.doc-feat-desc[contenteditable="true"] {
+  background: rgba(139, 92, 246, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.2);
+  padding: 2px 4px;
 }
 
 /* ── Bullets ── */
@@ -128,6 +154,19 @@
   line-height: 1.7;
   outline: none;
   flex: 1;
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+
+.doc-bullet-text:not([contenteditable="true"]):hover {
+  background: rgba(139, 92, 246, 0.05);
+  cursor: text;
+}
+
+.doc-bullet-text[contenteditable="true"] {
+  background: rgba(139, 92, 246, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.2);
+  padding: 0 2px;
 }
 
 .doc-bullet-ai-btn {
@@ -499,6 +538,12 @@
 .sel-res-btn.retry:hover   { background: #f3f4f6; }
 .sel-res-btn.discard { color: #ef4444; border-color: #fecaca; }
 .sel-res-btn.discard:hover { background: #ef4444; color: #fff; border-color: #ef4444; }
+
+/* ── Sel-insert card (already accepted, just dismissible) ── */
+.sel-insert-card {
+  border-left-color: #22c55e;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+}
 
 /* ── Scrollbar ── */
 .doc-body::-webkit-scrollbar { width: 6px; }

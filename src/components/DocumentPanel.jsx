@@ -78,6 +78,8 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
   const [features, setFeatures] = useState(loadFeatures)
   const [aiResponses, setAiResponses] = useState({}) // key: "featId-bulletIdx" or "featId-title"
   const [loadingKeys, setLoadingKeys] = useState(new Set())
+  const [editingKey, setEditingKey] = useState(null) // which field is in edit mode
+  const [selInserts, setSelInserts] = useState([]) // { id, featId, bulletIdx, text }
 
   const updateField = (featId, field, value) => {
     saveFeature(featId, field, value)
@@ -100,6 +102,7 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
   const [selResponse, setSelResponse] = useState(null) // { original, suggestion }
   const [selInput, setSelInput] = useState('')
   const docBodyRef = useRef(null)
+  const savedRangeRef = useRef(null) // save selection range before clicks clear it
 
   useEffect(() => {
     const handleMouseUp = (e) => {
@@ -112,10 +115,23 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
         const range = sel.getRangeAt(0)
         const rect = range.getBoundingClientRect()
         const bodyRect = docBodyRef.current.getBoundingClientRect()
+        savedRangeRef.current = range.cloneRange()
+
+        // Capture feat/bullet position now, before any re-renders detach the nodes
+        let featId = null, bulletIdx = null
+        let el = sel.anchorNode
+        if (el && el.nodeType === 3) el = el.parentElement
+        while (el && el !== docBodyRef.current) {
+          if (el.dataset?.featId) { featId = el.dataset.featId; bulletIdx = parseInt(el.dataset.bulletIdx ?? '-1'); break }
+          el = el.parentElement
+        }
+
         setSelPopup({
           x: rect.left - bodyRect.left + rect.width / 2,
           y: rect.top - bodyRect.top - 8 + docBodyRef.current.scrollTop,
           text,
+          featId,
+          bulletIdx,
         })
         setSelResponse(null)
         setSelInput('')
@@ -156,29 +172,30 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
   }
 
   const handleSelAccept = () => {
-    const sel = window.getSelection()
-    if (sel && sel.rangeCount > 0 && selResponse) {
+    if (savedRangeRef.current && selResponse) {
       try {
-        const range = sel.getRangeAt(0)
+        const range = savedRangeRef.current
         range.deleteContents()
         range.insertNode(document.createTextNode(selResponse.suggestion))
-        sel.removeAllRanges()
+        window.getSelection()?.removeAllRanges()
+        savedRangeRef.current = null
       } catch {}
     }
     setSelPopup(null); setSelResponse(null)
   }
 
   const handleSelInsertBelow = () => {
-    const sel = window.getSelection()
-    if (sel && sel.rangeCount > 0 && selResponse) {
-      try {
-        const range = sel.getRangeAt(0).cloneRange()
-        range.collapse(false)
-        range.insertNode(document.createTextNode(' ' + selResponse.suggestion))
-        sel.removeAllRanges()
-      } catch {}
+    if (selResponse && selPopup?.featId && selPopup.bulletIdx >= 0) {
+      setSelInserts(prev => [...prev, {
+        id: `si-${Date.now()}`,
+        featId: selPopup.featId,
+        bulletIdx: selPopup.bulletIdx,
+        text: selResponse.suggestion,
+      }])
     }
-    setSelPopup(null); setSelResponse(null)
+    savedRangeRef.current = null
+    setSelPopup(null)
+    setSelResponse(null)
   }
 
   const handleAskInline = async (featId, bulletIdx, lineText, featTitle, featContext) => {
@@ -305,9 +322,11 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
               <div className="doc-feat-title">
                 <span
                   className="doc-feat-title-text"
-                  contentEditable
+                  contentEditable={editingKey === `${feat.id}-title`}
                   suppressContentEditableWarning
-                  onBlur={e => updateField(feat.id, 'title', e.currentTarget.textContent)}
+                  onDoubleClick={() => setEditingKey(`${feat.id}-title`)}
+                  onBlur={e => { updateField(feat.id, 'title', e.currentTarget.textContent); setEditingKey(null) }}
+                  title={editingKey === `${feat.id}-title` ? '' : 'Double-click to edit'}
                 >
                   {feat.title}
                 </span>
@@ -380,14 +399,24 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
 
               {/* Description */}
               {feat.description && (
-                <p
-                  className="doc-feat-desc"
-                  contentEditable
-                  suppressContentEditableWarning
-                  onBlur={e => updateField(feat.id, 'description', e.currentTarget.textContent)}
-                >
-                  {feat.description}
-                </p>
+                editingKey === `${feat.id}-desc` ? (
+                  <p
+                    className="doc-feat-desc"
+                    contentEditable
+                    suppressContentEditableWarning
+                    autoFocus
+                    onBlur={e => { updateField(feat.id, 'description', e.currentTarget.textContent); setEditingKey(null) }}
+                  >
+                    {feat.description}
+                  </p>
+                ) : (
+                  <p
+                    className="doc-feat-desc"
+                    onDoubleClick={() => setEditingKey(`${feat.id}-desc`)}
+                    title="Double-click to edit"
+                    dangerouslySetInnerHTML={{ __html: renderMd(feat.description) }}
+                  />
+                )
               )}
 
               {/* Bullets */}
@@ -399,17 +428,27 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                   const response = aiResponses[bulletKey]
 
                   return (
-                    <div key={bi} className="doc-bullet-block">
+                    <div key={bi} className="doc-bullet-block" data-feat-id={feat.id} data-bullet-idx={bi}>
                       <div className="doc-bullet-row">
                         <span className="doc-bullet-marker">•</span>
-                        <span
-                          className="doc-bullet-text"
-                          contentEditable
-                          suppressContentEditableWarning
-                          onBlur={e => updateField(feat.id, `bullet-${bi}`, e.currentTarget.textContent)}
-                        >
-                          {bulletText}
-                        </span>
+                        {editingKey === `${feat.id}-bullet-${bi}` ? (
+                          <span
+                            className="doc-bullet-text"
+                            contentEditable
+                            suppressContentEditableWarning
+                            autoFocus
+                            onBlur={e => { updateField(feat.id, `bullet-${bi}`, e.currentTarget.textContent); setEditingKey(null) }}
+                          >
+                            {bulletText}
+                          </span>
+                        ) : (
+                          <span
+                            className="doc-bullet-text"
+                            onDoubleClick={() => setEditingKey(`${feat.id}-bullet-${bi}`)}
+                            title="Double-click to edit"
+                            dangerouslySetInnerHTML={{ __html: renderMd(bulletText) }}
+                          />
+                        )}
                         <button
                           className="doc-bullet-ai-btn"
                           onClick={() => handleAskInline(feat.id, bi, bulletText, feat.title, featContext)}
@@ -465,6 +504,27 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                           />
                         </div>
                       )}
+
+                      {selInserts
+                        .filter(ins => ins.featId === feat.id && ins.bulletIdx === bi)
+                        .map(ins => (
+                          <div key={ins.id} className="doc-ai-inline doc-ai-reveal sel-insert-card">
+                            <div className="doc-ai-inline-header">
+                              <AiIcon size={11} />
+                              <span>Inserted</span>
+                              <button
+                                className="doc-ai-reject"
+                                style={{ marginLeft: 'auto' }}
+                                title="Remove"
+                                onClick={() => setSelInserts(prev => prev.filter(i => i.id !== ins.id))}
+                              >
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                              </button>
+                            </div>
+                            <div className="doc-ai-inline-text" dangerouslySetInnerHTML={{ __html: renderMd(ins.text) }} />
+                          </div>
+                        ))
+                      }
                     </div>
                   )
                 })}
