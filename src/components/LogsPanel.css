@@ -2,7 +2,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #1a1a2e;
+  background: var(--bg-white);
   font-family: var(--font-mono);
 }
 
@@ -11,22 +11,22 @@
   align-items: center;
   justify-content: space-between;
   padding: 6px 12px;
-  border-bottom: 1px solid #2d2d44;
+  border-bottom: 1px solid var(--border-light);
   flex-shrink: 0;
-  background: #15152a;
+  background: var(--bg-soft);
 }
 
 .logs-header-left {
   display: flex;
   align-items: center;
   gap: 7px;
-  color: #8888a0;
+  color: var(--text-muted);
 }
 
 .logs-header-title {
   font-size: 11px;
   font-weight: 600;
-  color: #8888a0;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -40,7 +40,7 @@
   padding: 3px 8px;
   font-size: 10px;
   font-weight: 500;
-  color: #6b6b88;
+  color: var(--text-tertiary);
   background: transparent;
   border: none;
   border-radius: 4px;
@@ -49,8 +49,8 @@
   transition: all 0.15s;
 }
 
-.logs-filter:hover { background: #2d2d44; color: #aaa; }
-.logs-filter.active { background: #2d2d44; color: #b49aff; }
+.logs-filter:hover { background: var(--bg-muted); color: var(--text-secondary); }
+.logs-filter.active { background: var(--purple-50); color: var(--purple-600); }
 
 /* ── Content ── */
 .logs-content {
@@ -64,7 +64,7 @@
 
 .logs-content::-webkit-scrollbar { width: 4px; }
 .logs-content::-webkit-scrollbar-track { background: transparent; }
-.logs-content::-webkit-scrollbar-thumb { background: #2d2d44; border-radius: 2px; }
+.logs-content::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 2px; }
 
 /* ── Log Line ── */
 .logs-line {
@@ -77,7 +77,7 @@
 }
 
 .logs-time {
-  color: #555570;
+  color: var(--text-muted);
   font-weight: 500;
   flex-shrink: 0;
   min-width: 38px;
@@ -97,19 +97,19 @@
 }
 
 .logs-action {
-  color: #c0c0d0;
+  color: var(--text-secondary);
   flex: 1;
 }
 
-.logs-type-user .logs-action { color: #93c5fd; }
-.logs-type-agent .logs-action { color: #d4b8ff; }
-.logs-type-system .logs-action { color: #a0a0b0; }
+.logs-type-user .logs-action { color: #2563eb; }
+.logs-type-agent .logs-action { color: #7c3aed; }
+.logs-type-system .logs-action { color: var(--text-tertiary); }
 
 .logs-session {
   font-size: 10px;
   font-weight: 500;
-  color: #555570;
-  background: #2d2d44;
+  color: var(--text-muted);
+  background: var(--bg-muted);
   padding: 1px 6px;
   border-radius: 3px;
   flex-shrink: 0;
@@ -121,7 +121,7 @@
 }
 
 .logs-cursor-char {
-  color: #b49aff;
+  color: var(--purple-500);
   animation: blink 1s step-end infinite;
   font-size: 12px;
 }
