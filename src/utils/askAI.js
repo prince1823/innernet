@@ -28,7 +28,7 @@ export async function askAI(prompt, context = '') {
         'X-Title': 'Innernet',
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4',
+        model: 'anthropic/claude-3-haiku',
         messages,
         max_tokens: 300,
       }),
@@ -36,8 +36,8 @@ export async function askAI(prompt, context = '') {
 
     if (!res.ok) {
       const err = await res.text()
-      console.error('OpenRouter error:', err)
-      return `**AI Error:** Could not generate suggestion. Check your API key.`
+      console.error('OpenRouter error:', res.status, err)
+      return `**AI Error:** ${res.status} — Could not generate suggestion.`
     }
 
     const data = await res.json()
