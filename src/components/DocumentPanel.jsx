@@ -30,6 +30,47 @@ function renderMd(text) {
     .replace(/\n/g, '<br/>')
 }
 
+function AiResponseText({ text, editKey, editingKey, setEditingKey, onSave, accepted }) {
+  const ref = useRef(null)
+  const isEditing = editingKey === editKey
+
+  useEffect(() => {
+    if (isEditing && ref.current) {
+      ref.current.innerHTML = renderMd(text)
+      ref.current.focus()
+      // place cursor at end
+      const range = document.createRange()
+      range.selectNodeContents(ref.current)
+      range.collapse(false)
+      const sel = window.getSelection()
+      sel?.removeAllRanges()
+      sel?.addRange(range)
+    }
+  }, [isEditing]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (isEditing) {
+    return (
+      <div
+        ref={ref}
+        className="doc-ai-inline-text editable"
+        contentEditable
+        suppressContentEditableWarning
+        onBlur={e => { onSave(e.currentTarget.textContent); setEditingKey(null) }}
+        style={{ outline: 'none', cursor: 'text' }}
+      />
+    )
+  }
+
+  return (
+    <div
+      className={`doc-ai-inline-text ${accepted ? 'editable' : ''}`}
+      onClick={() => setEditingKey(editKey)}
+      style={{ cursor: 'text' }}
+      dangerouslySetInnerHTML={{ __html: renderMd(text) }}
+    />
+  )
+}
+
 const QUICK_ACTIONS = [
   { label: 'Improve writing', prompt: (t) => `Improve the writing of this text, keep it concise: "${t}"` },
   { label: 'Make shorter',    prompt: (t) => `Make this shorter while keeping the meaning: "${t}"` },
@@ -389,9 +430,13 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                       </div>
                     )}
                   </div>
-                  <div
-                    className={`doc-ai-inline-text ${acceptedKeys.has(titleKey) ? 'editable' : ''}`}
-                    dangerouslySetInnerHTML={{ __html: renderMd(titleResponse) }}
+                  <AiResponseText
+                    text={aiResponses[titleKey]}
+                    editKey={`ai-${titleKey}`}
+                    editingKey={editingKey}
+                    setEditingKey={setEditingKey}
+                    accepted={acceptedKeys.has(titleKey)}
+                    onSave={val => setAiResponses(prev => ({ ...prev, [titleKey]: val }))}
                   />
                 </div>
               )}
@@ -495,9 +540,13 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                               </div>
                             )}
                           </div>
-                          <div
-                            className={`doc-ai-inline-text ${acceptedKeys.has(bulletKey) ? 'editable' : ''}`}
-                            dangerouslySetInnerHTML={{ __html: renderMd(response) }}
+                          <AiResponseText
+                            text={aiResponses[bulletKey]}
+                            editKey={`ai-${bulletKey}`}
+                            editingKey={editingKey}
+                            setEditingKey={setEditingKey}
+                            accepted={acceptedKeys.has(bulletKey)}
+                            onSave={val => setAiResponses(prev => ({ ...prev, [bulletKey]: val }))}
                           />
                         </div>
                       )}
@@ -518,7 +567,14 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                               </button>
                             </div>
-                            <div className="doc-ai-inline-text" dangerouslySetInnerHTML={{ __html: renderMd(ins.text) }} />
+                            <AiResponseText
+                              text={ins.text}
+                              editKey={`ai-${ins.id}`}
+                              editingKey={editingKey}
+                              setEditingKey={setEditingKey}
+                              accepted={true}
+                              onSave={val => setSelInserts(prev => prev.map(i => i.id === ins.id ? { ...i, text: val } : i))}
+                            />
                           </div>
                         ))
                       }
