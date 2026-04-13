@@ -72,12 +72,9 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
       const feat = features.find(f => f.id === featId)
       if (!feat) return
 
-      const lineEl = btn.closest('[data-feat-id]')
-      const text = lineEl ? lineEl.textContent.replace(/[\u25B6\u2606]/g, '').trim() : feat.title
-
       if (action === 'implement' || action === 'ask-ai') {
         const bulletTexts = feat.bullets?.map(b => typeof b === 'string' ? b : b.text).join('\n')
-        onAskAI(featId, text, bulletTexts)
+        onAskAI(featId, feat.title, bulletTexts)
       }
     }
 
@@ -137,7 +134,6 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
           suppressContentEditableWarning
           dangerouslySetInnerHTML={{ __html: initialHTML }}
         />
-                  )}
       </div>
     </div>
   )
