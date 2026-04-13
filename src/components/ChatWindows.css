@@ -253,36 +253,35 @@
 
 /* ── Input ── */
 .cw-input-area {
-  padding: 10px 14px;
-  border-top: 1px solid var(--border-light);
+  padding: 4px 10px 6px;
   flex-shrink: 0;
 }
 
 .cw-input-box {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 6px 6px 12px;
+  gap: 6px;
+  padding: 3px 3px 3px 10px;
   background: var(--bg-soft);
   border: 1px solid var(--border-light);
-  border-radius: 8px;
+  border-radius: 20px;
   transition: all 0.15s;
 }
 
 .cw-input-box:focus-within {
   border-color: var(--purple-300);
   background: var(--bg-white);
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.08);
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.08);
 }
 
-.cw-input-box > svg { color: var(--purple-400); flex-shrink: 0; }
+.cw-input-box > svg { color: var(--purple-400); flex-shrink: 0; width: 12px; height: 12px; }
 
 .cw-input-box input {
   flex: 1;
   border: none;
   background: transparent;
   color: var(--text-primary);
-  font-size: 12.5px;
+  font-size: 11px;
   outline: none;
   font-family: var(--font-sans);
 }
@@ -290,9 +289,9 @@
 .cw-input-box input::placeholder { color: var(--text-muted); }
 
 .cw-send-btn {
-  width: 30px;
-  height: 30px;
-  border-radius: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
   background: linear-gradient(135deg, var(--purple-500), var(--purple-600));
   display: flex;
   align-items: center;
@@ -301,8 +300,10 @@
   border: none;
   cursor: pointer;
   transition: all 0.15s;
-  box-shadow: 0 2px 6px rgba(139, 92, 246, 0.2);
+  flex-shrink: 0;
 }
+
+.cw-send-btn svg { width: 11px; height: 11px; }
 
 .cw-send-btn:hover { opacity: 0.9; }
 
