@@ -2,40 +2,192 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #f8f9fa;
-  border-right: 1px solid var(--border-light);
+  background: #fff;
 }
 
-/* ── Toolbar (like Google Docs top bar) ── */
-.doc-toolbar {
+/* ══════════════════════════════════════════════
+   Google Docs Formatting Toolbar
+   ══════════════════════════════════════════════ */
+.gdoc-toolbar {
+  flex-shrink: 0;
+  background: #edf2fa;
+  border-bottom: 1px solid #dadce0;
+  padding: 4px 8px;
+}
+
+.gdoc-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 30px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.gdoc-toolbar-row::-webkit-scrollbar { display: none; }
+
+/* ── Dropdown ── */
+.gdoc-tb-dropdown-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.gdoc-tb-dropdown {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 16px;
-  border-bottom: 1px solid #dadce0;
+  gap: 4px;
+  height: 26px;
+  padding: 0 6px 0 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.1s;
+  user-select: none;
+}
+
+.gdoc-tb-dropdown:hover {
+  background: #dce3ed;
+  border-color: #c4ccd6;
+}
+
+.gdoc-tb-dropdown-value {
+  font-size: 12px;
+  font-weight: 500;
+  color: #3c4043;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-sans);
+}
+
+.gdoc-tb-dropdown svg {
+  color: #5f6368;
+  flex-shrink: 0;
+}
+
+.gdoc-tb-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 180px;
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  padding: 4px 0;
+  margin-top: 2px;
+}
+
+.gdoc-tb-dropdown-item {
+  padding: 6px 14px;
+  cursor: pointer;
+  color: #3c4043;
+  transition: background 0.1s;
+  font-family: var(--font-sans);
+}
+
+.gdoc-tb-dropdown-item:hover {
+  background: #f1f3f4;
+}
+
+/* ── Separator ── */
+.gdoc-tb-sep {
+  width: 1px;
+  height: 18px;
+  background: #c4ccd6;
+  margin: 0 3px;
+  flex-shrink: 0;
+}
+
+/* ── Icon Button ── */
+.gdoc-tb-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #444746;
+  transition: all 0.1s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.gdoc-tb-btn:hover {
+  background: #dce3ed;
+}
+
+.gdoc-tb-btn:active {
+  background: #c8d5e3;
+}
+
+/* ── Font Size Control ── */
+.gdoc-tb-fontsize {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  height: 26px;
+  border: 1px solid #c4ccd6;
+  border-radius: 4px;
+  overflow: hidden;
   flex-shrink: 0;
   background: #fff;
 }
 
-.doc-toolbar-left {
+.gdoc-tb-fontsize-btn {
+  width: 22px;
+  height: 26px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
   color: #5f6368;
+  transition: background 0.1s;
+  padding: 0;
 }
 
-.doc-toolbar-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
+.gdoc-tb-fontsize-btn:hover { background: #e0e0e0; }
+
+.gdoc-tb-fontsize-val {
+  width: 28px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: #3c4043;
+  border-left: 1px solid #c4ccd6;
+  border-right: 1px solid #c4ccd6;
+  line-height: 26px;
+  font-family: var(--font-sans);
 }
 
-.doc-toolbar-right {
+/* ── Text Color ── */
+.gdoc-tb-textcolor {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 0;
+  line-height: 1;
 }
 
+.gdoc-tb-colorbar {
+  width: 14px;
+  height: 3px;
+  background: #000;
+  border-radius: 1px;
+  margin-top: -1px;
+}
+
+/* ── Spacer ── */
+.gdoc-tb-spacer { flex: 1; min-width: 8px; }
+
+/* ── Implement All ── */
 .doc-implement-all-btn {
   display: flex;
   align-items: center;
@@ -50,6 +202,9 @@
   cursor: pointer;
   transition: all 0.15s;
   box-shadow: 0 2px 6px rgba(139, 92, 246, 0.2);
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+  white-space: nowrap;
 }
 
 .doc-implement-all-btn:hover {
@@ -57,293 +212,91 @@
   transform: translateY(-1px);
 }
 
-/* ── Document Body (Google Docs page feel) ── */
+/* ══════════════════════════════════════════════
+   Document Body — single contentEditable editor
+   ══════════════════════════════════════════════ */
 .doc-body {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 0;
-  background: #f8f9fa;
-}
-
-.doc-page {
-  max-width: 100%;
-  margin: 0 auto;
   background: #fff;
+}
+
+.doc-editor {
   min-height: 100%;
-  box-shadow: 0 0 0 1px #dadce0;
-  padding: 20px 0;
+  padding: 28px 24px;
+  outline: none;
+  font-family: Arial, sans-serif;
+  color: var(--text-primary);
+  line-height: 1.6;
+  cursor: text;
 }
 
-/* ── Each Line ── */
-.doc-line {
-  display: flex;
-  align-items: flex-start;
-  position: relative;
-  padding: 3px 20px 3px 0;
-  min-height: 28px;
-  transition: background 0.1s;
-}
-
-.doc-line.hovered {
-  background: #f8f9fa;
-}
-
-/* Gutter (line numbers, bullets, AI icons) */
-.doc-line-gutter {
-  width: 36px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding-right: 10px;
-  padding-top: 2px;
-  min-height: 24px;
-}
-
-.doc-line-num {
-  font-size: 14px;
+/* Styles for elements inside the editor */
+.doc-editor h2.doc-title {
+  font-size: 18px;
   font-weight: 700;
   color: var(--text-primary);
+  margin: 20px 0 4px 0;
+  padding: 4px 2px;
+  line-height: 1.4;
+  border-bottom: 1px solid #f1f3f4;
+  padding-bottom: 8px;
 }
 
-.doc-bullet-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #5f6368;
-  margin-top: 2px;
+.doc-editor h2.doc-title:first-child {
+  margin-top: 0;
 }
 
-/* Content area */
-.doc-line-content {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.doc-editor p.doc-desc {
+  font-size: 13px;
+  color: #5f6368;
+  margin: 2px 0;
+  padding: 2px 2px;
+  line-height: 1.7;
 }
 
-/* ── Title Lines ── */
-.doc-line-title {
-  padding-top: 14px;
-  padding-bottom: 4px;
+.doc-editor p.doc-bullet {
+  font-size: 13px;
+  color: var(--text-primary);
+  margin: 1px 0;
+  padding: 2px 2px 2px 8px;
+  line-height: 1.7;
+}
+
+.doc-editor .doc-bullet-marker {
+  color: #5f6368;
+  margin-right: 6px;
+  user-select: none;
+}
+
+/* Focus/selection highlight in editor */
+.doc-editor ::selection {
+  background: #a8c7fa;
+}
+
+/* ── AI Suggestion Section ── */
+.doc-ai-section {
+  padding: 8px 24px 16px;
   border-top: 1px solid #f1f3f4;
 }
 
-.doc-line-title:first-child {
-  padding-top: 0;
-  border-top: none;
-}
-
-.doc-line-title.has-agent {
-  border-left: 3px solid var(--purple-400);
-  background: linear-gradient(90deg, rgba(139, 92, 246, 0.03), transparent);
-}
-
-.doc-title-text {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text-primary);
-  line-height: 1.4;
-  cursor: text;
-  padding: 2px 4px;
-  margin: -2px -4px;
-  border-radius: 3px;
-  transition: background 0.1s;
-}
-
-.doc-title-text:hover {
-  background: rgba(66, 133, 244, 0.06);
-}
-
-.doc-line-tags {
+.doc-ai-line {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 2px;
+  gap: 10px;
+  padding: 8px 12px;
+  margin: 4px 0;
+  border-radius: 6px;
+  animation: aiLineIn 0.25s ease;
 }
 
-.doc-status-tag {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 1px 7px;
-  border-radius: 3px;
-}
-
-.doc-project-tag {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-}
-
-.doc-agent-tag {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--purple-600);
-  background: var(--purple-50);
-  padding: 1px 7px;
-  border-radius: 3px;
-}
-
-/* ── Description Lines ── */
-.doc-desc-text {
-  font-size: 13px;
-  line-height: 1.65;
-  color: #5f6368;
-  cursor: text;
-  padding: 2px 4px;
-  margin: -2px -4px;
-  border-radius: 3px;
-  transition: background 0.1s;
-}
-
-.doc-desc-text:hover {
-  background: rgba(66, 133, 244, 0.06);
-}
-
-/* ── Bullet Lines ── */
-.doc-line-bullet {
-  padding-left: 0;
-}
-
-.doc-bullet-text {
-  font-size: 13px;
-  line-height: 1.65;
-  color: var(--text-primary);
-  cursor: text;
-  padding: 2px 4px;
-  margin: -2px -4px;
-  border-radius: 3px;
-  transition: background 0.1s;
-}
-
-.doc-bullet-text:hover {
-  background: rgba(66, 133, 244, 0.06);
-}
-
-.doc-placeholder {
-  color: var(--text-muted);
-  font-style: italic;
-}
-
-/* ── Editing Input ── */
-.doc-edit-input {
-  width: 100%;
-  border: none;
-  outline: none;
-  font-family: var(--font-sans);
-  color: var(--text-primary);
-  background: transparent;
-  padding: 2px 4px;
-  margin: -2px -4px;
-  border-radius: 3px;
-  box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.3);
-  background: rgba(66, 133, 244, 0.04);
-}
-
-.doc-edit-title {
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.4;
-}
-
-.doc-edit-desc {
-  font-size: 13px;
-  line-height: 1.65;
-  color: #5f6368;
-}
-
-/* ── Per-Line Action Buttons ── */
-.doc-line-actions {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  gap: 4px;
-  z-index: 5;
-  opacity: 0;
-  animation: fadeInBtn 0.1s ease forwards;
-}
-
-.doc-line-implement-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  font-size: 10px;
-  font-weight: 600;
-  color: white;
-  background: linear-gradient(135deg, var(--purple-500), var(--purple-600));
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-  box-shadow: 0 1px 4px rgba(139, 92, 246, 0.25);
-}
-
-.doc-line-implement-btn:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.35);
-}
-
-/* When used standalone (not inside .doc-line-actions), position absolutely */
-.doc-line > .doc-line-ai-btn {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 5;
-  opacity: 0;
-  animation: fadeInBtn 0.1s ease forwards;
-}
-
-.doc-line-ai-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--purple-600);
-  background: var(--purple-50);
-  border: 1px solid var(--purple-200);
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-  box-shadow: 0 1px 4px rgba(139, 92, 246, 0.12);
-}
-
-@keyframes fadeInBtn {
-  from { opacity: 0; transform: translateY(-50%) translateX(4px); }
-  to { opacity: 1; transform: translateY(-50%) translateX(0); }
-}
-
-.doc-line-ai-btn:hover {
-  background: var(--purple-100);
-  border-color: var(--purple-300);
-  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.2);
-}
-
-.doc-line-ai-btn svg {
-  color: var(--purple-500);
-}
-
-/* ── AI-Edited Lines (Distinct Styling) ── */
-.doc-line-ai {
+.doc-ai-line.suggested {
   background: linear-gradient(90deg, #f5f0ff, #faf7ff, #fff);
   border-left: 3px solid var(--purple-400);
-  padding-top: 6px;
-  padding-bottom: 6px;
-  margin: 2px 0;
-  animation: aiLineIn 0.25s ease;
+}
+
+.doc-ai-line.accepted {
+  background: linear-gradient(90deg, #ecfdf5, #f0fdf4, #fff);
+  border-left: 3px solid var(--green-500);
 }
 
 @keyframes aiLineIn {
@@ -351,23 +304,22 @@
   to { opacity: 1; transform: translateX(0); }
 }
 
-.doc-line-ai.accepted {
-  background: linear-gradient(90deg, #ecfdf5, #f0fdf4, #fff);
-  border-left-color: var(--green-500);
-}
-
-.doc-line-ai.suggested {
-  background: linear-gradient(90deg, #f5f0ff, #faf7ff, #fff);
-  border-left-color: var(--purple-400);
+.doc-ai-line-left {
+  flex-shrink: 0;
+  padding-top: 2px;
 }
 
 .doc-ai-line-icon {
   color: var(--purple-400);
-  margin-top: 2px;
 }
 
-.doc-line-ai.accepted .doc-ai-line-icon {
+.doc-ai-line.accepted .doc-ai-line-icon {
   color: var(--green-500);
+}
+
+.doc-ai-line-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .doc-ai-text {
@@ -375,18 +327,18 @@
   line-height: 1.65;
   color: var(--purple-700);
   font-style: italic;
+  display: block;
 }
 
-.doc-line-ai.accepted .doc-ai-text {
+.doc-ai-line.accepted .doc-ai-text {
   color: #166534;
   font-style: normal;
 }
 
-/* AI line actions */
 .doc-ai-line-actions {
   display: flex;
   gap: 6px;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .doc-ai-accept {
@@ -402,11 +354,10 @@
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s;
+  font-family: var(--font-sans);
 }
 
-.doc-ai-accept:hover {
-  background: #bbf7d0;
-}
+.doc-ai-accept:hover { background: #bbf7d0; }
 
 .doc-ai-dismiss {
   display: flex;
@@ -421,6 +372,7 @@
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s;
+  font-family: var(--font-sans);
 }
 
 .doc-ai-dismiss:hover {
@@ -436,30 +388,8 @@
   padding: 1px 8px;
   border-radius: 3px;
   display: inline-block;
-  margin-top: 2px;
+  margin-top: 4px;
   width: fit-content;
-}
-
-/* ── Add Line ── */
-.doc-line-add {
-  cursor: pointer;
-  color: var(--text-muted);
-  transition: all 0.15s;
-  padding-top: 4px;
-  padding-bottom: 12px;
-}
-
-.doc-line-add .doc-line-content {
-  flex-direction: row;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  font-weight: 500;
-}
-
-.doc-line-add:hover {
-  color: var(--purple-500);
-  background: var(--purple-50);
 }
 
 /* ── Scrollbar ── */

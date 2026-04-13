@@ -1,27 +1,6 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { featureDocItems } from '../data/sampleData'
 import './DocumentPanel.css'
-
-// Flatten features into a flat document line model
-function buildDocLines(features) {
-  const lines = []
-  features.forEach((feat, fi) => {
-    lines.push({ id: `${feat.id}-title`, type: 'title', text: feat.title, featId: feat.id, featIdx: fi, status: feat.status, project: feat.project })
-    if (feat.description) {
-      lines.push({ id: `${feat.id}-desc`, type: 'description', text: feat.description, featId: feat.id })
-    }
-    feat.bullets.forEach((b, bi) => {
-      lines.push({ id: `${feat.id}-b-${bi}`, type: 'bullet', text: b, featId: feat.id, bulletIdx: bi })
-    })
-    // AI-edited lines
-    if (feat.aiLines) {
-      feat.aiLines.forEach((al, ai) => {
-        lines.push({ id: `${feat.id}-ai-${ai}`, type: 'ai-edit', text: al.text, original: al.original, status: al.status, featId: feat.id, aiIdx: ai })
-      })
-    }
-  })
-  return lines
-}
 
 const initialFeatures = featureDocItems.map(f => ({
   ...f,
@@ -31,63 +10,144 @@ const initialFeatures = featureDocItems.map(f => ({
   ] : [],
 }))
 
+/* ── Selection save/restore for toolbar ── */
+let savedRange = null
+function saveSelection() {
+  const sel = window.getSelection()
+  if (sel.rangeCount > 0) {
+    savedRange = sel.getRangeAt(0)
+  }
+}
+function restoreSelection() {
+  if (savedRange) {
+    const sel = window.getSelection()
+    sel.removeAllRanges()
+    sel.addRange(savedRange)
+  }
+}
+
+function execCmd(cmd, value = null) {
+  restoreSelection()
+  document.execCommand(cmd, false, value)
+}
+
+/* ── Toolbar components ── */
+function TBtn({ children, title, cmd, onClick }) {
+  const handleClick = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (cmd) execCmd(cmd)
+    if (onClick) onClick(e)
+  }
+  return (
+    <button className="gdoc-tb-btn" title={title} onMouseDown={handleClick}>
+      {children}
+    </button>
+  )
+}
+
+function TDropdown({ value, width, title, options, onSelect }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const close = (e) => { if (!ref.current?.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [open])
+
+  return (
+    <div className="gdoc-tb-dropdown-wrap" style={{ width }} ref={ref}>
+      <div
+        className="gdoc-tb-dropdown"
+        title={title}
+        onMouseDown={(e) => { e.preventDefault(); setOpen(!open) }}
+      >
+        <span className="gdoc-tb-dropdown-value">{value}</span>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      {open && options && (
+        <div className="gdoc-tb-dropdown-menu">
+          {options.map(opt => (
+            <div
+              key={opt.value}
+              className="gdoc-tb-dropdown-item"
+              style={opt.style}
+              onMouseDown={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                onSelect(opt.value)
+                setOpen(false)
+              }}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TSep() {
+  return <div className="gdoc-tb-sep" />
+}
+
+const headingOptions = [
+  { value: 'p', label: 'Normal text', style: { fontSize: '13px' } },
+  { value: 'h1', label: 'Heading 1', style: { fontSize: '20px', fontWeight: 700 } },
+  { value: 'h2', label: 'Heading 2', style: { fontSize: '17px', fontWeight: 700 } },
+  { value: 'h3', label: 'Heading 3', style: { fontSize: '14px', fontWeight: 700 } },
+]
+
+const fontOptions = [
+  { value: 'Arial', label: 'Arial', style: { fontFamily: 'Arial' } },
+  { value: 'Georgia', label: 'Georgia', style: { fontFamily: 'Georgia' } },
+  { value: 'Times New Roman', label: 'Times New Roman', style: { fontFamily: 'Times New Roman' } },
+  { value: 'Courier New', label: 'Courier New', style: { fontFamily: 'Courier New' } },
+  { value: 'Verdana', label: 'Verdana', style: { fontFamily: 'Verdana' } },
+]
+
 export default function DocumentPanel({ onAskAI, onImplementAll, activeAgentFeatures = [] }) {
   const [features, setFeatures] = useState(initialFeatures)
-  const [editingId, setEditingId] = useState(null)
-  const [editText, setEditText] = useState('')
-  const [hoveredLine, setHoveredLine] = useState(null)
   const [aiLoadingLine, setAiLoadingLine] = useState(null)
-  const editRef = useRef(null)
+  const [fontSize, setFontSize] = useState(11)
+  const [currentFont, setCurrentFont] = useState('Arial')
+  const [currentHeading, setCurrentHeading] = useState('Normal text')
+  const editorRef = useRef(null)
 
-  const docLines = buildDocLines(features)
-
-  const startEdit = useCallback((lineId, text) => {
-    setEditingId(lineId)
-    setEditText(text)
-    setTimeout(() => editRef.current?.focus(), 20)
+  // Save selection whenever it changes inside the editor
+  useEffect(() => {
+    const handler = () => {
+      const sel = window.getSelection()
+      if (sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
+        saveSelection()
+      }
+    }
+    document.addEventListener('selectionchange', handler)
+    return () => document.removeEventListener('selectionchange', handler)
   }, [])
 
-  const saveEdit = useCallback((lineId) => {
-    const parts = lineId.split('-')
-    const featId = parts.slice(0, 2).join('-')
-
-    setFeatures(prev => prev.map(f => {
-      if (f.id !== featId) return f
-      if (lineId.endsWith('-title')) return { ...f, title: editText }
-      if (lineId.endsWith('-desc')) return { ...f, description: editText }
-      if (lineId.includes('-b-')) {
-        const bi = parseInt(parts[parts.length - 1])
-        const newBullets = [...f.bullets]
-        newBullets[bi] = editText
-        return { ...f, bullets: newBullets }
+  // Build initial HTML for the editor
+  const buildInitialHTML = useCallback(() => {
+    let html = ''
+    features.forEach((feat, fi) => {
+      html += `<h2 class="doc-title" data-feat-id="${feat.id}" data-feat-idx="${fi}">${feat.title}</h2>`
+      if (feat.description) {
+        html += `<p class="doc-desc" data-feat-id="${feat.id}">${feat.description}</p>`
       }
-      return f
-    }))
-    setEditingId(null)
-    setEditText('')
-  }, [editText])
+      feat.bullets.forEach((b, bi) => {
+        html += `<p class="doc-bullet" data-feat-id="${feat.id}" data-bullet-idx="${bi}"><span class="doc-bullet-marker" contenteditable="false">&#8226;</span> ${b}</p>`
+      })
+    })
+    return html
+  }, []) // only on mount
 
-  const handleKeyDown = useCallback((e, lineId) => {
-    if (e.key === 'Enter') { e.preventDefault(); saveEdit(lineId) }
-    if (e.key === 'Escape') { setEditingId(null); setEditText('') }
-  }, [saveEdit])
+  const [initialHTML] = useState(buildInitialHTML)
 
-  const addLine = useCallback((featId) => {
-    setFeatures(prev => prev.map(f => {
-      if (f.id !== featId) return f
-      return { ...f, bullets: [...f.bullets, ''] }
-    }))
-    const f = features.find(ff => ff.id === featId)
-    if (f) {
-      const newId = `${featId}-b-${f.bullets.length}`
-      setTimeout(() => startEdit(newId, ''), 30)
-    }
-  }, [features, startEdit])
-
-  // Simulate AI edit on a specific line
   const handleLineAskAI = useCallback((line) => {
     setAiLoadingLine(line.id)
-    // Simulate AI response after delay
     setTimeout(() => {
       setFeatures(prev => prev.map(f => {
         if (f.id !== line.featId) return f
@@ -115,198 +175,168 @@ export default function DocumentPanel({ onAskAI, onImplementAll, activeAgentFeat
     }))
   }, [])
 
-  const statusColors = {
-    'in-progress': { bg: '#fff3e0', text: '#e65100', label: 'In Progress' },
-    'planned': { bg: '#e3f2fd', text: '#1565c0', label: 'Planned' },
-    'done': { bg: '#e8f5e9', text: '#2e7d32', label: 'Done' },
+  const handleHeadingChange = (val) => {
+    if (val === 'p') {
+      execCmd('formatBlock', '<p>')
+      setCurrentHeading('Normal text')
+    } else {
+      execCmd('formatBlock', `<${val}>`)
+      setCurrentHeading(headingOptions.find(h => h.value === val)?.label || 'Normal text')
+    }
+  }
+
+  const handleFontChange = (val) => {
+    execCmd('fontName', val)
+    setCurrentFont(val)
+  }
+
+  const handleFontSizeChange = (delta) => {
+    const newSize = Math.min(Math.max(fontSize + delta, 8), 96)
+    setFontSize(newSize)
+    restoreSelection()
+    document.execCommand('fontSize', false, 7)
+    const el = editorRef.current
+    if (el) {
+      const fonts = el.querySelectorAll('font[size="7"]')
+      fonts.forEach(f => {
+        f.removeAttribute('size')
+        f.style.fontSize = `${newSize}px`
+      })
+    }
   }
 
   return (
     <div className="doc-panel">
-      {/* Toolbar */}
-      <div className="doc-toolbar">
-        <div className="doc-toolbar-left">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          <span className="doc-toolbar-title">Feature Document</span>
-        </div>
-        <div className="doc-toolbar-right">
+      {/* ── Google Docs Formatting Toolbar ── */}
+      <div className="gdoc-toolbar">
+        <div className="gdoc-toolbar-row">
+          <TDropdown value={currentHeading} width="110px" title="Styles" options={headingOptions} onSelect={handleHeadingChange} />
+          <TSep />
+          <TDropdown value={currentFont} width="100px" title="Font" options={fontOptions} onSelect={handleFontChange} />
+          <TSep />
+
+          <div className="gdoc-tb-fontsize">
+            <button className="gdoc-tb-fontsize-btn" title="Decrease font size" onMouseDown={(e) => { e.preventDefault(); handleFontSizeChange(-1) }}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+            <span className="gdoc-tb-fontsize-val">{fontSize}</span>
+            <button className="gdoc-tb-fontsize-btn" title="Increase font size" onMouseDown={(e) => { e.preventDefault(); handleFontSizeChange(1) }}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+          <TSep />
+
+          <TBtn title="Bold (Ctrl+B)" cmd="bold">
+            <span style={{ fontWeight: 700, fontSize: '13px' }}>B</span>
+          </TBtn>
+          <TBtn title="Italic (Ctrl+I)" cmd="italic">
+            <span style={{ fontWeight: 600, fontSize: '13px', fontStyle: 'italic' }}>I</span>
+          </TBtn>
+          <TBtn title="Underline (Ctrl+U)" cmd="underline">
+            <span style={{ fontWeight: 600, fontSize: '13px', textDecoration: 'underline' }}>U</span>
+          </TBtn>
+          <TBtn title="Strikethrough" cmd="strikeThrough">
+            <span style={{ fontWeight: 600, fontSize: '13px', textDecoration: 'line-through' }}>S</span>
+          </TBtn>
+          <TBtn title="Text color" onClick={() => {
+            const color = prompt('Enter color (hex or name):', '#000000')
+            if (color) execCmd('foreColor', color)
+          }}>
+            <div className="gdoc-tb-textcolor">
+              <span style={{ fontWeight: 700, fontSize: '13px' }}>A</span>
+              <div className="gdoc-tb-colorbar" />
+            </div>
+          </TBtn>
+          <TBtn title="Highlight color" onClick={() => {
+            const color = prompt('Enter highlight color:', '#ffff00')
+            if (color) execCmd('hiliteColor', color)
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg>
+          </TBtn>
+          <TSep />
+
+          <TBtn title="Insert link (Ctrl+K)" onClick={() => {
+            const url = prompt('Enter URL:')
+            if (url) execCmd('createLink', url)
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          </TBtn>
+          <TSep />
+
+          <TBtn title="Align left" cmd="justifyLeft">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
+          </TBtn>
+          <TBtn title="Align center" cmd="justifyCenter">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+          </TBtn>
+          <TBtn title="Align right" cmd="justifyRight">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/></svg>
+          </TBtn>
+          <TSep />
+
+          <TBtn title="Bulleted list" cmd="insertUnorderedList">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="4" cy="18" r="1.5" fill="currentColor"/></svg>
+          </TBtn>
+          <TBtn title="Numbered list" cmd="insertOrderedList">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><text x="2" y="8" fontSize="7" fill="currentColor" stroke="none" fontWeight="600">1</text><text x="2" y="14" fontSize="7" fill="currentColor" stroke="none" fontWeight="600">2</text><text x="2" y="20" fontSize="7" fill="currentColor" stroke="none" fontWeight="600">3</text></svg>
+          </TBtn>
+          <TSep />
+
+          <TBtn title="Undo (Ctrl+Z)" cmd="undo">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+          </TBtn>
+          <TBtn title="Redo (Ctrl+Y)" cmd="redo">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"/></svg>
+          </TBtn>
+
+          <div className="gdoc-tb-spacer" />
           <button className="doc-implement-all-btn" onClick={onImplementAll}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             Implement All
           </button>
         </div>
       </div>
 
-      {/* Document Body - Google Docs style */}
+      {/* ── Single contentEditable document ── */}
       <div className="doc-body">
-        <div className="doc-page">
-          {docLines.map((line) => {
-            const isEditing = editingId === line.id
-            const isHovered = hoveredLine === line.id
-            const isAiLoading = aiLoadingLine === line.id
+        <div
+          ref={editorRef}
+          className="doc-editor"
+          contentEditable
+          suppressContentEditableWarning
+          dangerouslySetInnerHTML={{ __html: initialHTML }}
+        />
 
-            if (line.type === 'title') {
-              const sc = statusColors[line.status] || statusColors.planned
-              const hasAgent = activeAgentFeatures.includes(line.featId)
-              return (
-                <div
-                  key={line.id}
-                  className={`doc-line doc-line-title ${isHovered ? 'hovered' : ''} ${hasAgent ? 'has-agent' : ''}`}
-                  onMouseEnter={() => setHoveredLine(line.id)}
-                  onMouseLeave={() => setHoveredLine(null)}
-                >
-                  <div className="doc-line-gutter">
-                    <span className="doc-line-num">{line.featIdx + 1}.</span>
-                  </div>
-                  <div className="doc-line-content">
-                    {isEditing ? (
-                      <input
-                        ref={editRef}
-                        className="doc-edit-input doc-edit-title"
-                        value={editText}
-                        onChange={e => setEditText(e.target.value)}
-                        onBlur={() => saveEdit(line.id)}
-                        onKeyDown={e => handleKeyDown(e, line.id)}
-                      />
-                    ) : (
-                      <h2 className="doc-title-text" onClick={() => startEdit(line.id, line.text)}>
-                        {line.text}
-                      </h2>
-                    )}
-                    <div className="doc-line-tags">
-                      <span className="doc-status-tag" style={{ background: sc.bg, color: sc.text }}>{sc.label}</span>
-                      {line.project && <span className="doc-project-tag">#{line.project}</span>}
-                      {hasAgent && <span className="doc-agent-tag">Agent active</span>}
-                    </div>
-                  </div>
-                  {isHovered && !isEditing && (
-                    <div className="doc-line-actions">
-                      <button className="doc-line-implement-btn" onClick={() => onAskAI(line.featId, line.text, features.find(f => f.id === line.featId)?.bullets?.join('\n'))}>
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                        Implement
+        {/* AI suggestion lines rendered below the editor */}
+        {features.some(f => f.aiLines?.length > 0) && (
+          <div className="doc-ai-section">
+            {features.map(feat => feat.aiLines?.map((al, ai) => (
+              <div key={`${feat.id}-ai-${ai}`} className={`doc-ai-line ${al.status}`}>
+                <div className="doc-ai-line-left">
+                  <svg className="doc-ai-line-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                </div>
+                <div className="doc-ai-line-body">
+                  <span className="doc-ai-text">{al.text}</span>
+                  {al.status === 'suggested' && (
+                    <div className="doc-ai-line-actions">
+                      <button className="doc-ai-accept" onClick={() => handleAiAction(feat.id, ai, 'accept')}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                        Accept
                       </button>
-                      <button className="doc-line-ai-btn" onClick={() => onAskAI(line.featId, line.text, features.find(f => f.id === line.featId)?.bullets?.join('\n'))}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                        Ask AI
+                      <button className="doc-ai-dismiss" onClick={() => handleAiAction(feat.id, ai, 'dismiss')}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        Dismiss
                       </button>
                     </div>
                   )}
-                </div>
-              )
-            }
-
-            if (line.type === 'description') {
-              return (
-                <div
-                  key={line.id}
-                  className={`doc-line doc-line-desc ${isHovered ? 'hovered' : ''}`}
-                  onMouseEnter={() => setHoveredLine(line.id)}
-                  onMouseLeave={() => setHoveredLine(null)}
-                >
-                  <div className="doc-line-gutter" />
-                  <div className="doc-line-content">
-                    {isEditing ? (
-                      <input
-                        ref={editRef}
-                        className="doc-edit-input doc-edit-desc"
-                        value={editText}
-                        onChange={e => setEditText(e.target.value)}
-                        onBlur={() => saveEdit(line.id)}
-                        onKeyDown={e => handleKeyDown(e, line.id)}
-                      />
-                    ) : (
-                      <p className="doc-desc-text" onClick={() => startEdit(line.id, line.text)}>{line.text}</p>
-                    )}
-                  </div>
-                  {isHovered && !isEditing && (
-                    <button className="doc-line-ai-btn" onClick={() => handleLineAskAI(line)}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                      {isAiLoading ? '...' : 'Ask AI'}
-                    </button>
+                  {al.status === 'accepted' && (
+                    <span className="doc-ai-accepted-badge">Accepted</span>
                   )}
                 </div>
-              )
-            }
-
-            if (line.type === 'bullet') {
-              return (
-                <div
-                  key={line.id}
-                  className={`doc-line doc-line-bullet ${isHovered ? 'hovered' : ''}`}
-                  onMouseEnter={() => setHoveredLine(line.id)}
-                  onMouseLeave={() => setHoveredLine(null)}
-                >
-                  <div className="doc-line-gutter">
-                    <span className="doc-bullet-dot" />
-                  </div>
-                  <div className="doc-line-content">
-                    {isEditing ? (
-                      <input
-                        ref={editRef}
-                        className="doc-edit-input"
-                        value={editText}
-                        onChange={e => setEditText(e.target.value)}
-                        onBlur={() => saveEdit(line.id)}
-                        onKeyDown={e => handleKeyDown(e, line.id)}
-                      />
-                    ) : (
-                      <span className="doc-bullet-text" onClick={() => startEdit(line.id, line.text)}>
-                        {line.text || <span className="doc-placeholder">Type something...</span>}
-                      </span>
-                    )}
-                  </div>
-                  {isHovered && !isEditing && (
-                    <button className="doc-line-ai-btn" onClick={() => handleLineAskAI(line)}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                      {isAiLoading ? '...' : 'Ask AI'}
-                    </button>
-                  )}
-                </div>
-              )
-            }
-
-            if (line.type === 'ai-edit') {
-              return (
-                <div key={line.id} className={`doc-line doc-line-ai ${line.status}`}>
-                  <div className="doc-line-gutter">
-                    <svg className="doc-ai-line-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                  </div>
-                  <div className="doc-line-content">
-                    <span className="doc-ai-text">{line.text}</span>
-                    {line.status === 'suggested' && (
-                      <div className="doc-ai-line-actions">
-                        <button className="doc-ai-accept" onClick={() => handleAiAction(line.featId, line.aiIdx, 'accept')}>
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-                          Accept
-                        </button>
-                        <button className="doc-ai-dismiss" onClick={() => handleAiAction(line.featId, line.aiIdx, 'dismiss')}>
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                          Dismiss
-                        </button>
-                      </div>
-                    )}
-                    {line.status === 'accepted' && (
-                      <span className="doc-ai-accepted-badge">Accepted</span>
-                    )}
-                  </div>
-                </div>
-              )
-            }
-
-            return null
-          })}
-
-          {/* Add new line at end of each feature */}
-          {features.map(feat => (
-            <div key={`add-${feat.id}`} className="doc-line doc-line-add" onClick={() => addLine(feat.id)}>
-              <div className="doc-line-gutter" />
-              <div className="doc-line-content">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                <span>Add a line</span>
               </div>
-            </div>
-          ))}
-        </div>
+            )))}
+          </div>
+        )}
       </div>
     </div>
   )
