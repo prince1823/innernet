@@ -425,9 +425,11 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                       </span>
                     )}
                   </div>
-                  <span className="cal-event-time" style={{ color: color.text }}>
-                    {formatTimeDisplay(task.time)} – {formatTimeDisplay(task.endTime)}
-                  </span>
+                  {!isExpanded && (
+                    <span className="cal-event-time" style={{ color: color.text }}>
+                      {formatTimeDisplay(task.time)} – {formatTimeDisplay(task.endTime)}
+                    </span>
+                  )}
 
                   {/* Expanded tabs: Summary / Activity */}
                   {isExpanded && summary && (
