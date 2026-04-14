@@ -166,6 +166,17 @@ function toggleCollapse(tree, id) {
   return next
 }
 
+// Insert a new block at the beginning of a parent block's children (auto-expands if collapsed)
+function prependChild(tree, parentId, newChild) {
+  const next = cloneTree(tree)
+  const ctx = findContext(next, parentId)
+  if (!ctx) return next
+  if (!ctx.block.children) ctx.block.children = []
+  ctx.block.children.unshift(newChild)
+  if (ctx.block.collapsed) ctx.block.collapsed = false
+  return next
+}
+
 // Returns ancestor blocks from outermost to innermost (not including the target block itself)
 function findAncestors(tree, id) {
   const ctx = findContext(tree, id)
@@ -430,25 +441,39 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     e.preventDefault()
     if (!atQuery.trim() || !atPopup) return
 
-    // Remove the @ from the text node
-    if (atPopup.node && atPopup.node.textContent) {
+    const query = atQuery.trim()
+
+    // Inline the query text into the block next to the @ so the block reads "... @query"
+    // atPopup.offset is the caret position just after the @ character
+    if (atPopup.node && typeof atPopup.node.textContent === 'string') {
       const t = atPopup.node.textContent
-      atPopup.node.textContent = t.slice(0, atPopup.offset - 1) + t.slice(atPopup.offset)
+      atPopup.node.textContent = t.slice(0, atPopup.offset) + query + t.slice(atPopup.offset)
     }
 
-    const ctx = findContext(blocks, atPopup.blockId)
-    const blockText = ctx?.block?.text || ''
+    // Read the full block's text from the DOM (contentEditable) so we persist
+    // the "@query" insertion along with anything else the user typed
+    const blockEl = docBodyRef.current?.querySelector(
+      `[data-block-id="${atPopup.blockId}"] > .ls-block-content > .ls-block-text`
+    )
+    const fullBlockText = blockEl?.textContent || ''
 
     setAtLoading(true)
-    const prompt = `Answer this question: ${atQuery.trim()}\n\nContext:\n${blockText}`
-    const response = await askAI(prompt, blockText)
+    const prompt = `Answer this question: ${query}\n\nContext:\n${fullBlockText}`
+    const response = await askAI(prompt, fullBlockText)
 
-    const insert = {
-      id: `at-${Date.now()}`,
-      blockId: atPopup.blockId,
-      text: renderMd(response),
+    // Create an AI-authored child block and prepend it under the parent
+    const aiChild = {
+      id: newBlockId(),
+      text: response,
+      children: [],
+      isAI: true,
     }
-    setAtInserts(prev => [...prev, insert])
+
+    applyTreeOp(tree => {
+      const withText = setBlockText(tree, atPopup.blockId, fullBlockText)
+      return prependChild(withText, atPopup.blockId, aiChild)
+    })
+
     setAtPopup(null)
     setAtQuery('')
     setAtLoading(false)
@@ -470,10 +495,11 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     const blockInserts = atInserts.filter(ins => ins.blockId === block.id)
 
     const isCollapsed = !!block.collapsed
+    const isAI = !!block.isAI
     const showChildren = (hasChildren && !isCollapsed) || blockInserts.length > 0
 
     return (
-      <div key={block.id} className={`ls-block ${depth === 0 ? 'ls-block-top' : ''} ${isCollapsed ? 'ls-block-collapsed' : ''}`} data-block-id={block.id}>
+      <div key={block.id} className={`ls-block ${depth === 0 ? 'ls-block-top' : ''} ${isCollapsed ? 'ls-block-collapsed' : ''} ${isAI ? 'ls-block-ai-child' : ''}`} data-block-id={block.id}>
         <div className="ls-block-content">
           <div className="ls-bullet-wrap">
             {hasChildren && (
@@ -491,14 +517,14 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
               </button>
             )}
             <span
-              className={`ls-bullet ${hasChildren ? 'ls-bullet-parent' : ''}`}
+              className={`ls-bullet ${hasChildren ? 'ls-bullet-parent' : ''} ${isAI ? 'ls-bullet-ai' : ''}`}
               onClick={e => handleBulletClick(block.id, e)}
               onMouseDown={e => e.preventDefault()}
               title="Click to zoom in"
             />
           </div>
           <span
-            className={`ls-block-text ${depth === 0 ? 'ls-heading' : ''}`}
+            className={`ls-block-text ${depth === 0 ? 'ls-heading' : ''} ${isAI ? 'ls-block-text-ai' : ''}`}
             contentEditable
             suppressContentEditableWarning
             onInput={e => handleInput(e, block.id)}
@@ -510,6 +536,18 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
 
         {showChildren && (
           <div className="ls-block-children">
+            {/* Clickable thread line — collapses the parent block */}
+            {hasChildren && !isCollapsed && (
+              <button
+                type="button"
+                className="ls-thread-line"
+                onClick={e => handleToggleCollapse(block.id, e)}
+                onMouseDown={e => e.preventDefault()}
+                aria-label="Collapse"
+                title="Collapse"
+                tabIndex={-1}
+              />
+            )}
             {/* AI inserts for this block */}
             {blockInserts.map(ins => (
               <div key={ins.id} className="ls-block ls-block-ai" data-ins-id={ins.id}>

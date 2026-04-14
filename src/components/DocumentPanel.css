@@ -184,6 +184,30 @@
   background: var(--purple-500, #8b5cf6);
 }
 
+/* AI-authored child block (created from @ prompt) */
+.ls-block-text-ai {
+  color: #555;
+  font-size: 14px;
+}
+
+.ls-block-text-ai strong {
+  color: var(--purple-600, #7c3aed);
+  font-weight: 600;
+}
+
+.ls-block-text-ai code {
+  background: rgba(139, 92, 246, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.ls-block-text-ai em {
+  font-style: italic;
+  color: #666;
+}
+
 /* ── Block Text ── */
 
 .ls-block-text {
@@ -218,15 +242,39 @@
   padding-left: 24px;
 }
 
-.ls-block-children::before {
-  content: '';
+/* Clickable vertical thread line — click to collapse the parent block */
+.ls-thread-line {
   position: absolute;
   left: 11px;
   top: 0;
   bottom: 10px;
   width: 1.5px;
   background: #e5e8ec;
+  border: none;
+  padding: 0;
+  margin: 0;
   border-radius: 1px;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+/* Widen the hit target so a 1.5px line is still easy to click */
+.ls-thread-line::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -5px;
+  right: -5px;
+}
+
+.ls-thread-line:hover {
+  background: #7c8894;
+  box-shadow: 0 0 0 0.5px #7c8894;
+}
+
+.ls-thread-line:focus {
+  outline: none;
 }
 
 /* ── AI Insert Blocks ── */
