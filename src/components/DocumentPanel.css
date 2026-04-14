@@ -193,8 +193,7 @@
   gap: 10px;
   padding: 9px 14px 9px 12px;
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.055) 0%, rgba(139, 92, 246, 0.018) 100%);
-  border-left: 2px solid rgba(139, 92, 246, 0.45);
-  border-radius: 0 6px 6px 0;
+  border-radius: 6px;
   margin: 2px 0;
   min-width: 0;
   max-width: 680px;
