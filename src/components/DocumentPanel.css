@@ -469,6 +469,127 @@
   40% { opacity: 1; transform: scale(1.1); }
 }
 
+/* ── AI badge (subtle sparkle before AI block text) ── */
+.ls-ai-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  margin: 7px 4px 0 0;
+  color: var(--purple-500, #8b5cf6);
+  flex-shrink: 0;
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+.ls-ai-badge svg {
+  filter: drop-shadow(0 0 2px rgba(139, 92, 246, 0.4));
+  animation: lsAiBadgePulse 2.4s ease-in-out infinite;
+}
+
+@keyframes lsAiBadgePulse {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.1); }
+}
+
+/* ── Streaming caret (pulsing bar at end of text while AI is typing) ── */
+.ls-block-text-streaming {
+  cursor: default;
+  user-select: none;
+}
+
+.ls-block-text-streaming::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 13px;
+  margin-left: 2px;
+  background: var(--purple-500, #8b5cf6);
+  vertical-align: -2px;
+  border-radius: 1px;
+  animation: lsStreamCaret 0.85s ease-in-out infinite;
+}
+
+@keyframes lsStreamCaret {
+  0%, 45%   { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+/* ── AI loading placeholder ("AI is thinking…") ── */
+.ls-block-ai-loading {
+  position: relative;
+  animation: lsBlockAiIn 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ls-bullet-loading {
+  animation: lsLoadingBulletPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes lsLoadingBulletPulse {
+  0%, 100% { transform: scale(1);   opacity: 0.9; }
+  50%      { transform: scale(1.35); opacity: 1;  }
+}
+
+.ls-ai-badge-loading svg {
+  animation: lsAiBadgeSpin 1.8s linear infinite;
+}
+
+@keyframes lsAiBadgeSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.ls-ai-thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  font-size: 13px;
+  color: #6b7785;
+}
+
+.ls-ai-thinking-label {
+  color: var(--purple-500, #8b5cf6);
+  font-weight: 600;
+  font-size: 13px;
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.45) 0%, rgba(139, 92, 246, 1) 50%, rgba(139, 92, 246, 0.45) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: lsAiShimmer 1.8s ease-in-out infinite;
+}
+
+@keyframes lsAiShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.ls-ai-thinking-dots {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 2px;
+}
+
+.ls-ai-thinking-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--purple-400, #a78bfa);
+  display: inline-block;
+  animation: lsAiDot 1.2s ease-in-out infinite;
+}
+
+.ls-ai-thinking-dots span:nth-child(1) { animation-delay: 0s; }
+.ls-ai-thinking-dots span:nth-child(2) { animation-delay: 0.15s; }
+.ls-ai-thinking-dots span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes lsAiDot {
+  0%, 80%, 100% { opacity: 0.3; transform: translateY(0)    scale(0.85); }
+  40%           { opacity: 1;   transform: translateY(-2px) scale(1.1);  }
+}
+
 /* ── Scrollbar ── */
 .doc-body::-webkit-scrollbar { width: 6px; }
 .doc-body::-webkit-scrollbar-track { background: transparent; }

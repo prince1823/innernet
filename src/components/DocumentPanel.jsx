@@ -289,6 +289,13 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   const [atLoading, setAtLoading] = useState(false)
   const atInputRef = useRef(null)
 
+  // Streaming + loading state for AI responses
+  // streamingText: blockId → partial text override (takes priority over block.text while streaming)
+  const [streamingText, setStreamingText] = useState({})
+  // loadingPlaceholder: { parentId } — render an ephemeral "AI is thinking…" placeholder under this parent
+  const [loadingPlaceholder, setLoadingPlaceholder] = useState(null)
+  const streamTimersRef = useRef([])
+
   // Working blocks for current date (saved tree OR materialized from sample)
   const blocks = trees[selectedDate] || materializeTree(selectedDate, legacyEditsRef.current)
 
@@ -330,14 +337,24 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     }
   })
 
-  // Clear popup/focus/zoom state when date changes
+  // Clear popup/focus/zoom + streaming state when date changes
   useEffect(() => {
     setAtPopup(null)
     setAtQuery('')
     setAtLoading(false)
     setFocusRequest(null)
     setZoomedBlockId(null)
+    setStreamingText({})
+    setLoadingPlaceholder(null)
+    streamTimersRef.current.forEach(t => clearTimeout(t))
+    streamTimersRef.current = []
   }, [selectedDate])
+
+  // Clean up any in-flight stream timers when the component unmounts
+  useEffect(() => () => {
+    streamTimersRef.current.forEach(t => clearTimeout(t))
+    streamTimersRef.current = []
+  }, [])
 
   // Restore focus + cursor after tree-modifying operations
   useLayoutEffect(() => {
@@ -473,11 +490,58 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     setZoomedBlockId(blockId)
   }
 
+  // ── Streaming helpers ────────────────────────────────────────────────────
+  // Flatten a block tree depth-first (used to stream nested AI responses in reading order)
+  const flattenBlocks = (blockList, acc = []) => {
+    for (const b of blockList) {
+      acc.push(b)
+      if (b.children && b.children.length > 0) flattenBlocks(b.children, acc)
+    }
+    return acc
+  }
+
+  // Animate text into a single block via streamingText state overrides
+  const streamBlockText = (blockId, fullText) => new Promise(resolve => {
+    const CHARS_PER_TICK = 4
+    const TICK_MS = 16
+    let i = 0
+    const tick = () => {
+      i = Math.min(i + CHARS_PER_TICK, fullText.length)
+      setStreamingText(prev => ({ ...prev, [blockId]: fullText.slice(0, i) }))
+      if (i < fullText.length) {
+        const t = setTimeout(tick, TICK_MS)
+        streamTimersRef.current.push(t)
+      } else {
+        // Done — remove the override so block.text takes over on next render
+        const t = setTimeout(() => {
+          setStreamingText(prev => {
+            const next = { ...prev }
+            delete next[blockId]
+            return next
+          })
+          resolve()
+        }, 40)
+        streamTimersRef.current.push(t)
+      }
+    }
+    const t0 = setTimeout(tick, 10)
+    streamTimersRef.current.push(t0)
+  })
+
+  // Stream a list of blocks sequentially (depth-first)
+  const streamBlocksSequentially = async (blocks) => {
+    const flat = flattenBlocks(blocks)
+    for (const b of flat) {
+      await streamBlockText(b.id, b.text || '')
+    }
+  }
+
   const handleAtSubmit = async (e) => {
     e.preventDefault()
     if (!atQuery.trim() || !atPopup) return
 
     const query = atQuery.trim()
+    const parentBlockId = atPopup.blockId
 
     // Inline the query text into the block next to the @ so the block reads "... @query"
     // atPopup.offset is the caret position just after the @ character
@@ -489,11 +553,18 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     // Read the full block's text from the DOM (contentEditable) so we persist
     // the "@query" insertion along with anything else the user typed
     const blockEl = docBodyRef.current?.querySelector(
-      `[data-block-id="${atPopup.blockId}"] > .ls-block-content > .ls-block-text`
+      `[data-block-id="${parentBlockId}"] > .ls-block-content > .ls-block-text`
     )
     const fullBlockText = blockEl?.textContent || ''
 
-    setAtLoading(true)
+    // Persist the updated parent text and immediately show the loading placeholder
+    // under it. Closing the popup first so the user sees the "AI is thinking…" row.
+    applyTreeOp(tree => setBlockText(tree, parentBlockId, fullBlockText))
+    setLoadingPlaceholder({ parentId: parentBlockId })
+    setAtPopup(null)
+    setAtQuery('')
+    setAtLoading(false)
+
     const prompt = `Answer this question: ${query}\n\nContext:\n${fullBlockText}`
     const response = await askAI(prompt, fullBlockText)
 
@@ -504,14 +575,18 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
       aiBlocks = [{ id: newBlockId(), text: response || '', children: [], isAI: true }]
     }
 
-    applyTreeOp(tree => {
-      const withText = setBlockText(tree, atPopup.blockId, fullBlockText)
-      return prependChildren(withText, atPopup.blockId, aiBlocks)
+    // Pre-seed streamingText so the newly-inserted blocks render empty on first paint,
+    // then stream each one character-by-character in reading order.
+    const flat = flattenBlocks(aiBlocks)
+    setStreamingText(prev => {
+      const next = { ...prev }
+      for (const b of flat) next[b.id] = ''
+      return next
     })
+    setLoadingPlaceholder(null)
+    applyTreeOp(tree => prependChildren(tree, parentBlockId, aiBlocks))
 
-    setAtPopup(null)
-    setAtQuery('')
-    setAtLoading(false)
+    await streamBlocksSequentially(aiBlocks)
   }
 
   const dismissAtPopup = () => {
@@ -531,7 +606,12 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
 
     const isCollapsed = !!block.collapsed
     const isAI = !!block.isAI
-    const showChildren = (hasChildren && !isCollapsed) || blockInserts.length > 0
+    // Streaming: if this block is currently being typed out, use the partial
+    // text override (even when empty) instead of the source-of-truth block.text
+    const isStreaming = Object.prototype.hasOwnProperty.call(streamingText, block.id)
+    const displayText = isStreaming ? streamingText[block.id] : (block.text || '')
+    const hasLoading = loadingPlaceholder?.parentId === block.id
+    const showChildren = (hasChildren && !isCollapsed) || blockInserts.length > 0 || hasLoading
 
     return (
       <div key={block.id} className={`ls-block ${depth === 0 ? 'ls-block-top' : ''} ${isCollapsed ? 'ls-block-collapsed' : ''} ${isAI ? 'ls-block-ai-child' : ''}`} data-block-id={block.id}>
@@ -558,14 +638,21 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
               title="Click to zoom in"
             />
           </div>
+          {isAI && (
+            <span className="ls-ai-badge" aria-hidden="true" title="AI-generated">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2l1.8 5.3 5.3 1.8-5.3 1.8L12 16l-1.8-5.3L4.9 9.1l5.3-1.8z" />
+              </svg>
+            </span>
+          )}
           <span
-            className={`ls-block-text ${depth === 0 ? 'ls-heading' : ''} ${isAI ? 'ls-block-text-ai' : ''}`}
-            contentEditable
+            className={`ls-block-text ${depth === 0 ? 'ls-heading' : ''} ${isAI ? 'ls-block-text-ai' : ''} ${isStreaming ? 'ls-block-text-streaming' : ''}`}
+            contentEditable={!isStreaming}
             suppressContentEditableWarning
             onInput={e => handleInput(e, block.id)}
             onKeyDown={e => handleBlockKeyDown(e, block.id)}
             onBlur={e => handleBlockBlur(block.id, e.currentTarget.textContent)}
-            dangerouslySetInnerHTML={{ __html: renderMd(block.text) }}
+            dangerouslySetInnerHTML={{ __html: renderMd(displayText) }}
           />
         </div>
 
@@ -583,6 +670,29 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                 tabIndex={-1}
               />
             )}
+
+            {/* Ephemeral "AI is thinking…" placeholder while request is in flight */}
+            {hasLoading && (
+              <div className="ls-block ls-block-ai-loading" aria-live="polite">
+                <div className="ls-block-content">
+                  <div className="ls-bullet-wrap">
+                    <span className="ls-bullet ls-bullet-ai ls-bullet-loading" />
+                  </div>
+                  <span className="ls-ai-badge ls-ai-badge-loading" aria-hidden="true">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2l1.8 5.3 5.3 1.8-5.3 1.8L12 16l-1.8-5.3L4.9 9.1l5.3-1.8z" />
+                    </svg>
+                  </span>
+                  <div className="ls-ai-thinking">
+                    <span className="ls-ai-thinking-label">AI is thinking</span>
+                    <span className="ls-ai-thinking-dots">
+                      <span /><span /><span />
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* AI inserts for this block */}
             {blockInserts.map(ins => (
               <div key={ins.id} className="ls-block ls-block-ai" data-ins-id={ins.id}>
