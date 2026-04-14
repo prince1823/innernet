@@ -166,15 +166,51 @@ function toggleCollapse(tree, id) {
   return next
 }
 
-// Insert a new block at the beginning of a parent block's children (auto-expands if collapsed)
-function prependChild(tree, parentId, newChild) {
+// Insert new blocks at the beginning of a parent block's children (auto-expands if collapsed)
+function prependChildren(tree, parentId, newChildren) {
   const next = cloneTree(tree)
   const ctx = findContext(next, parentId)
   if (!ctx) return next
   if (!ctx.block.children) ctx.block.children = []
-  ctx.block.children.unshift(newChild)
+  ctx.block.children = [...newChildren, ...ctx.block.children]
   if (ctx.block.collapsed) ctx.block.collapsed = false
   return next
+}
+
+// Parse an AI markdown response into a nested tree of blocks.
+// - Blank lines are ignored
+// - Leading whitespace → nesting depth (2 spaces = 1 level)
+// - List markers (- * 1. 2. …) and heading markers (# ##) are stripped
+// - Each non-empty line becomes its own block, marked isAI: true
+function parseAIResponseToBlocks(response) {
+  if (!response || typeof response !== 'string') return []
+  const lines = response.split('\n')
+  const result = []
+  const stack = [{ indent: -1, children: result }]
+
+  for (const rawLine of lines) {
+    if (!rawLine.trim()) continue
+    const lead = (rawLine.match(/^(\s*)/) || [''])[0].length
+    let content = rawLine.slice(lead)
+      .replace(/^[-*+]\s+/, '')
+      .replace(/^\d+[.)]\s+/, '')
+      .replace(/^#{1,6}\s+/, '')
+      .trim()
+    if (!content) continue
+
+    const indent = Math.floor(lead / 2)
+
+    // Pop stack to the correct parent for this indent level
+    while (stack.length > 1 && stack[stack.length - 1].indent >= indent) {
+      stack.pop()
+    }
+
+    const block = { id: newBlockId(), text: content, children: [], isAI: true }
+    stack[stack.length - 1].children.push(block)
+    stack.push({ indent, children: block.children })
+  }
+
+  return result
 }
 
 // Returns ancestor blocks from outermost to innermost (not including the target block itself)
@@ -461,17 +497,16 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     const prompt = `Answer this question: ${query}\n\nContext:\n${fullBlockText}`
     const response = await askAI(prompt, fullBlockText)
 
-    // Create an AI-authored child block and prepend it under the parent
-    const aiChild = {
-      id: newBlockId(),
-      text: response,
-      children: [],
-      isAI: true,
+    // Parse the response into a tree of blocks — one per line, respecting indentation —
+    // so each point becomes its own editable bullet under the parent
+    let aiBlocks = parseAIResponseToBlocks(response)
+    if (aiBlocks.length === 0) {
+      aiBlocks = [{ id: newBlockId(), text: response || '', children: [], isAI: true }]
     }
 
     applyTreeOp(tree => {
       const withText = setBlockText(tree, atPopup.blockId, fullBlockText)
-      return prependChild(withText, atPopup.blockId, aiChild)
+      return prependChildren(withText, atPopup.blockId, aiBlocks)
     })
 
     setAtPopup(null)
