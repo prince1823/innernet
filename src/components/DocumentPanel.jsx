@@ -592,7 +592,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     setAtQuery('')
     setAtLoading(false)
 
-    const prompt = `Answer this question: ${query}\n\nContext:\n${fullBlockText}\n\nRespond as a single flowing paragraph. Do NOT use bullet points, numbered lists, or headings — write it as continuous prose.`
+    const prompt = `Answer this question: ${query}\n\nContext:\n${fullBlockText}\n\nRespond as a single flowing paragraph, 2-3 sentences maximum. Be concise and focused. Do NOT use bullet points, numbered lists, or headings — write it as continuous prose.`
     const response = await askAI(prompt, fullBlockText)
 
     // AI response always lands as a single paragraph block — flatten any list
@@ -669,18 +669,30 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
               title="Click to zoom in"
             />
           </div>
-          {isAI && (
-            <span className="ls-ai-prefix" aria-hidden="true">AI:</span>
+          {isAI ? (
+            <div className="ls-ai-card">
+              <span className="ls-ai-prefix" aria-hidden="true">AI</span>
+              <span
+                className={`ls-block-text ls-block-text-ai ${isStreaming ? 'ls-block-text-streaming' : ''}`}
+                contentEditable={!isStreaming}
+                suppressContentEditableWarning
+                onInput={e => handleInput(e, block.id)}
+                onKeyDown={e => handleBlockKeyDown(e, block.id)}
+                onBlur={e => handleBlockBlur(block.id, e.currentTarget.textContent)}
+                dangerouslySetInnerHTML={{ __html: renderMd(displayText) }}
+              />
+            </div>
+          ) : (
+            <span
+              className={`ls-block-text ${depth === 0 ? 'ls-heading' : ''} ${isStreaming ? 'ls-block-text-streaming' : ''}`}
+              contentEditable={!isStreaming}
+              suppressContentEditableWarning
+              onInput={e => handleInput(e, block.id)}
+              onKeyDown={e => handleBlockKeyDown(e, block.id)}
+              onBlur={e => handleBlockBlur(block.id, e.currentTarget.textContent)}
+              dangerouslySetInnerHTML={{ __html: renderMd(displayText) }}
+            />
           )}
-          <span
-            className={`ls-block-text ${depth === 0 ? 'ls-heading' : ''} ${isAI ? 'ls-block-text-ai' : ''} ${isStreaming ? 'ls-block-text-streaming' : ''}`}
-            contentEditable={!isStreaming}
-            suppressContentEditableWarning
-            onInput={e => handleInput(e, block.id)}
-            onKeyDown={e => handleBlockKeyDown(e, block.id)}
-            onBlur={e => handleBlockBlur(block.id, e.currentTarget.textContent)}
-            dangerouslySetInnerHTML={{ __html: renderMd(displayText) }}
-          />
         </div>
 
         {showChildren && (
@@ -705,11 +717,14 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                   <div className="ls-bullet-wrap">
                     <span className="ls-bullet ls-bullet-ai ls-bullet-loading" />
                   </div>
-                  <div className="ls-ai-thinking">
-                    <span className="ls-ai-thinking-label">AI is thinking</span>
-                    <span className="ls-ai-thinking-dots">
-                      <span /><span /><span />
-                    </span>
+                  <div className="ls-ai-card">
+                    <span className="ls-ai-prefix" aria-hidden="true">AI</span>
+                    <div className="ls-ai-thinking">
+                      <span className="ls-ai-thinking-label">thinking</span>
+                      <span className="ls-ai-thinking-dots">
+                        <span /><span /><span />
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
