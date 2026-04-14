@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
+import { flushSync } from 'react-dom'
 
 import { journalPages } from '../data/sampleData'
 import { askAI } from '../utils/askAI'
@@ -261,24 +262,43 @@ function getCursorOffset(el) {
 }
 
 function setCursorAtOffset(el, offset) {
+  if (!el) return
   el.focus()
   const sel = window.getSelection()
   if (!sel) return
 
-  // "End" sentinel
-  if (offset === null || offset === undefined || offset === Infinity) {
+  // Collect all text-node descendants (single pass)
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null)
+  const nodes = []
+  let n
+  while ((n = walker.nextNode())) nodes.push(n)
+
+  // Helper: place the caret at the very end of the element's content.
+  // Uses the last text node's character length so the anchor is unambiguous —
+  // element-level offsets like (span, 1) get re-normalized by the browser in
+  // contentEditable, which can snap the caret back to position 0.
+  const placeAtEnd = () => {
     const range = document.createRange()
-    range.selectNodeContents(el)
-    range.collapse(false)
+    if (nodes.length > 0) {
+      const last = nodes[nodes.length - 1]
+      range.setStart(last, last.textContent.length)
+    } else {
+      range.setStart(el, 0)
+    }
+    range.collapse(true)
     sel.removeAllRanges()
     sel.addRange(range)
+  }
+
+  // "End" sentinel
+  if (offset === null || offset === undefined || offset === Infinity) {
+    placeAtEnd()
     return
   }
 
+  // Finite offset → walk text nodes until we consume it
   let remaining = offset
-  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null)
-  let node
-  while ((node = walker.nextNode())) {
+  for (const node of nodes) {
     const len = node.textContent.length
     if (remaining <= len) {
       const range = document.createRange()
@@ -290,12 +310,9 @@ function setCursorAtOffset(el, offset) {
     }
     remaining -= len
   }
-  // Fallback: place at end (empty element or offset past content)
-  const range = document.createRange()
-  range.selectNodeContents(el)
-  range.collapse(false)
-  sel.removeAllRanges()
-  sel.addRange(range)
+
+  // Offset past all text → fall through to end
+  placeAtEnd()
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -386,9 +403,11 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   // Restore focus + cursor after tree-modifying operations
   useLayoutEffect(() => {
     if (!focusRequest) return
-    const el = docBodyRef.current?.querySelector(
-      `[data-block-id="${focusRequest.id}"] > .ls-block-content > .ls-block-text`
-    )
+    // The text span lives directly under .ls-block-content for regular blocks,
+    // but inside .ls-ai-card for AI blocks — descendant search handles both.
+    const blockEl = docBodyRef.current?.querySelector(`[data-block-id="${focusRequest.id}"]`)
+    const contentEl = blockEl?.querySelector(':scope > .ls-block-content')
+    const el = contentEl?.querySelector('.ls-block-text')
     if (el) setCursorAtOffset(el, focusRequest.offset)
     setFocusRequest(null)
   }, [focusRequest, trees])
@@ -490,19 +509,51 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
       const ctx = findContext(currentTree, blockId)
       if (!ctx) return
       if (ctx.block.children && ctx.block.children.length > 0) return
-      e.preventDefault()
       // Find previous block (visual order) to focus
       const flat = flattenIds(currentTree)
       const idx = flat.indexOf(blockId)
-      const prevId = idx > 0 ? flat[idx - 1] : null
-      applyTreeOp(tree => deleteBlock(tree, blockId))
-      if (prevId) setFocusRequest({ id: prevId, offset: Infinity })
+      if (idx <= 0) return // first block — nothing to focus
+      const prevId = flat[idx - 1]
+      e.preventDefault()
+
+      // flushSync: commit the delete synchronously so the DOM is already
+      // updated by the time we restore the cursor. This bypasses the
+      // focusRequest/useLayoutEffect round-trip, which was racing with the
+      // blur that fires on the unmounting block and sometimes landing the
+      // caret at offset 0.
+      flushSync(() => {
+        applyTreeOp(tree => deleteBlock(tree, blockId))
+      })
+
+      // Now directly look up the previous block's text element and place
+      // the caret at the end of its rendered text content.
+      const prevBlockEl = docBodyRef.current?.querySelector(`[data-block-id="${prevId}"]`)
+      const prevContentEl = prevBlockEl?.querySelector(':scope > .ls-block-content')
+      const prevTextEl = prevContentEl?.querySelector('.ls-block-text')
+      if (prevTextEl) {
+        // Use the rendered DOM text length (not the source block.text length)
+        // — markdown formatting shrinks the visible text, and we want the
+        // caret at the visual end, which is the length of textContent.
+        const domLen = (prevTextEl.textContent || '').length
+        setCursorAtOffset(prevTextEl, domLen)
+      }
     }
   }
 
-  // Blur → persist text edit into tree
+  // Blur → persist text edit into tree.
+  // Bails when the block is gone (e.g. just removed via Backspace) or when the
+  // text hasn't actually changed, so the blur that fires on an unmounting
+  // element can't trigger a wasted render that clobbers a just-restored cursor
+  // elsewhere on the page.
   const handleBlockBlur = (blockId, text) => {
-    applyTreeOp(tree => setBlockText(tree, blockId, text))
+    setTrees(prev => {
+      const current = prev[selectedDate]
+      if (!current) return prev
+      const ctx = findContext(current, blockId)
+      if (!ctx) return prev                 // block no longer exists
+      if (ctx.block.text === text) return prev  // no-op edit
+      return { ...prev, [selectedDate]: setBlockText(current, blockId, text) }
+    })
   }
 
   // Toggle collapse state on a block
@@ -578,11 +629,12 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     }
 
     // Read the full block's text from the DOM (contentEditable) so we persist
-    // the "@query" insertion along with anything else the user typed
-    const blockEl = docBodyRef.current?.querySelector(
-      `[data-block-id="${parentBlockId}"] > .ls-block-content > .ls-block-text`
-    )
-    const fullBlockText = blockEl?.textContent || ''
+    // the "@query" insertion along with anything else the user typed.
+    // Descendant search so the AI-card layout also works.
+    const blockEl = docBodyRef.current?.querySelector(`[data-block-id="${parentBlockId}"]`)
+    const contentEl = blockEl?.querySelector(':scope > .ls-block-content')
+    const textEl = contentEl?.querySelector('.ls-block-text')
+    const fullBlockText = textEl?.textContent || ''
 
     // Persist the updated parent text and immediately show the loading placeholder
     // under it. Closing the popup first so the user sees the "AI is thinking…" row.
