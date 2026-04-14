@@ -87,13 +87,20 @@ export default function ChatWindows({ featureWindows = [], onClose }) {
     return init
   })
 
+  // Track which feature IDs have been properly initialized as feature windows
+  const initializedFeatureIds = useRef(new Set())
+
   // Sync new featureWindows into conversations when they arrive
   useEffect(() => {
     featureWindows.forEach(fw => {
-      setConversations(prev => {
-        if (prev[fw.id]) return prev
-        return { ...prev, [fw.id]: buildInitialMessages({ ...fw, isFeature: true }) }
-      })
+      if (!initializedFeatureIds.current.has(fw.id)) {
+        initializedFeatureIds.current.add(fw.id)
+        // Always override — the pre-initialized conversation had no feature context
+        setConversations(prev => ({
+          ...prev,
+          [fw.id]: buildInitialMessages({ ...fw, isFeature: true }),
+        }))
+      }
     })
     if (featureWindows.length > 0) {
       setActiveTab(featureWindows[featureWindows.length - 1].id)

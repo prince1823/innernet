@@ -475,7 +475,12 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                     <AiIcon size={11} />
                     <span>AI</span>
                     {acceptedKeys.has(titleKey) ? (
-                      <span className="doc-ai-accepted-badge">Added to doc</span>
+                      <>
+                        <span className="doc-ai-accepted-badge">Added to doc</span>
+                        <button className="doc-ai-reject" onClick={() => dismissResponse(titleKey)} title="Remove">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                      </>
                     ) : (
                       <div className="doc-ai-actions">
                         <button className="doc-ai-accept" onClick={() => acceptResponse(titleKey)} title="Add to document">
@@ -573,7 +578,12 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
                             <AiIcon size={11} />
                             <span>AI</span>
                             {acceptedKeys.has(bulletKey) ? (
+                              <>
                               <span className="doc-ai-accepted-badge">Added to doc</span>
+                              <button className="doc-ai-reject" onClick={() => dismissResponse(bulletKey)} title="Remove">
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                              </button>
+                              </>
                             ) : (
                               <div className="doc-ai-actions">
                                 <button className="doc-ai-accept" onClick={() => acceptResponse(bulletKey)} title="Add to document">
