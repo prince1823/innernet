@@ -103,8 +103,6 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const [zoomLevel, setZoomLevel] = useState(56) // pixels per hour: 42, 56, 84
   const [expandedEvent, setExpandedEvent] = useState(null) // event id to expand inline
   const [expandedTab, setExpandedTab] = useState('summary') // 'summary' | 'activity'
-  const [expandedExtraHeight, setExpandedExtraHeight] = useState(0)
-  const expandedRef = useRef(null)
   const gridRef = useRef(null)
   const searchRef = useRef(null)
 
@@ -179,53 +177,6 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const handleMiniCalMonthNav = (dir) => {
     setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + dir, 1))
   }
-
-  // Max extra grid expansion (capped at ~3 hours of slot height)
-  const MAX_EXTRA = zoomLevel * 3
-
-  // Measure expanded event and compute extra height needed beyond its slot
-  useEffect(() => {
-    if (!expandedEvent || !expandedRef.current) {
-      setExpandedExtraHeight(0)
-      return
-    }
-    const measure = () => {
-      const el = expandedRef.current
-      if (!el) return
-      const task = tasks.find(t => t.id === expandedEvent)
-      if (!task) return
-      const startMin = timeToMinutes(task.time)
-      const endMin = timeToMinutes(task.endTime)
-      const slotHeight = ((endMin - startMin) / 60) * zoomLevel
-      const actualHeight = el.scrollHeight
-      const rawExtra = Math.max(0, actualHeight - slotHeight)
-      setExpandedExtraHeight(Math.min(rawExtra, MAX_EXTRA))
-    }
-    requestAnimationFrame(measure)
-  }, [expandedEvent, expandedTab, zoomLevel, tasks])
-
-  // Find the expanded task's hour range for stretching slots
-  const expandedTask = expandedEvent ? tasks.find(t => t.id === expandedEvent) : null
-  const expandedStartHour = expandedTask ? parseInt(expandedTask.time.split(':')[0]) : -1
-  const expandedEndHour = expandedTask ? Math.ceil(timeToMinutes(expandedTask.endTime) / 60) : -1
-  const expandedSpanHours = Math.max(expandedEndHour - expandedStartHour, 1)
-  const extraPerSlot = expandedExtraHeight / expandedSpanHours
-
-  // Calculate cumulative extra offset for a given minute position
-  const getExtraOffset = (minutes) => {
-    if (!expandedTask || expandedExtraHeight === 0) return 0
-    const startMin = timeToMinutes(expandedTask.time)
-    const endMin = timeToMinutes(expandedTask.endTime)
-    if (minutes <= startMin) return 0
-    if (minutes >= endMin) return expandedExtraHeight
-    const fraction = (minutes - startMin) / (endMin - startMin)
-    return fraction * expandedExtraHeight
-  }
-
-  // Total height available for expanded event (slot + extra)
-  const expandedMaxHeight = expandedTask
-    ? ((timeToMinutes(expandedTask.endTime) - timeToMinutes(expandedTask.time)) / 60) * zoomLevel + expandedExtraHeight
-    : 0
 
   useEffect(() => {
     if (gridRef.current) gridRef.current.scrollTop = zoomLevel * 7
@@ -404,27 +355,22 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
       <div className="cal-grid-scroll" ref={gridRef}>
         <div className="cal-time-grid">
           <div className="cal-gutter">
-            {HOURS.map(hour => {
-              const slotExtra = (hour >= expandedStartHour && hour < expandedEndHour) ? extraPerSlot : 0
-              return (
-                <div key={hour} className="cal-time-label" style={{ height: `${zoomLevel + slotExtra}px` }}>
-                  {hour > 0 && <span>{formatHourLabel(hour)}</span>}
-                </div>
-              )
-            })}
+            {HOURS.map(hour => (
+              <div key={hour} className="cal-time-label" style={{ height: `${zoomLevel}px` }}>
+                {hour > 0 && <span>{formatHourLabel(hour)}</span>}
+              </div>
+            ))}
           </div>
 
           <div className="cal-day-col" onClick={handleSlotClick}>
-            {HOURS.map(hour => {
-              const slotExtra = (hour >= expandedStartHour && hour < expandedEndHour) ? extraPerSlot : 0
-              return <div key={hour} className="cal-hour-slot" style={{ height: `${zoomLevel + slotExtra}px` }} />
-            })}
+            {HOURS.map(hour => (
+              <div key={hour} className="cal-hour-slot" style={{ height: `${zoomLevel}px` }} />
+            ))}
 
             {/* Thought blocks */}
             {thoughtSlots.map(slot => {
               const [h, m] = slot.time.split(':').map(Number)
-              const minutes = h * 60 + m
-              const topOffset = (minutes / 60) * zoomLevel + getExtraOffset(minutes)
+              const topOffset = ((h * 60 + m) / 60) * zoomLevel
               const isActive = quickSlot?.time === slot.time
               return (
                 <div key={slot.time} className={`cal-thought-block ${isActive ? 'active' : ''}`} style={{ top: `${topOffset}px` }}
@@ -439,8 +385,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
             {/* Quick slot indicator */}
             {quickSlot && !thoughtSlots.some(s => s.time === quickSlot.time) && (() => {
               const [h, m] = quickSlot.time.split(':').map(Number)
-              const minutes = h * 60 + m
-              const topOffset = (minutes / 60) * zoomLevel + getExtraOffset(minutes)
+              const topOffset = ((h * 60 + m) / 60) * zoomLevel
               return (
                 <div className="cal-quick-slot" style={{ top: `${topOffset}px` }}>
                   <div className="cal-quick-slot-label">{quickSlot.label}</div>
@@ -453,7 +398,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               const startMin = timeToMinutes(task.time)
               const endMin = timeToMinutes(task.endTime)
               const duration = endMin - startMin
-              const topOffset = (startMin / 60) * zoomLevel + getExtraOffset(startMin)
+              const topOffset = (startMin / 60) * zoomLevel
               const height = (duration / 60) * zoomLevel
               const color = eventColors[task.colorIndex] || eventColors[0]
               const isExpanded = expandedEvent === task.id
@@ -462,13 +407,11 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               return (
                 <div
                   key={task.id}
-                  ref={isExpanded ? expandedRef : undefined}
                   className={`cal-event-block ${selectedEvent?.id === task.id ? 'selected' : ''} ${isExpanded ? 'expanded' : ''}`}
                   style={{
                     top: `${topOffset}px`,
                     minHeight: `${Math.max(height, 24)}px`,
-                    height: isExpanded ? 'auto' : `${Math.max(height, 24)}px`,
-                    maxHeight: isExpanded ? `${expandedMaxHeight}px` : undefined,
+                    height: `${Math.max(height, 24)}px`,
                     backgroundColor: color.bg,
                     borderLeft: `4px solid ${color.border}`,
                   }}
@@ -552,7 +495,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
 
             {/* Current time line */}
             {isToday && (
-              <div className="cal-now-line" style={{ top: `${((10 * 60 + 10) / 60) * zoomLevel + getExtraOffset(10 * 60 + 10)}px` }}>
+              <div className="cal-now-line" style={{ top: `${((10 * 60 + 10) / 60) * zoomLevel}px` }}>
                 <div className="cal-now-dot" />
                 <div className="cal-now-rule" />
               </div>
