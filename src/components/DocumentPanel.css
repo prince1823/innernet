@@ -469,28 +469,23 @@
   40% { opacity: 1; transform: scale(1.1); }
 }
 
-/* ── AI badge (subtle sparkle before AI block text) ── */
-.ls-ai-badge {
+/* ── AI prefix label ("AI:" before AI-authored block text) ── */
+.ls-ai-prefix {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 12px;
-  height: 12px;
-  margin: 7px 4px 0 0;
-  color: var(--purple-500, #8b5cf6);
+  margin: 5px 6px 0 0;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--purple-600, #7c3aed);
+  background: rgba(139, 92, 246, 0.1);
+  border-radius: 4px;
   flex-shrink: 0;
-  opacity: 0.9;
+  user-select: none;
   pointer-events: none;
-}
-
-.ls-ai-badge svg {
-  filter: drop-shadow(0 0 2px rgba(139, 92, 246, 0.4));
-  animation: lsAiBadgePulse 2.4s ease-in-out infinite;
-}
-
-@keyframes lsAiBadgePulse {
-  0%, 100% { opacity: 0.85; transform: scale(1); }
-  50%      { opacity: 1;    transform: scale(1.1); }
+  white-space: nowrap;
 }
 
 /* ── Streaming caret (pulsing bar at end of text while AI is typing) ── */
@@ -529,15 +524,6 @@
 @keyframes lsLoadingBulletPulse {
   0%, 100% { transform: scale(1);   opacity: 0.9; }
   50%      { transform: scale(1.35); opacity: 1;  }
-}
-
-.ls-ai-badge-loading svg {
-  animation: lsAiBadgeSpin 1.8s linear infinite;
-}
-
-@keyframes lsAiBadgeSpin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
 }
 
 .ls-ai-thinking {

@@ -177,7 +177,34 @@ function prependChildren(tree, parentId, newChildren) {
   return next
 }
 
+// Flatten an AI markdown response into a single-paragraph plain-text string.
+// The AI response always lands in one block rendered as flowing prose, so:
+//   - List markers (- * + 1. 2. …) and heading markers (# ##) are dropped
+//   - Inline markdown (**bold**, *italic*, `code`) is unwrapped to plain text,
+//     so round-trip editing via textContent never loses formatting
+//   - Lines are joined with a single space to read as one continuous paragraph
+function formatAIParagraph(response) {
+  if (!response || typeof response !== 'string') return ''
+  return response
+    .split('\n')
+    .map(line => line
+      .replace(/^\s*[-*+]\s+/, '')        // leading bullet marker
+      .replace(/^\s*\d+[.)]\s+/, '')      // leading numbered marker
+      .replace(/^\s*#{1,6}\s+/, '')       // leading heading marker
+      .replace(/\*\*([^*]+)\*\*/g, '$1')  // **bold** → bold
+      .replace(/\*([^*]+)\*/g, '$1')      // *italic* → italic
+      .replace(/`([^`]+)`/g, '$1')        // `code` → code
+      .trim()
+    )
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 // Parse an AI markdown response into a nested tree of blocks.
+// (Kept for reference / possible future use — current flow uses formatAIParagraph
+// to always return a single paragraph block.)
 // - Blank lines are ignored
 // - Leading whitespace → nesting depth (2 spaces = 1 level)
 // - List markers (- * 1. 2. …) and heading markers (# ##) are stripped
@@ -565,15 +592,19 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     setAtQuery('')
     setAtLoading(false)
 
-    const prompt = `Answer this question: ${query}\n\nContext:\n${fullBlockText}`
+    const prompt = `Answer this question: ${query}\n\nContext:\n${fullBlockText}\n\nRespond as a single flowing paragraph. Do NOT use bullet points, numbered lists, or headings — write it as continuous prose.`
     const response = await askAI(prompt, fullBlockText)
 
-    // Parse the response into a tree of blocks — one per line, respecting indentation —
-    // so each point becomes its own editable bullet under the parent
-    let aiBlocks = parseAIResponseToBlocks(response)
-    if (aiBlocks.length === 0) {
-      aiBlocks = [{ id: newBlockId(), text: response || '', children: [], isAI: true }]
-    }
+    // AI response always lands as a single paragraph block — flatten any list
+    // markers / headings / inline markdown so it reads as clean prose and
+    // round-trips cleanly through contentEditable edits.
+    const paraText = formatAIParagraph(response) || (response || '')
+    const aiBlocks = [{
+      id: newBlockId(),
+      text: paraText,
+      children: [],
+      isAI: true,
+    }]
 
     // Pre-seed streamingText so the newly-inserted blocks render empty on first paint,
     // then stream each one character-by-character in reading order.
@@ -639,11 +670,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
             />
           </div>
           {isAI && (
-            <span className="ls-ai-badge" aria-hidden="true" title="AI-generated">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2l1.8 5.3 5.3 1.8-5.3 1.8L12 16l-1.8-5.3L4.9 9.1l5.3-1.8z" />
-              </svg>
-            </span>
+            <span className="ls-ai-prefix" aria-hidden="true">AI:</span>
           )}
           <span
             className={`ls-block-text ${depth === 0 ? 'ls-heading' : ''} ${isAI ? 'ls-block-text-ai' : ''} ${isStreaming ? 'ls-block-text-streaming' : ''}`}
@@ -678,11 +705,6 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                   <div className="ls-bullet-wrap">
                     <span className="ls-bullet ls-bullet-ai ls-bullet-loading" />
                   </div>
-                  <span className="ls-ai-badge ls-ai-badge-loading" aria-hidden="true">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 2l1.8 5.3 5.3 1.8-5.3 1.8L12 16l-1.8-5.3L4.9 9.1l5.3-1.8z" />
-                    </svg>
-                  </span>
                   <div className="ls-ai-thinking">
                     <span className="ls-ai-thinking-label">AI is thinking</span>
                     <span className="ls-ai-thinking-dots">
