@@ -446,6 +446,7 @@
   justify-content: flex-end;
   padding-right: 6px;
   position: relative;
+  transition: height 0.2s ease;
 }
 
 .cal-time-label span {
@@ -467,7 +468,7 @@
   height: 56px;
   border-bottom: 1px solid #e8eaed;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, height 0.2s ease;
 }
 
 .cal-hour-slot:hover { background: rgba(245, 158, 11, 0.04); }
