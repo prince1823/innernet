@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 
 import { journalPages } from '../data/sampleData'
 import { askAI } from '../utils/askAI'
@@ -16,19 +16,16 @@ function renderMd(text) {
     .replace(/\n/g, '<br/>')
 }
 
-const EDITS_KEY = 'innernet-journal-edits'
+const EDITS_KEY = 'innernet-journal-edits'        // legacy — read once for migration
+const TREES_KEY = 'innernet-journal-trees'        // per-date editable block trees
 const AI_INSERTS_KEY = 'innernet-journal-inserts'
 
-function loadEdits() {
+function loadLegacyEdits() {
   try { return JSON.parse(localStorage.getItem(EDITS_KEY) || '{}') } catch { return {} }
 }
 
-function saveEdit(blockId, text) {
-  try {
-    const edits = loadEdits()
-    edits[blockId] = text
-    localStorage.setItem(EDITS_KEY, JSON.stringify(edits))
-  } catch {}
+function loadTrees() {
+  try { return JSON.parse(localStorage.getItem(TREES_KEY) || '{}') } catch { return {} }
 }
 
 function loadAtInserts() {
@@ -46,9 +43,197 @@ function formatDateHeading(dateStr) {
   return `${months[date.getMonth()]} ${day}${suffix}, ${date.getFullYear()}`
 }
 
+// ── Tree helpers ──────────────────────────────────────────────────────────
+
+function cloneTree(tree) {
+  return JSON.parse(JSON.stringify(tree))
+}
+
+function applyLegacyEdits(tree, edits) {
+  for (const b of tree) {
+    if (edits[b.id] !== undefined) b.text = edits[b.id]
+    if (b.children) applyLegacyEdits(b.children, edits)
+  }
+  return tree
+}
+
+// Materialize a working tree for a date from sample data + any legacy edits
+function materializeTree(date, legacyEdits) {
+  const sample = cloneTree(journalPages[date] || [])
+  return applyLegacyEdits(sample, legacyEdits)
+}
+
+// Find block + context (siblings list, index, parent chain) in a tree
+function findContext(tree, id) {
+  function search(siblings, parentChain) {
+    for (let i = 0; i < siblings.length; i++) {
+      if (siblings[i].id === id) {
+        return { block: siblings[i], siblings, index: i, parentChain }
+      }
+      if (siblings[i].children && siblings[i].children.length > 0) {
+        const res = search(siblings[i].children, [...parentChain, { siblings, index: i }])
+        if (res) return res
+      }
+    }
+    return null
+  }
+  return search(tree, [])
+}
+
+// Flatten tree to an array of block IDs in visual (depth-first) order
+function flattenIds(tree, acc = []) {
+  for (const b of tree) {
+    acc.push(b.id)
+    if (b.children && b.children.length > 0) flattenIds(b.children, acc)
+  }
+  return acc
+}
+
+function newBlockId() {
+  return `b-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+// ── Tree ops (pure; return new tree) ──────────────────────────────────────
+
+function setBlockText(tree, id, text) {
+  const next = cloneTree(tree)
+  const ctx = findContext(next, id)
+  if (!ctx) return next
+  ctx.block.text = text
+  return next
+}
+
+function insertSiblingAfter(tree, id, newBlock) {
+  const next = cloneTree(tree)
+  const ctx = findContext(next, id)
+  if (!ctx) return next
+  ctx.siblings.splice(ctx.index + 1, 0, newBlock)
+  return next
+}
+
+function indentBlock(tree, id) {
+  const next = cloneTree(tree)
+  const ctx = findContext(next, id)
+  if (!ctx || ctx.index === 0) return next // no previous sibling → can't indent
+  const prev = ctx.siblings[ctx.index - 1]
+  if (!prev.children) prev.children = []
+  const [removed] = ctx.siblings.splice(ctx.index, 1)
+  prev.children.push(removed)
+  return next
+}
+
+function outdentBlock(tree, id) {
+  const next = cloneTree(tree)
+  const ctx = findContext(next, id)
+  if (!ctx || ctx.parentChain.length === 0) return next // already at top level
+  const parent = ctx.parentChain[ctx.parentChain.length - 1]
+  const [removed] = ctx.siblings.splice(ctx.index, 1)
+  parent.siblings.splice(parent.index + 1, 0, removed)
+  return next
+}
+
+function deleteBlock(tree, id) {
+  const next = cloneTree(tree)
+  const ctx = findContext(next, id)
+  if (!ctx) return next
+  ctx.siblings.splice(ctx.index, 1)
+  return next
+}
+
+function moveBlockUp(tree, id) {
+  const next = cloneTree(tree)
+  const ctx = findContext(next, id)
+  if (!ctx || ctx.index === 0) return next
+  const [removed] = ctx.siblings.splice(ctx.index, 1)
+  ctx.siblings.splice(ctx.index - 1, 0, removed)
+  return next
+}
+
+function moveBlockDown(tree, id) {
+  const next = cloneTree(tree)
+  const ctx = findContext(next, id)
+  if (!ctx || ctx.index >= ctx.siblings.length - 1) return next
+  const [removed] = ctx.siblings.splice(ctx.index, 1)
+  ctx.siblings.splice(ctx.index + 1, 0, removed)
+  return next
+}
+
+function toggleCollapse(tree, id) {
+  const next = cloneTree(tree)
+  const ctx = findContext(next, id)
+  if (!ctx) return next
+  ctx.block.collapsed = !ctx.block.collapsed
+  return next
+}
+
+// Returns ancestor blocks from outermost to innermost (not including the target block itself)
+function findAncestors(tree, id) {
+  const ctx = findContext(tree, id)
+  if (!ctx) return []
+  return ctx.parentChain.map(p => p.siblings[p.index])
+}
+
+// ── Cursor helpers ────────────────────────────────────────────────────────
+
+function getCursorOffset(el) {
+  const sel = window.getSelection()
+  if (!sel || sel.rangeCount === 0) return 0
+  const range = sel.getRangeAt(0)
+  if (el !== range.startContainer && !el.contains(range.startContainer)) return 0
+  const preRange = document.createRange()
+  preRange.selectNodeContents(el)
+  preRange.setEnd(range.startContainer, range.startOffset)
+  return preRange.toString().length
+}
+
+function setCursorAtOffset(el, offset) {
+  el.focus()
+  const sel = window.getSelection()
+  if (!sel) return
+
+  // "End" sentinel
+  if (offset === null || offset === undefined || offset === Infinity) {
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.collapse(false)
+    sel.removeAllRanges()
+    sel.addRange(range)
+    return
+  }
+
+  let remaining = offset
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null)
+  let node
+  while ((node = walker.nextNode())) {
+    const len = node.textContent.length
+    if (remaining <= len) {
+      const range = document.createRange()
+      range.setStart(node, remaining)
+      range.collapse(true)
+      sel.removeAllRanges()
+      sel.addRange(range)
+      return
+    }
+    remaining -= len
+  }
+  // Fallback: place at end (empty element or offset past content)
+  const range = document.createRange()
+  range.selectNodeContents(el)
+  range.collapse(false)
+  sel.removeAllRanges()
+  sel.addRange(range)
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+
 export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatures = [] }) {
-  const [edits, setEdits] = useState(loadEdits)
+  const [trees, setTrees] = useState(loadTrees)
   const [atInserts, setAtInserts] = useState(loadAtInserts)
+  // { id, offset } — set after a tree op to restore caret in the target block
+  const [focusRequest, setFocusRequest] = useState(null)
+  // When set, only render this block (and its subtree) as the page root
+  const [zoomedBlockId, setZoomedBlockId] = useState(null)
+  const legacyEditsRef = useRef(loadLegacyEdits())
   const docBodyRef = useRef(null)
 
   // @ mention popup state
@@ -57,16 +242,25 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   const [atLoading, setAtLoading] = useState(false)
   const atInputRef = useRef(null)
 
-  const blocks = journalPages[selectedDate] || []
+  // Working blocks for current date (saved tree OR materialized from sample)
+  const blocks = trees[selectedDate] || materializeTree(selectedDate, legacyEditsRef.current)
 
-  const updateBlockText = useCallback((blockId, text) => {
-    saveEdit(blockId, text)
-    setEdits(prev => ({ ...prev, [blockId]: text }))
-  }, [])
+  // Persist trees
+  useEffect(() => {
+    try { localStorage.setItem(TREES_KEY, JSON.stringify(trees)) } catch {}
+  }, [trees])
 
   useEffect(() => {
     try { localStorage.setItem(AI_INSERTS_KEY, JSON.stringify(atInserts)) } catch {}
   }, [atInserts])
+
+  // Apply a transformation to the current date's tree (materializes on first op)
+  const applyTreeOp = useCallback((fn) => {
+    setTrees(prev => {
+      const current = prev[selectedDate] || materializeTree(selectedDate, legacyEditsRef.current)
+      return { ...prev, [selectedDate]: fn(current) }
+    })
+  }, [selectedDate])
 
   // Force contentEditable on AI insert elements and attach blur save handler
   useEffect(() => {
@@ -89,12 +283,24 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     }
   })
 
-  // Dismiss popup when date changes
+  // Clear popup/focus/zoom state when date changes
   useEffect(() => {
     setAtPopup(null)
     setAtQuery('')
     setAtLoading(false)
+    setFocusRequest(null)
+    setZoomedBlockId(null)
   }, [selectedDate])
+
+  // Restore focus + cursor after tree-modifying operations
+  useLayoutEffect(() => {
+    if (!focusRequest) return
+    const el = docBodyRef.current?.querySelector(
+      `[data-block-id="${focusRequest.id}"] > .ls-block-content > .ls-block-text`
+    )
+    if (el) setCursorAtOffset(el, focusRequest.offset)
+    setFocusRequest(null)
+  }, [focusRequest, trees])
 
   // Detect @ typed in any editable field
   const handleInput = (e, blockId) => {
@@ -125,6 +331,101 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     }
   }
 
+  // Keyboard handler — Enter / Tab / Shift+Tab / Backspace
+  const handleBlockKeyDown = (e, blockId) => {
+    const el = e.currentTarget
+
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      // Split current text at cursor; new block gets the "after" portion
+      const cursorOffset = getCursorOffset(el)
+      const fullText = el.textContent || ''
+      const before = fullText.slice(0, cursorOffset)
+      const after = fullText.slice(cursorOffset)
+      const newId = newBlockId()
+      const newBlock = { id: newId, text: after, children: [] }
+
+      applyTreeOp(tree => {
+        const withText = setBlockText(tree, blockId, before)
+        return insertSiblingAfter(withText, blockId, newBlock)
+      })
+      setFocusRequest({ id: newId, offset: 0 })
+      return
+    }
+
+    if (e.key === 'Tab' && !e.shiftKey) {
+      e.preventDefault()
+      const cursorOffset = getCursorOffset(el)
+      const currentText = el.textContent || ''
+      applyTreeOp(tree => {
+        const withText = setBlockText(tree, blockId, currentText)
+        return indentBlock(withText, blockId)
+      })
+      setFocusRequest({ id: blockId, offset: cursorOffset })
+      return
+    }
+
+    if (e.key === 'Tab' && e.shiftKey) {
+      e.preventDefault()
+      const cursorOffset = getCursorOffset(el)
+      const currentText = el.textContent || ''
+      applyTreeOp(tree => {
+        const withText = setBlockText(tree, blockId, currentText)
+        return outdentBlock(withText, blockId)
+      })
+      setFocusRequest({ id: blockId, offset: cursorOffset })
+      return
+    }
+
+    // Alt+↑ / Alt+↓ → move block up/down within its current siblings
+    if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      e.preventDefault()
+      const cursorOffset = getCursorOffset(el)
+      const currentText = el.textContent || ''
+      const op = e.key === 'ArrowUp' ? moveBlockUp : moveBlockDown
+      applyTreeOp(tree => {
+        const withText = setBlockText(tree, blockId, currentText)
+        return op(withText, blockId)
+      })
+      setFocusRequest({ id: blockId, offset: cursorOffset })
+      return
+    }
+
+    if (e.key === 'Backspace') {
+      const text = el.textContent || ''
+      if (text !== '') return // let default handle character deletion
+      // Only delete empty, childless blocks
+      const currentTree = trees[selectedDate] || materializeTree(selectedDate, legacyEditsRef.current)
+      const ctx = findContext(currentTree, blockId)
+      if (!ctx) return
+      if (ctx.block.children && ctx.block.children.length > 0) return
+      e.preventDefault()
+      // Find previous block (visual order) to focus
+      const flat = flattenIds(currentTree)
+      const idx = flat.indexOf(blockId)
+      const prevId = idx > 0 ? flat[idx - 1] : null
+      applyTreeOp(tree => deleteBlock(tree, blockId))
+      if (prevId) setFocusRequest({ id: prevId, offset: Infinity })
+    }
+  }
+
+  // Blur → persist text edit into tree
+  const handleBlockBlur = (blockId, text) => {
+    applyTreeOp(tree => setBlockText(tree, blockId, text))
+  }
+
+  // Toggle collapse state on a block
+  const handleToggleCollapse = (blockId, e) => {
+    if (e) { e.stopPropagation(); e.preventDefault() }
+    applyTreeOp(tree => toggleCollapse(tree, blockId))
+  }
+
+  // Zoom into a block (click its bullet)
+  const handleBulletClick = (blockId, e) => {
+    if (e) { e.stopPropagation(); e.preventDefault() }
+    setZoomedBlockId(blockId)
+  }
+
   const handleAtSubmit = async (e) => {
     e.preventDefault()
     if (!atQuery.trim() || !atPopup) return
@@ -135,7 +436,8 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
       atPopup.node.textContent = t.slice(0, atPopup.offset - 1) + t.slice(atPopup.offset)
     }
 
-    const blockText = edits[atPopup.blockId] || ''
+    const ctx = findContext(blocks, atPopup.blockId)
+    const blockText = ctx?.block?.text || ''
 
     setAtLoading(true)
     const prompt = `Answer this question: ${atQuery.trim()}\n\nContext:\n${blockText}`
@@ -166,25 +468,47 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   const renderBlock = (block, depth = 0) => {
     const hasChildren = block.children && block.children.length > 0
     const blockInserts = atInserts.filter(ins => ins.blockId === block.id)
-    const text = edits[block.id] ?? block.text
+
+    const isCollapsed = !!block.collapsed
+    const showChildren = (hasChildren && !isCollapsed) || blockInserts.length > 0
 
     return (
-      <div key={block.id} className={`ls-block ${depth === 0 ? 'ls-block-top' : ''}`} data-block-id={block.id}>
+      <div key={block.id} className={`ls-block ${depth === 0 ? 'ls-block-top' : ''} ${isCollapsed ? 'ls-block-collapsed' : ''}`} data-block-id={block.id}>
         <div className="ls-block-content">
           <div className="ls-bullet-wrap">
-            <span className={`ls-bullet ${hasChildren ? 'ls-bullet-parent' : ''}`} />
+            {hasChildren && (
+              <button
+                type="button"
+                className={`ls-collapse-btn ${isCollapsed ? 'ls-collapse-btn-collapsed' : ''}`}
+                onClick={e => handleToggleCollapse(block.id, e)}
+                onMouseDown={e => e.preventDefault()}
+                aria-label={isCollapsed ? 'Expand' : 'Collapse'}
+                title={isCollapsed ? 'Expand' : 'Collapse'}
+              >
+                <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </button>
+            )}
+            <span
+              className={`ls-bullet ${hasChildren ? 'ls-bullet-parent' : ''}`}
+              onClick={e => handleBulletClick(block.id, e)}
+              onMouseDown={e => e.preventDefault()}
+              title="Click to zoom in"
+            />
           </div>
           <span
             className={`ls-block-text ${depth === 0 ? 'ls-heading' : ''}`}
             contentEditable
             suppressContentEditableWarning
             onInput={e => handleInput(e, block.id)}
-            onBlur={e => updateBlockText(block.id, e.currentTarget.textContent)}
-            dangerouslySetInnerHTML={{ __html: renderMd(text) }}
+            onKeyDown={e => handleBlockKeyDown(e, block.id)}
+            onBlur={e => handleBlockBlur(block.id, e.currentTarget.textContent)}
+            dangerouslySetInnerHTML={{ __html: renderMd(block.text) }}
           />
         </div>
 
-        {(hasChildren || blockInserts.length > 0) && (
+        {showChildren && (
           <div className="ls-block-children">
             {/* AI inserts for this block */}
             {blockInserts.map(ins => (
@@ -202,19 +526,45 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
             ))}
 
             {/* Child blocks */}
-            {hasChildren && block.children.map(child => renderBlock(child, depth + 1))}
+            {hasChildren && !isCollapsed && block.children.map(child => renderBlock(child, depth + 1))}
           </div>
         )}
       </div>
     )
   }
 
+  // Determine what to render as page root: either the full date's blocks or a zoomed subtree
+  const zoomedBlock = zoomedBlockId ? findContext(blocks, zoomedBlockId)?.block : null
+  const rootBlocks = zoomedBlock ? [zoomedBlock] : blocks
+  const ancestorTrail = zoomedBlockId ? findAncestors(blocks, zoomedBlockId) : []
+
   return (
     <div className="doc-panel">
       <div className="doc-body" ref={docBodyRef} style={{ position: 'relative' }}>
 
-        {/* Date heading */}
-        <h1 className="ls-page-title">{formatDateHeading(selectedDate || '2026-04-09')}</h1>
+        {/* Page heading — date in normal mode, breadcrumb when zoomed into a block */}
+        {zoomedBlockId ? (
+          <div className="ls-breadcrumb">
+            <button type="button" className="ls-breadcrumb-item" onClick={() => setZoomedBlockId(null)}>
+              {formatDateHeading(selectedDate || '2026-04-09')}
+            </button>
+            {ancestorTrail.map(a => (
+              <span key={a.id} className="ls-breadcrumb-sep-group">
+                <span className="ls-breadcrumb-sep">/</span>
+                <button
+                  type="button"
+                  className="ls-breadcrumb-item"
+                  onClick={() => setZoomedBlockId(a.id)}
+                  title={a.text}
+                >
+                  {a.text.length > 32 ? a.text.slice(0, 32) + '…' : a.text}
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <h1 className="ls-page-title">{formatDateHeading(selectedDate || '2026-04-09')}</h1>
+        )}
 
         {/* @ mention popup */}
         {atPopup && (
@@ -251,9 +601,9 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
           </div>
         )}
 
-        {/* Journal blocks */}
-        {blocks.length > 0 ? (
-          blocks.map(block => renderBlock(block, 0))
+        {/* Journal blocks (or zoomed subtree) */}
+        {rootBlocks.length > 0 ? (
+          rootBlocks.map(block => renderBlock(block, 0))
         ) : (
           <div className="ls-empty">
             <span className="ls-empty-text">No entries for this date yet</span>

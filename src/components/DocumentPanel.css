@@ -23,6 +23,51 @@
   letter-spacing: -0.3px;
 }
 
+/* ── Breadcrumb (zoom view) ── */
+.ls-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 0 0 16px 4px;
+  font-size: 13px;
+  color: #6b7785;
+  line-height: 1.4;
+}
+
+.ls-breadcrumb-item {
+  border: none;
+  background: transparent;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #6b7785;
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.ls-breadcrumb-item:hover {
+  background: rgba(59, 130, 246, 0.08);
+  color: #1a1a2e;
+}
+
+.ls-breadcrumb-sep-group {
+  display: inline-flex;
+  align-items: center;
+}
+
+.ls-breadcrumb-sep {
+  color: #c4cad2;
+  padding: 0 2px;
+  font-weight: 400;
+}
+
 /* ── Empty State ── */
 
 .ls-empty {
@@ -51,13 +96,53 @@
 }
 
 .ls-bullet-wrap {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 24px;
   min-height: 28px;
   flex-shrink: 0;
+}
+
+/* ── Collapse / Expand triangle ── */
+.ls-collapse-btn {
+  position: absolute;
+  right: calc(100% - 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #9aa3ad;
   cursor: pointer;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.ls-block:hover > .ls-block-content > .ls-bullet-wrap > .ls-collapse-btn,
+.ls-collapse-btn.ls-collapse-btn-collapsed {
+  opacity: 1;
+}
+
+.ls-collapse-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #4b5563;
+}
+
+.ls-collapse-btn svg {
+  transform: rotate(90deg); /* pointing down → expanded */
+  transition: transform 0.15s;
+}
+
+.ls-collapse-btn-collapsed svg {
+  transform: rotate(0deg); /* pointing right → collapsed */
 }
 
 .ls-bullet {
@@ -66,7 +151,13 @@
   border-radius: 50%;
   background: #bfc5cc;
   flex-shrink: 0;
+  cursor: pointer;
   transition: all 0.15s;
+}
+
+/* Collapsed parent bullet gets a subtle ring so it's recognizable */
+.ls-block-collapsed > .ls-block-content > .ls-bullet-wrap > .ls-bullet-parent {
+  box-shadow: 0 0 0 3px rgba(107, 119, 133, 0.18);
 }
 
 .ls-bullet:hover {
