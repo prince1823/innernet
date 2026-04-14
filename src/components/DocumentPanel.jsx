@@ -319,6 +319,9 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
 
   return (
     <div className="doc-panel">
+      <div className="doc-panel-header">
+        <span className="doc-panel-title">Plan Window</span>
+      </div>
       <div className="doc-body" ref={docBodyRef} style={{ position: 'relative' }}>
 
         {/* Selection AI Popup */}
