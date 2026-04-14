@@ -665,13 +665,15 @@
 .cal-event-block.expanded {
   z-index: 10;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
-  overflow: visible;
+  overflow-y: auto;
+  overflow-x: hidden;
   cursor: default;
   padding-bottom: 10px;
   background: white !important;
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-left-width: 4px;
   color: var(--text-primary);
+  scrollbar-width: thin;
 }
 
 .cal-event-block.expanded .cal-event-title,

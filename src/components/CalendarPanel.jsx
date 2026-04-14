@@ -171,6 +171,9 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
     setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + dir, 1))
   }
 
+  // Max extra grid expansion (capped at ~3 hours of slot height)
+  const MAX_EXTRA = zoomLevel * 3
+
   // Measure expanded event and compute extra height needed beyond its slot
   useEffect(() => {
     if (!expandedEvent || !expandedRef.current) {
@@ -186,17 +189,17 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
       const endMin = timeToMinutes(task.endTime)
       const slotHeight = ((endMin - startMin) / 60) * zoomLevel
       const actualHeight = el.scrollHeight
-      setExpandedExtraHeight(Math.max(0, actualHeight - slotHeight))
+      const rawExtra = Math.max(0, actualHeight - slotHeight)
+      setExpandedExtraHeight(Math.min(rawExtra, MAX_EXTRA))
     }
-    // Measure after render
     requestAnimationFrame(measure)
   }, [expandedEvent, zoomLevel, tasks])
 
   // Find the expanded task's hour range for stretching slots
   const expandedTask = expandedEvent ? tasks.find(t => t.id === expandedEvent) : null
   const expandedStartHour = expandedTask ? parseInt(expandedTask.time.split(':')[0]) : -1
-  const expandedEndHour = expandedTask ? parseInt(expandedTask.endTime.split(':')[0]) : -1
-  const expandedSpanHours = expandedEndHour - expandedStartHour || 1
+  const expandedEndHour = expandedTask ? Math.ceil(timeToMinutes(expandedTask.endTime) / 60) : -1
+  const expandedSpanHours = Math.max(expandedEndHour - expandedStartHour, 1)
   const extraPerSlot = expandedExtraHeight / expandedSpanHours
 
   // Calculate cumulative extra offset for a given minute position
@@ -206,10 +209,14 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
     const endMin = timeToMinutes(expandedTask.endTime)
     if (minutes <= startMin) return 0
     if (minutes >= endMin) return expandedExtraHeight
-    // Proportional within the expanded range
     const fraction = (minutes - startMin) / (endMin - startMin)
     return fraction * expandedExtraHeight
   }
+
+  // Total height available for expanded event (slot + extra)
+  const expandedMaxHeight = expandedTask
+    ? ((timeToMinutes(expandedTask.endTime) - timeToMinutes(expandedTask.time)) / 60) * zoomLevel + expandedExtraHeight
+    : 0
 
   useEffect(() => {
     if (gridRef.current) gridRef.current.scrollTop = zoomLevel * 7
@@ -448,6 +455,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                     top: `${topOffset}px`,
                     minHeight: `${Math.max(height, 24)}px`,
                     height: isExpanded ? 'auto' : `${Math.max(height, 24)}px`,
+                    maxHeight: isExpanded ? `${expandedMaxHeight}px` : undefined,
                     backgroundColor: color.bg,
                     borderLeft: `4px solid ${color.border}`,
                   }}
