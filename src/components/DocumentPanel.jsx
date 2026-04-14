@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 
-import { featureDocItems } from '../data/sampleData'
+import { journalPages } from '../data/sampleData'
 import { askAI } from '../utils/askAI'
 import './DocumentPanel.css'
 
@@ -9,50 +9,25 @@ function renderMd(text) {
   if (!text) return ''
   return text
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/^### (.+)$/gm, '<strong style="display:block;margin:4px 0 2px">$1</strong>')
-    .replace(/^## (.+)$/gm, '<strong style="display:block;margin:4px 0 2px">$1</strong>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/^- (.+)$/gm, '• $1')
+    .replace(/^- (.+)$/gm, '&bull; $1')
     .replace(/\n/g, '<br/>')
 }
 
-const STORAGE_KEY = 'innernet-doc-edits'
-const AI_INSERTS_KEY = 'innernet-at-inserts'
+const EDITS_KEY = 'innernet-journal-edits'
+const AI_INSERTS_KEY = 'innernet-journal-inserts'
 
-function loadFeatures() {
-  const base = featureDocItems.map(f => ({
-    ...f,
-    bullets: f.bullets.map(b => typeof b === 'string' ? { text: b } : { ...b }),
-  }))
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
-    return base.map(f => {
-      const s = saved[f.id]
-      if (!s) return f
-      return {
-        ...f,
-        title: s.title ?? f.title,
-        description: s.description ?? f.description,
-        bullets: f.bullets.map((b, i) => ({ ...b, text: s.bullets?.[i] ?? b.text })),
-      }
-    })
-  } catch { return base }
+function loadEdits() {
+  try { return JSON.parse(localStorage.getItem(EDITS_KEY) || '{}') } catch { return {} }
 }
 
-function saveFeature(featId, field, value) {
+function saveEdit(blockId, text) {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
-    if (!saved[featId]) saved[featId] = {}
-    if (field === 'title' || field === 'description') {
-      saved[featId][field] = value
-    } else if (field.startsWith('bullet-')) {
-      const idx = parseInt(field.replace('bullet-', ''))
-      if (!saved[featId].bullets) saved[featId].bullets = {}
-      saved[featId].bullets[idx] = value
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(saved))
+    const edits = loadEdits()
+    edits[blockId] = text
+    localStorage.setItem(EDITS_KEY, JSON.stringify(edits))
   } catch {}
 }
 
@@ -60,32 +35,34 @@ function loadAtInserts() {
   try { return JSON.parse(localStorage.getItem(AI_INSERTS_KEY) || '[]') } catch { return [] }
 }
 
-export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
-  const [features, setFeatures] = useState(loadFeatures)
-  const [editingKey, setEditingKey] = useState(null)
-  const [atInserts, setAtInserts] = useState(loadAtInserts) // { id, featId, bulletIdx, text }
+function formatDateHeading(dateStr) {
+  const date = new Date(dateStr + 'T00:00:00')
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const day = date.getDate()
+  const suffix = [11, 12, 13].includes(day) ? 'th'
+    : day % 10 === 1 ? 'st'
+    : day % 10 === 2 ? 'nd'
+    : day % 10 === 3 ? 'rd' : 'th'
+  return `${months[date.getMonth()]} ${day}${suffix}, ${date.getFullYear()}`
+}
+
+export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatures = [] }) {
+  const [edits, setEdits] = useState(loadEdits)
+  const [atInserts, setAtInserts] = useState(loadAtInserts)
   const docBodyRef = useRef(null)
 
   // @ mention popup state
-  const [atPopup, setAtPopup] = useState(null) // { x, y, featId, bulletIdx, field, node, offset }
+  const [atPopup, setAtPopup] = useState(null)
   const [atQuery, setAtQuery] = useState('')
   const [atLoading, setAtLoading] = useState(false)
   const atInputRef = useRef(null)
 
-  const updateField = (featId, field, value) => {
-    saveFeature(featId, field, value)
-    setFeatures(prev => prev.map(f => {
-      if (f.id !== featId) return f
-      if (field === 'title') return { ...f, title: value }
-      if (field === 'description') return { ...f, description: value }
-      if (field.startsWith('bullet-')) {
-        const idx = parseInt(field.replace('bullet-', ''))
-        const bullets = f.bullets.map((b, i) => i === idx ? { ...b, text: value } : b)
-        return { ...f, bullets }
-      }
-      return f
-    }))
-  }
+  const blocks = journalPages[selectedDate] || []
+
+  const updateBlockText = useCallback((blockId, text) => {
+    saveEdit(blockId, text)
+    setEdits(prev => ({ ...prev, [blockId]: text }))
+  }, [])
 
   useEffect(() => {
     try { localStorage.setItem(AI_INSERTS_KEY, JSON.stringify(atInserts)) } catch {}
@@ -99,7 +76,7 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
         if (!el.dataset.blurAttached) {
           el.dataset.blurAttached = '1'
           el.addEventListener('blur', () => {
-            const id = el.parentElement?.dataset?.insId
+            const id = el.closest('[data-ins-id]')?.dataset?.insId
             if (!id) return
             try {
               const stored = JSON.parse(localStorage.getItem(AI_INSERTS_KEY) || '[]')
@@ -112,20 +89,18 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
     }
   })
 
-  // Save edited insert text — update state (for persistence) without resetting DOM
-  const saveInsertText = useCallback((id, newHtml) => {
-    setAtInserts(prev => prev.map(i => i.id === id ? { ...i, text: newHtml } : i))
-  }, [])
+  // Dismiss popup when date changes
+  useEffect(() => {
+    setAtPopup(null)
+    setAtQuery('')
+    setAtLoading(false)
+  }, [selectedDate])
 
   // Detect @ typed in any editable field
-  const handleInput = (e, featId, bulletIdx, field) => {
-    const el = e.currentTarget
-    const text = el.textContent || ''
+  const handleInput = (e, blockId) => {
     const sel = window.getSelection()
     if (!sel || sel.rangeCount === 0) return
-
     const range = sel.getRangeAt(0)
-    // Check if the character just before cursor is @
     const cursorOffset = range.startOffset
     const node = range.startContainer
     const nodeText = node.textContent || ''
@@ -140,9 +115,7 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
       setAtPopup({
         x: rect.left - bodyRect.left,
         y: rect.bottom - bodyRect.top + docBodyRef.current.scrollTop + 4,
-        featId,
-        bulletIdx,
-        field,
+        blockId,
         node,
         offset: cursorOffset,
       })
@@ -162,21 +135,15 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
       atPopup.node.textContent = t.slice(0, atPopup.offset - 1) + t.slice(atPopup.offset)
     }
 
-    const feat = features.find(f => f.id === atPopup.featId)
-    const featTitle = feat?.title || ''
-    const context = feat ? [
-      feat.description || '',
-      ...feat.bullets.map(b => `- ${b.text}`),
-    ].filter(Boolean).join('\n') : ''
+    const blockText = edits[atPopup.blockId] || ''
 
     setAtLoading(true)
-    const prompt = `For the feature "${featTitle}", answer this: ${atQuery.trim()}\n\nContext:\n${context}`
-    const response = await askAI(prompt, context)
+    const prompt = `Answer this question: ${atQuery.trim()}\n\nContext:\n${blockText}`
+    const response = await askAI(prompt, blockText)
 
     const insert = {
       id: `at-${Date.now()}`,
-      featId: atPopup.featId,
-      bulletIdx: atPopup.bulletIdx,
+      blockId: atPopup.blockId,
       text: renderMd(response),
     }
     setAtInserts(prev => [...prev, insert])
@@ -195,12 +162,59 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
     setAtInserts(prev => prev.filter(i => i.id !== id))
   }
 
+  // Recursive block renderer
+  const renderBlock = (block, depth = 0) => {
+    const hasChildren = block.children && block.children.length > 0
+    const blockInserts = atInserts.filter(ins => ins.blockId === block.id)
+    const text = edits[block.id] ?? block.text
+
+    return (
+      <div key={block.id} className={`ls-block ${depth === 0 ? 'ls-block-top' : ''}`} data-block-id={block.id}>
+        <div className="ls-block-content">
+          <div className="ls-bullet-wrap">
+            <span className={`ls-bullet ${hasChildren ? 'ls-bullet-parent' : ''}`} />
+          </div>
+          <span
+            className={`ls-block-text ${depth === 0 ? 'ls-heading' : ''}`}
+            contentEditable
+            suppressContentEditableWarning
+            onInput={e => handleInput(e, block.id)}
+            onBlur={e => updateBlockText(block.id, e.currentTarget.textContent)}
+            dangerouslySetInnerHTML={{ __html: renderMd(text) }}
+          />
+        </div>
+
+        {(hasChildren || blockInserts.length > 0) && (
+          <div className="ls-block-children">
+            {/* AI inserts for this block */}
+            {blockInserts.map(ins => (
+              <div key={ins.id} className="ls-block ls-block-ai" data-ins-id={ins.id}>
+                <div className="ls-block-content">
+                  <div className="ls-bullet-wrap">
+                    <span className="ls-bullet ls-bullet-ai" />
+                  </div>
+                  <div className="doc-at-insert-text" dangerouslySetInnerHTML={{ __html: ins.text }} />
+                </div>
+                <button className="doc-at-insert-dismiss" onClick={() => removeInsert(ins.id)} title="Remove">
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            ))}
+
+            {/* Child blocks */}
+            {hasChildren && block.children.map(child => renderBlock(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="doc-panel">
-      <div className="doc-panel-header">
-        <span className="doc-panel-title">Plan Window</span>
-      </div>
       <div className="doc-body" ref={docBodyRef} style={{ position: 'relative' }}>
+
+        {/* Date heading */}
+        <h1 className="ls-page-title">{formatDateHeading(selectedDate || '2026-04-09')}</h1>
 
         {/* @ mention popup */}
         {atPopup && (
@@ -237,84 +251,14 @@ export default function DocumentPanel({ onAskAI, activeAgentFeatures = [] }) {
           </div>
         )}
 
-        {features.map((feat) => {
-          return (
-            <div key={feat.id} className="doc-feature" data-feat-id={feat.id}>
-              {/* Feature title */}
-              <div className="doc-feat-title">
-                <span
-                  className="doc-feat-title-text"
-                  contentEditable
-                  suppressContentEditableWarning
-                  onInput={e => handleInput(e, feat.id, null, 'title')}
-                  onBlur={e => { updateField(feat.id, 'title', e.currentTarget.textContent); setEditingKey(null) }}
-                >
-                  {feat.title}
-                </span>
-              </div>
-
-              {/* AI inserts for title level */}
-              {atInserts
-                .filter(ins => ins.featId === feat.id && ins.bulletIdx === null)
-                .map(ins => (
-                  <div key={ins.id} className="doc-at-insert" data-ins-id={ins.id}>
-                    <div
-                      className="doc-at-insert-text"
-                      dangerouslySetInnerHTML={{ __html: ins.text }}
-                    />
-                    <button className="doc-at-insert-dismiss" onClick={() => removeInsert(ins.id)} title="Remove">
-                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                    </button>
-                  </div>
-                ))
-              }
-
-              {/* Description */}
-              {feat.description && (
-                <p
-                  className="doc-feat-desc"
-                  contentEditable
-                  suppressContentEditableWarning
-                  onInput={e => handleInput(e, feat.id, null, 'description')}
-                  onBlur={e => { updateField(feat.id, 'description', e.currentTarget.textContent); setEditingKey(null) }}
-                  dangerouslySetInnerHTML={{ __html: renderMd(feat.description) }}
-                />
-              )}
-
-              {/* Bullets */}
-              <div className="doc-bullets">
-                {feat.bullets.map((bullet, bi) => (
-                  <div key={bi} className="doc-bullet-block" data-feat-id={feat.id} data-bullet-idx={bi}>
-                    <div className="doc-bullet-row">
-                      <span className="doc-bullet-marker">•</span>
-                      <span
-                        className="doc-bullet-text"
-                        contentEditable
-                        suppressContentEditableWarning
-                        onInput={e => handleInput(e, feat.id, bi, `bullet-${bi}`)}
-                        onBlur={e => { updateField(feat.id, `bullet-${bi}`, e.currentTarget.textContent); setEditingKey(null) }}
-                        dangerouslySetInnerHTML={{ __html: renderMd(bullet.text) }}
-                      />
-                    </div>
-
-                    {/* AI inserts for this bullet */}
-                    {atInserts
-                      .filter(ins => ins.featId === feat.id && ins.bulletIdx === bi)
-                      .map(ins => (
-                        <div key={ins.id} className="doc-at-insert" data-ins-id={ins.id}>
-                          <div className="doc-at-insert-text" dangerouslySetInnerHTML={{ __html: ins.text }} />
-                          <button className="doc-at-insert-dismiss" onClick={() => removeInsert(ins.id)} title="Remove">
-                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                          </button>
-                        </div>
-                      ))
-                    }
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
-        })}
+        {/* Journal blocks */}
+        {blocks.length > 0 ? (
+          blocks.map(block => renderBlock(block, 0))
+        ) : (
+          <div className="ls-empty">
+            <span className="ls-empty-text">No entries for this date yet</span>
+          </div>
+        )}
       </div>
     </div>
   )

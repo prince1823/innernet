@@ -215,6 +215,7 @@ function App() {
           <div className="app-bottom" style={{ height: `${bottomHeight}px` }}>
             <div className="bottom-split" style={{ flex: 1 }}>
               <DocumentPanel
+                selectedDate={selectedDate}
                 onAskAI={handleAskAI}
                 activeAgentFeatures={activeAgentFeatures}
               />

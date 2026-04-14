@@ -419,6 +419,188 @@ export const featureDocItems = [
   },
 ];
 
+// Journal pages — date-keyed nested blocks for the Document panel (Logseq-style)
+export const journalPages = {
+  '2026-04-07': [
+    {
+      id: 'j0407-1', text: 'Kickoff: Innernet v1 planning', children: [
+        { id: 'j0407-1a', text: 'Core idea — a personal OS that connects calendar, documents, and AI agents into one workspace', children: [] },
+        {
+          id: 'j0407-1b', text: 'Design pillars', children: [
+            { id: 'j0407-1b1', text: 'Everything is a block — editable, nestable, linkable', children: [] },
+            { id: 'j0407-1b2', text: 'AI is a collaborator, not a tool — it lives inside the doc', children: [] },
+            { id: 'j0407-1b3', text: 'Time is the primary axis — calendar drives context', children: [] },
+          ]
+        },
+      ]
+    },
+    {
+      id: 'j0407-2', text: 'Decided on tech stack', children: [
+        { id: 'j0407-2a', text: 'React + Vite for the frontend', children: [] },
+        { id: 'j0407-2b', text: 'Cloudflare Workers for sync layer', children: [] },
+        { id: 'j0407-2c', text: 'localStorage for now, migrate to IndexedDB later', children: [] },
+      ]
+    },
+  ],
+
+  '2026-04-08': [
+    {
+      id: 'j0408-1', text: 'Calendar panel prototype', children: [
+        { id: 'j0408-1a', text: 'Built time-grid with 30min slots', children: [] },
+        {
+          id: 'j0408-1b', text: 'Event rendering', children: [
+            { id: 'j0408-1b1', text: 'Color-coded by project tag', children: [] },
+            { id: 'j0408-1b2', text: 'Click to expand with summary tab', children: [] },
+            { id: 'j0408-1b3', text: 'Dynamic height calculation for overlapping events', children: [] },
+          ]
+        },
+        { id: 'j0408-1c', text: 'Need to add mini-calendar dropdown for date navigation', children: [] },
+      ]
+    },
+  ],
+
+  '2026-04-09': [
+    {
+      id: 'j0409-1', text: 'Implement Promises Feature', children: [
+        {
+          id: 'j0409-1a', text: 'Core requirements', children: [
+            { id: 'j0409-1a1', text: 'Window summary view showing daily promise status', children: [] },
+            { id: 'j0409-1a2', text: 'Doc summary comparing planned items vs actual completion', children: [] },
+            { id: 'j0409-1a3', text: 'AI-generated analysis of promise fulfillment patterns', children: [] },
+          ]
+        },
+        { id: 'j0409-1b', text: 'Build the promises tracking system that logs what was planned vs what was actually done each day', children: [] },
+        { id: 'j0409-1c', text: 'Consider adding a "promise streak" indicator to gamify daily commitment tracking', children: [] },
+      ]
+    },
+    {
+      id: 'j0409-2', text: 'Sync to Universe with Cloudflare Worker', children: [
+        { id: 'j0409-2a', text: 'Setup Cloudflare Worker endpoint', children: [] },
+        { id: 'j0409-2b', text: 'Integration with project #colab91', children: [] },
+        {
+          id: 'j0409-2c', text: 'Real-time sync protocol', children: [
+            { id: 'j0409-2c1', text: 'Conflict resolution strategy — last-write-wins for now, CRDT later', children: [] },
+            { id: 'j0409-2c2', text: 'WebSocket vs polling — leaning towards WebSocket for low latency', children: [] },
+          ]
+        },
+      ]
+    },
+    {
+      id: 'j0409-3', text: 'Morning standup notes', children: [
+        { id: 'j0409-3a', text: 'Team agreed on semaphore pattern for agent concurrency (max 3)', children: [] },
+        { id: 'j0409-3b', text: 'Tanuj to review calendar search prototype by end of day', children: [] },
+      ]
+    },
+  ],
+
+  '2026-04-10': [
+    {
+      id: 'j0410-1', text: 'Multi-Agent Execution Engine', children: [
+        { id: 'j0410-1a', text: 'Each feature triggers a separate agent session', children: [] },
+        { id: 'j0410-1b', text: 'Agent receives feature doc content as input/context', children: [] },
+        {
+          id: 'j0410-1c', text: 'Results pipeline', children: [
+            { id: 'j0410-1c1', text: 'Results are logged to activity panel in real-time', children: [] },
+            { id: 'j0410-1c2', text: 'Inserted back into the document as inline AI blocks', children: [] },
+            { id: 'j0410-1c3', text: 'User can accept, edit, or dismiss each suggestion', children: [] },
+          ]
+        },
+      ]
+    },
+    {
+      id: 'j0410-2', text: 'Calendar Search & Filter', children: [
+        { id: 'j0410-2a', text: 'Search #colab91 to see all Colab91 meetings', children: [] },
+        { id: 'j0410-2b', text: 'Search "Tanuj" to see all meetings with Tanuj', children: [] },
+        {
+          id: 'j0410-2c', text: 'Implementation notes', children: [
+            { id: 'j0410-2c1', text: 'Fuzzy matching with Levenshtein distance (threshold: 2)', children: [] },
+            { id: 'j0410-2c2', text: 'Scoring: exact (100) > prefix (80) > fuzzy (60)', children: [] },
+            { id: 'j0410-2c3', text: 'Results grouped by date in schedule view', children: [] },
+          ]
+        },
+      ]
+    },
+  ],
+
+  '2026-04-11': [
+    {
+      id: 'j0411-1', text: 'Weekly review', children: [
+        {
+          id: 'j0411-1a', text: 'What went well', children: [
+            { id: 'j0411-1a1', text: 'Promises feature MVP is functional', children: [] },
+            { id: 'j0411-1a2', text: 'Calendar panel UX feels solid', children: [] },
+            { id: 'j0411-1a3', text: 'AI @mention integration working end-to-end', children: [] },
+          ]
+        },
+        {
+          id: 'j0411-1b', text: 'What needs improvement', children: [
+            { id: 'j0411-1b1', text: 'Agent sessions sometimes hang — need timeout and retry logic', children: [] },
+            { id: 'j0411-1b2', text: 'Document panel should feel more like an outliner (Logseq-style)', children: [] },
+            { id: 'j0411-1b3', text: 'Need keyboard shortcuts for power users', children: [] },
+          ]
+        },
+      ]
+    },
+    {
+      id: 'j0411-2', text: 'Reading: "Tools for Thought" by Howard Rheingold', children: [
+        { id: 'j0411-2a', text: 'The best tools disappear — they become extensions of how you think', children: [] },
+        { id: 'j0411-2b', text: 'Innernet should feel like thinking out loud, not operating software', children: [] },
+      ]
+    },
+  ],
+
+  '2026-04-12': [
+    {
+      id: 'j0412-1', text: 'Thoughts on the spectrum model', children: [
+        {
+          id: 'j0412-1a', text: 'Most things in life exist on a spectrum, and to double down on one point of view when there are other ways of seeing things is limiting', children: [
+            { id: 'j0412-1a1', text: 'Behaviours, normality, harm — all contextual', children: [] },
+            {
+              id: 'j0412-1a2', text: 'Some spectrums have balancing points, and some have tipping points', children: [
+                { id: 'j0412-1a2a', text: 'Tipping points can be both for negative and positive change', children: [] },
+                { id: 'j0412-1a2b', text: 'Balancing points are where equilibrium naturally settles', children: [] },
+              ]
+            },
+          ]
+        },
+        { id: 'j0412-1b', text: 'Normal is relative, and the baseline is always shifting', children: [] },
+      ]
+    },
+  ],
+
+  '2026-04-13': [
+    {
+      id: 'j0413-1', text: 'Sunday — rest day', children: [
+        { id: 'j0413-1a', text: 'Walked along the river, cleared my head', children: [] },
+        {
+          id: 'j0413-1b', text: 'Ideas that came up', children: [
+            { id: 'j0413-1b1', text: 'What if the document panel was also a journal? Date-driven, like Logseq', children: [] },
+            { id: 'j0413-1b2', text: 'Calendar events could auto-generate block stubs for meeting notes', children: [] },
+            { id: 'j0413-1b3', text: 'The boundary between planning and reflecting should be blurry', children: [] },
+          ]
+        },
+      ]
+    },
+  ],
+
+  '2026-04-14': [
+    {
+      id: 'j0414-1', text: 'Shipping the outliner update today', children: [
+        { id: 'j0414-1a', text: 'Document panel now renders as Logseq-style nested blocks', children: [] },
+        { id: 'j0414-1b', text: 'Thread lines connect parent bullets to children', children: [] },
+        { id: 'j0414-1c', text: 'Journal pages are date-keyed — selecting a date shows that day\'s blocks', children: [] },
+      ]
+    },
+    {
+      id: 'j0414-2', text: 'Next up', children: [
+        { id: 'j0414-2a', text: 'Block collapsing/expanding (click bullet to toggle)', children: [] },
+        { id: 'j0414-2b', text: 'Drag-and-drop reordering', children: [] },
+        { id: 'j0414-2c', text: 'Block references — link to other blocks by ID', children: [] },
+      ]
+    },
+  ],
+};
+
 // Activity logs for the Logs panel
 export const activityLogs = [
   { id: 'log-1', time: '07:01', type: 'user', action: 'Opened Innernet app', session: null },
