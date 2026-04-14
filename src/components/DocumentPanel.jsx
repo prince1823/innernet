@@ -248,6 +248,17 @@ function findAncestors(tree, id) {
   return ctx.parentChain.map(p => p.siblings[p.index])
 }
 
+// Scan back from `cursor` for the most recent `@` in `text` that's not crossed by a newline.
+// Returns the char index of the `@`, or -1 if not found. Used by the inline @-query flow in
+// handleBlockKeyDown: Cmd/Ctrl+Enter submits everything between this `@` and the cursor.
+function findPendingAtOffset(text, cursor) {
+  for (let i = cursor - 1; i >= 0; i--) {
+    if (text[i] === '\n') return -1
+    if (text[i] === '@') return i
+  }
+  return -1
+}
+
 // ── Cursor helpers ────────────────────────────────────────────────────────
 
 function getCursorOffset(el) {
@@ -327,17 +338,9 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   const legacyEditsRef = useRef(loadLegacyEdits())
   const docBodyRef = useRef(null)
 
-  // @ mention popup state
-  const [atPopup, setAtPopup] = useState(null)
-  const [atQuery, setAtQuery] = useState('')
-  const [atLoading, setAtLoading] = useState(false)
-  const atInputRef = useRef(null)
-
-  // Streaming + loading state for AI responses
+  // Streaming state for AI responses
   // streamingText: blockId → partial text override (takes priority over block.text while streaming)
   const [streamingText, setStreamingText] = useState({})
-  // loadingPlaceholder: { parentId } — render an ephemeral "AI is thinking…" placeholder under this parent
-  const [loadingPlaceholder, setLoadingPlaceholder] = useState(null)
   const streamTimersRef = useRef([])
 
   // Working blocks for current date (saved tree OR materialized from sample)
@@ -381,15 +384,11 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     }
   })
 
-  // Clear popup/focus/zoom + streaming state when date changes
+  // Clear focus/zoom + streaming state when date changes
   useEffect(() => {
-    setAtPopup(null)
-    setAtQuery('')
-    setAtLoading(false)
     setFocusRequest(null)
     setZoomedBlockId(null)
     setStreamingText({})
-    setLoadingPlaceholder(null)
     streamTimersRef.current.forEach(t => clearTimeout(t))
     streamTimersRef.current = []
   }, [selectedDate])
@@ -412,38 +411,28 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     setFocusRequest(null)
   }, [focusRequest, trees])
 
-  // Detect @ typed in any editable field
-  const handleInput = (e, blockId) => {
-    const sel = window.getSelection()
-    if (!sel || sel.rangeCount === 0) return
-    const range = sel.getRangeAt(0)
-    const cursorOffset = range.startOffset
-    const node = range.startContainer
-    const nodeText = node.textContent || ''
-
-    if (cursorOffset > 0 && nodeText[cursorOffset - 1] === '@') {
-      const bodyRect = docBodyRef.current.getBoundingClientRect()
-      const tempRange = document.createRange()
-      tempRange.setStart(node, cursorOffset - 1)
-      tempRange.setEnd(node, cursorOffset)
-      const rect = tempRange.getBoundingClientRect()
-
-      setAtPopup({
-        x: rect.left - bodyRect.left,
-        y: rect.bottom - bodyRect.top + docBodyRef.current.scrollTop + 4,
-        blockId,
-        node,
-        offset: cursorOffset,
-      })
-      setAtQuery('')
-      setAtLoading(false)
-      setTimeout(() => atInputRef.current?.focus(), 0)
-    }
-  }
-
-  // Keyboard handler — Enter / Tab / Shift+Tab / Backspace
-  const handleBlockKeyDown = (e, blockId) => {
+  // Keyboard handler — Cmd/Ctrl+Enter (inline @-query submit) / Enter / Tab / Shift+Tab / Backspace
+  const handleBlockKeyDown = (e, blockId, block) => {
     const el = e.currentTarget
+
+    // Cmd/Ctrl+Enter submits the inline @-query: scan back from cursor for the
+    // most recent @, use everything between it and the cursor as the query, and
+    // insert the AI response as a sibling block right after this one. If there's
+    // no pending @, fall through so the shortcut isn't swallowed.
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      if (e.nativeEvent?.isComposing) return      // IME safety
+      if (block?.isAI) return                     // don't recursively ask from inside an AI answer
+      const blockText = el.textContent || ''
+      const cursorOffset = getCursorOffset(el)
+      const atIdx = findPendingAtOffset(blockText, cursorOffset)
+      if (atIdx < 0) return
+      const query = blockText.slice(atIdx + 1, cursorOffset).trim()
+      if (!query) return
+      e.preventDefault()
+      const context = blockText.slice(0, atIdx).trim()
+      submitInlineAt(blockId, blockText, query, context, cursorOffset)
+      return
+    }
 
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -569,15 +558,6 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   }
 
   // ── Streaming helpers ────────────────────────────────────────────────────
-  // Flatten a block tree depth-first (used to stream nested AI responses in reading order)
-  const flattenBlocks = (blockList, acc = []) => {
-    for (const b of blockList) {
-      acc.push(b)
-      if (b.children && b.children.length > 0) flattenBlocks(b.children, acc)
-    }
-    return acc
-  }
-
   // Animate text into a single block via streamingText state overrides
   const streamBlockText = (blockId, fullText) => new Promise(resolve => {
     const CHARS_PER_TICK = 4
@@ -606,76 +586,32 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     streamTimersRef.current.push(t0)
   })
 
-  // Stream a list of blocks sequentially (depth-first)
-  const streamBlocksSequentially = async (blocks) => {
-    const flat = flattenBlocks(blocks)
-    for (const b of flat) {
-      await streamBlockText(b.id, b.text || '')
-    }
-  }
+  // Inline @-query submit: user typed `@query` directly into a block's text and pressed
+  // Cmd/Ctrl+Enter. The question block keeps its `@query` verbatim; the answer lands as
+  // the first child of the question block, styled as an AI card, forming a Q→A visual pair.
+  const submitInlineAt = async (blockId, blockText, query, context, cursorOffset) => {
+    // 1. Persist the question block text (includes the typed `@query`).
+    applyTreeOp(tree => setBlockText(tree, blockId, blockText))
 
-  const handleAtSubmit = async (e) => {
-    e.preventDefault()
-    if (!atQuery.trim() || !atPopup) return
+    // 2. Pre-create the empty AI child block so it appears INSTANTLY under the question.
+    //    Pre-seeding streamingText[id]='' renders it as an empty AI card with the
+    //    existing .ls-block-text-streaming caret — that's our "thinking" affordance.
+    const aiBlockId = newBlockId()
+    const aiBlock = { id: aiBlockId, text: '', children: [], isAI: true }
+    setStreamingText(prev => ({ ...prev, [aiBlockId]: '' }))
+    applyTreeOp(tree => prependChildren(tree, blockId, [aiBlock]))
 
-    const query = atQuery.trim()
-    const parentBlockId = atPopup.blockId
+    // 3. Keep focus/cursor in the QUESTION block — the user shouldn't jump to the AI card.
+    setFocusRequest({ id: blockId, offset: cursorOffset })
 
-    // Inline the query text into the block next to the @ so the block reads "... @query"
-    // atPopup.offset is the caret position just after the @ character
-    if (atPopup.node && typeof atPopup.node.textContent === 'string') {
-      const t = atPopup.node.textContent
-      atPopup.node.textContent = t.slice(0, atPopup.offset) + query + t.slice(atPopup.offset)
-    }
-
-    // Read the full block's text from the DOM (contentEditable) so we persist
-    // the "@query" insertion along with anything else the user typed.
-    // Descendant search so the AI-card layout also works.
-    const blockEl = docBodyRef.current?.querySelector(`[data-block-id="${parentBlockId}"]`)
-    const contentEl = blockEl?.querySelector(':scope > .ls-block-content')
-    const textEl = contentEl?.querySelector('.ls-block-text')
-    const fullBlockText = textEl?.textContent || ''
-
-    // Persist the updated parent text and immediately show the loading placeholder
-    // under it. Closing the popup first so the user sees the "AI is thinking…" row.
-    applyTreeOp(tree => setBlockText(tree, parentBlockId, fullBlockText))
-    setLoadingPlaceholder({ parentId: parentBlockId })
-    setAtPopup(null)
-    setAtQuery('')
-    setAtLoading(false)
-
-    const prompt = `Answer this question: ${query}\n\nContext:\n${fullBlockText}\n\nRespond as a single flowing paragraph, 2-3 sentences maximum. Be concise and focused. Do NOT use bullet points, numbered lists, or headings — write it as continuous prose.`
-    const response = await askAI(prompt, fullBlockText)
-
-    // AI response always lands as a single paragraph block — flatten any list
-    // markers / headings / inline markdown so it reads as clean prose and
-    // round-trips cleanly through contentEditable edits.
+    // 4. Fetch.
+    const prompt = `Answer this question: ${query}\n\nContext:\n${context}\n\nRespond as a single flowing paragraph, 2-3 sentences maximum. Be concise and focused. Do NOT use bullet points, numbered lists, or headings — write it as continuous prose.`
+    const response = await askAI(prompt, context)
     const paraText = formatAIParagraph(response) || (response || '')
-    const aiBlocks = [{
-      id: newBlockId(),
-      text: paraText,
-      children: [],
-      isAI: true,
-    }]
 
-    // Pre-seed streamingText so the newly-inserted blocks render empty on first paint,
-    // then stream each one character-by-character in reading order.
-    const flat = flattenBlocks(aiBlocks)
-    setStreamingText(prev => {
-      const next = { ...prev }
-      for (const b of flat) next[b.id] = ''
-      return next
-    })
-    setLoadingPlaceholder(null)
-    applyTreeOp(tree => prependChildren(tree, parentBlockId, aiBlocks))
-
-    await streamBlocksSequentially(aiBlocks)
-  }
-
-  const dismissAtPopup = () => {
-    setAtPopup(null)
-    setAtQuery('')
-    setAtLoading(false)
+    // 5. Commit the real text to the tree, then stream it in character-by-character.
+    applyTreeOp(tree => setBlockText(tree, aiBlockId, paraText))
+    await streamBlockText(aiBlockId, paraText)
   }
 
   const removeInsert = (id) => {
@@ -693,8 +629,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     // text override (even when empty) instead of the source-of-truth block.text
     const isStreaming = Object.prototype.hasOwnProperty.call(streamingText, block.id)
     const displayText = isStreaming ? streamingText[block.id] : (block.text || '')
-    const hasLoading = loadingPlaceholder?.parentId === block.id
-    const showChildren = (hasChildren && !isCollapsed) || blockInserts.length > 0 || hasLoading
+    const showChildren = (hasChildren && !isCollapsed) || blockInserts.length > 0
 
     return (
       <div key={block.id} className={`ls-block ${depth === 0 ? 'ls-block-top' : ''} ${isCollapsed ? 'ls-block-collapsed' : ''} ${isAI ? 'ls-block-ai-child' : ''}`} data-block-id={block.id}>
@@ -723,13 +658,11 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
           </div>
           {isAI ? (
             <div className="ls-ai-card">
-              <span className="ls-ai-prefix" aria-hidden="true">AI</span>
               <span
                 className={`ls-block-text ls-block-text-ai ${isStreaming ? 'ls-block-text-streaming' : ''}`}
                 contentEditable={!isStreaming}
                 suppressContentEditableWarning
-                onInput={e => handleInput(e, block.id)}
-                onKeyDown={e => handleBlockKeyDown(e, block.id)}
+                onKeyDown={e => handleBlockKeyDown(e, block.id, block)}
                 onBlur={e => handleBlockBlur(block.id, e.currentTarget.textContent)}
                 dangerouslySetInnerHTML={{ __html: renderMd(displayText) }}
               />
@@ -739,8 +672,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
               className={`ls-block-text ${depth === 0 ? 'ls-heading' : ''} ${isStreaming ? 'ls-block-text-streaming' : ''}`}
               contentEditable={!isStreaming}
               suppressContentEditableWarning
-              onInput={e => handleInput(e, block.id)}
-              onKeyDown={e => handleBlockKeyDown(e, block.id)}
+              onKeyDown={e => handleBlockKeyDown(e, block.id, block)}
               onBlur={e => handleBlockBlur(block.id, e.currentTarget.textContent)}
               dangerouslySetInnerHTML={{ __html: renderMd(displayText) }}
             />
@@ -760,26 +692,6 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                 title="Collapse"
                 tabIndex={-1}
               />
-            )}
-
-            {/* Ephemeral "AI is thinking…" placeholder while request is in flight */}
-            {hasLoading && (
-              <div className="ls-block ls-block-ai-loading" aria-live="polite">
-                <div className="ls-block-content">
-                  <div className="ls-bullet-wrap">
-                    <span className="ls-bullet ls-bullet-ai ls-bullet-loading" />
-                  </div>
-                  <div className="ls-ai-card">
-                    <span className="ls-ai-prefix" aria-hidden="true">AI</span>
-                    <div className="ls-ai-thinking">
-                      <span className="ls-ai-thinking-label">thinking</span>
-                      <span className="ls-ai-thinking-dots">
-                        <span /><span /><span />
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
             )}
 
             {/* AI inserts for this block */}
@@ -836,41 +748,6 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
           </div>
         ) : (
           <h1 className="ls-page-title">{formatDateHeading(selectedDate || '2026-04-09')}</h1>
-        )}
-
-        {/* @ mention popup */}
-        {atPopup && (
-          <div className="at-popup" style={{ left: atPopup.x, top: atPopup.y }}>
-            <div className="at-popup-header">
-              <span className="at-popup-label">@</span>
-              <span className="at-popup-hint">Ask your AI agent</span>
-            </div>
-            <form className="at-popup-form" onSubmit={handleAtSubmit}>
-              <input
-                ref={atInputRef}
-                className="at-popup-input"
-                placeholder="Type your question..."
-                value={atQuery}
-                onChange={e => setAtQuery(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Escape') dismissAtPopup() }}
-                disabled={atLoading}
-                autoFocus
-              />
-              {!atLoading && (
-                <button type="submit" className="at-popup-send" disabled={!atQuery.trim()}>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                </button>
-              )}
-            </form>
-            {atLoading && (
-              <div className="at-popup-loading">
-                <div className="at-loading-dots">
-                  <span /><span /><span />
-                </div>
-                <span className="at-loading-text">Thinking...</span>
-              </div>
-            )}
-          </div>
         )}
 
         {/* Journal blocks (or zoomed subtree) */}
