@@ -84,7 +84,15 @@ function getEventSummaryData(event, dateStr) {
     agentSummary = agentSession.preview || agentSession.title
   }
 
-  return { features, approachSummary, agentSummary }
+  // Activity logs within the event's time window
+  const startMin = timeToMinutes(event.time)
+  const endMin = timeToMinutes(event.endTime)
+  const logs = activityLogs.filter(log => {
+    const logMin = timeToMinutes(log.time)
+    return logMin >= startMin && logMin < endMin
+  })
+
+  return { features, approachSummary, agentSummary, logs }
 }
 
 export default function CalendarPanel({ selectedDate, setSelectedDate, selectedEvent, setSelectedEvent, onSlotClick, quickSlot, thoughts = {}, onDatePanelOpen }) {
@@ -94,6 +102,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const [searchResults, setSearchResults] = useState(null)
   const [zoomLevel, setZoomLevel] = useState(56) // pixels per hour: 42, 56, 84
   const [expandedEvent, setExpandedEvent] = useState(null) // event id to expand inline
+  const [expandedTab, setExpandedTab] = useState('summary') // 'summary' | 'activity'
   const [expandedExtraHeight, setExpandedExtraHeight] = useState(0)
   const expandedRef = useRef(null)
   const gridRef = useRef(null)
@@ -193,7 +202,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
       setExpandedExtraHeight(Math.min(rawExtra, MAX_EXTRA))
     }
     requestAnimationFrame(measure)
-  }, [expandedEvent, zoomLevel, tasks])
+  }, [expandedEvent, expandedTab, zoomLevel, tasks])
 
   // Find the expanded task's hour range for stretching slots
   const expandedTask = expandedEvent ? tasks.find(t => t.id === expandedEvent) : null
@@ -227,7 +236,11 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const handleEventClick = (e, event) => {
     e.stopPropagation()
     setSelectedEvent(event)
-    setExpandedEvent(prev => prev === event.id ? null : event.id)
+    setExpandedEvent(prev => {
+      if (prev === event.id) return null
+      setExpandedTab('summary')
+      return event.id
+    })
   }
 
   const handleSlotClick = (e) => {
@@ -473,43 +486,64 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                     {formatTimeDisplay(task.time)} – {formatTimeDisplay(task.endTime)}
                   </span>
 
-                  {/* Expanded inline summary */}
+                  {/* Expanded tabs: Summary / Activity */}
                   {isExpanded && summary && (
                     <div className="cal-inline-summary" onClick={(e) => e.stopPropagation()}>
-                      {/* AI Summary */}
-                      {task.aiSummary && (
-                        <div className="cal-is-row">
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                          <span className="cal-is-text">{task.aiSummary}</span>
-                        </div>
+                      {/* Tab bar */}
+                      <div className="cal-is-tabs">
+                        <button className={`cal-is-tab ${expandedTab === 'summary' ? 'active' : ''}`} onClick={() => setExpandedTab('summary')}>Summary</button>
+                        <button className={`cal-is-tab ${expandedTab === 'activity' ? 'active' : ''}`} onClick={() => setExpandedTab('activity')}>Activity</button>
+                      </div>
+
+                      {/* Summary tab */}
+                      {expandedTab === 'summary' && (
+                        <>
+                          {task.aiSummary && (
+                            <div className="cal-is-row">
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                              <span className="cal-is-text">{task.aiSummary}</span>
+                            </div>
+                          )}
+                          {summary.approachSummary && (
+                            <div className="cal-is-approach">
+                              <span className="cal-is-label">Approach</span>
+                              <p className="cal-is-approach-text">
+                                <strong>Planned:</strong> {summary.approachSummary.plannedText}
+                              </p>
+                              <p className="cal-is-approach-text">
+                                <strong>Done:</strong> {summary.approachSummary.doneText}
+                              </p>
+                            </div>
+                          )}
+                          {summary.features.length > 0 && (
+                            <div className="cal-is-features">
+                              <span className="cal-is-label">Feature Docs</span>
+                              {summary.features.map(f => (
+                                <div key={f.id} className="cal-is-feat-row">
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                  <span className="cal-is-feat-title">{f.title}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
                       )}
 
-                      {/* Approach: Planned vs Actual — text only */}
-                      {summary.approachSummary && (
-                        <div className="cal-is-approach">
-                          <span className="cal-is-label">Approach</span>
-                          <p className="cal-is-approach-text">
-                            <strong>Planned:</strong> {summary.approachSummary.plannedText}
-                          </p>
-                          <p className="cal-is-approach-text">
-                            <strong>Done:</strong> {summary.approachSummary.doneText}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Feature docs — title only, no status */}
-                      {summary.features.length > 0 && (
-                        <div className="cal-is-features">
-                          <span className="cal-is-label">Feature Docs</span>
-                          {summary.features.map(f => (
-                            <div key={f.id} className="cal-is-feat-row">
-                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                              <span className="cal-is-feat-title">{f.title}</span>
+                      {/* Activity tab */}
+                      {expandedTab === 'activity' && (
+                        <div className="cal-is-activity">
+                          {summary.logs.length === 0 && (
+                            <span className="cal-is-activity-empty">No activity during this time</span>
+                          )}
+                          {summary.logs.map(log => (
+                            <div key={log.id} className={`cal-is-log cal-is-log--${log.type}`}>
+                              <span className="cal-is-log-time">{formatTimeDisplay(log.time)}</span>
+                              <span className={`cal-is-log-dot cal-is-log-dot--${log.type}`} />
+                              <span className="cal-is-log-action">{log.action}</span>
                             </div>
                           ))}
                         </div>
                       )}
-
                     </div>
                   )}
                 </div>
