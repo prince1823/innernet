@@ -230,7 +230,7 @@ function formatDuration(mins) {
   return m === 0 ? `${h}h` : `${h}h ${m}m`
 }
 
-export default function CalendarPanel({ selectedDate, setSelectedDate, selectedEvent, setSelectedEvent, onSlotClick, quickSlot, thoughts = {}, onDatePanelOpen }) {
+export default function CalendarPanel({ selectedDate, setSelectedDate, selectedEvent, setSelectedEvent, onSlotClick, onQuickNoteAdd, onQuickSlotClear, quickSlot, thoughts = {}, onDatePanelOpen }) {
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 9))
   const [showMiniCal, setShowMiniCal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -242,6 +242,9 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const [pullProgress, setPullProgress] = useState(0) // -1..1 (negative = prev day pull, positive = next day pull)
   const [dayTransition, setDayTransition] = useState(null) // 'prev' | 'next' during day flip
   const [hoveredEventId, setHoveredEventId] = useState(null) // event id for the hover peek card
+  // Draft text for the inline quick-note input that pops up when an empty slot is clicked
+  const [quickNoteText, setQuickNoteText] = useState('')
+  const quickNoteInputRef = useRef(null)
   const gridRef = useRef(null)
   const searchRef = useRef(null)
   const panelRef = useRef(null)
@@ -543,10 +546,11 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
 
   const handleSlotClick = (e) => {
     if (!onSlotClick) return
-    const scrollContainer = gridRef.current
-    const scrollTop = scrollContainer ? scrollContainer.scrollTop : 0
+    // getBoundingClientRect() is viewport-relative, which already accounts for
+    // scroll — don't add scrollTop again or the computed time drifts forward
+    // by however many hours the grid is scrolled.
     const rect = e.currentTarget.getBoundingClientRect()
-    const y = e.clientY - rect.top + scrollTop
+    const y = e.clientY - rect.top
     const totalMinutes = Math.floor((y / zoomLevel) * 60)
     const hour = Math.floor(totalMinutes / 60)
     const minute = Math.floor(totalMinutes / 30) * 30 % 60
@@ -1014,14 +1018,50 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               )
             })}
 
-            {/* Quick slot indicator */}
+            {/* Quick-note composer — appears when an empty slot is clicked.
+                Type + Enter adds a thought that persists as a thought-block. */}
             {quickSlot && !thoughtSlots.some(s => s.time === quickSlot.time) && (() => {
               const [h, m] = quickSlot.time.split(':').map(Number)
               const minutes = h * 60 + m
               const topOffset = (minutes / 60) * zoomLevel
+              const submit = () => {
+                const text = quickNoteText.trim()
+                if (!text) return
+                if (onQuickNoteAdd) onQuickNoteAdd(quickSlot.time, text)
+                setQuickNoteText('')
+                if (onQuickSlotClear) onQuickSlotClear()
+              }
+              const cancel = () => {
+                setQuickNoteText('')
+                if (onQuickSlotClear) onQuickSlotClear()
+              }
               return (
-                <div className="cal-quick-slot" style={{ top: `${topOffset}px` }}>
-                  <div className="cal-quick-slot-label">{quickSlot.label}</div>
+                <div
+                  className="cal-quick-slot"
+                  style={{ top: `${topOffset}px` }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="cal-quick-slot-label">{quickSlot.label}</span>
+                  <input
+                    ref={quickNoteInputRef}
+                    className="cal-quick-slot-input"
+                    type="text"
+                    value={quickNoteText}
+                    placeholder="Jot a note — Enter to save, Esc to cancel"
+                    autoFocus
+                    onChange={(e) => setQuickNoteText(e.target.value)}
+                    onKeyDown={(e) => {
+                      e.stopPropagation()
+                      if (e.key === 'Enter') { e.preventDefault(); submit() }
+                      else if (e.key === 'Escape') { e.preventDefault(); cancel() }
+                    }}
+                    onBlur={() => {
+                      // If user clicks away without typing, dismiss. If they
+                      // typed something, save it rather than lose it silently.
+                      if (quickNoteText.trim()) submit()
+                      else cancel()
+                    }}
+                  />
                 </div>
               )
             })()}
