@@ -822,6 +822,7 @@
 .cal-event-block--future {
   opacity: 1;
   filter: saturate(1.1) brightness(1.02);
+  cursor: default;
 }
 
 .cal-event-block--now {
