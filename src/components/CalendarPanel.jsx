@@ -106,12 +106,14 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const [isClosingOverlay, setIsClosingOverlay] = useState(false)
   const [pullProgress, setPullProgress] = useState(0) // -1..1 (negative = prev day pull, positive = next day pull)
   const [dayTransition, setDayTransition] = useState(null) // 'prev' | 'next' during day flip
+  const [hoveredEventId, setHoveredEventId] = useState(null) // event id for the hover peek card
   const gridRef = useRef(null)
   const searchRef = useRef(null)
   const panelRef = useRef(null)
   const pullAccum = useRef(0)
   const pullTimer = useRef(null)
   const closeTimeoutRef = useRef(null)
+  const hoverTimerRef = useRef(null)
 
   const dateStr = formatDateStr(currentDate)
   const isToday = dateStr === '2026-04-09'
@@ -207,6 +209,25 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
       setIsClosingOverlay(false)
     }, 220)
   }, [])
+
+  // Hover peek: show a small floating preview card after a short delay
+  const handleEventEnter = useCallback((event) => {
+    if (expandedEvent) return
+    clearTimeout(hoverTimerRef.current)
+    hoverTimerRef.current = setTimeout(() => {
+      setHoveredEventId(event.id)
+    }, 380)
+  }, [expandedEvent])
+
+  const handleEventLeave = useCallback(() => {
+    clearTimeout(hoverTimerRef.current)
+    setHoveredEventId(null)
+  }, [])
+
+  // Resolve hovered task for peek render
+  const hoveredTask = hoveredEventId && !expandedEvent
+    ? tasks.find(t => t.id === hoveredEventId)
+    : null
 
   const handleEventClick = (e, event) => {
     e.stopPropagation()
@@ -521,6 +542,8 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                     borderLeft: `4px solid ${color.border}`,
                   }}
                   onClick={(e) => handleEventClick(e, task)}
+                  onMouseEnter={() => handleEventEnter(task)}
+                  onMouseLeave={handleEventLeave}
                 >
                   <span className="cal-event-title" style={{ color: color.text }}>{task.title}</span>
                   <span className="cal-event-time" style={{ color: color.text }}>
@@ -529,6 +552,47 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                 </div>
               )
             })}
+
+            {/* Hover peek card — small floating preview on event hover */}
+            {hoveredTask && (() => {
+              const startMin = timeToMinutes(hoveredTask.time)
+              const endMin = timeToMinutes(hoveredTask.endTime)
+              const blockTop = (startMin / 60) * zoomLevel
+              const blockHeight = Math.max(24, ((endMin - startMin) / 60) * zoomLevel)
+              const blockBottom = blockTop + blockHeight
+              // Pick first undone task, or fall back to first task
+              const allTasks = (hoveredTask.actionItems || []).flatMap(g => g.tasks || [])
+              const keyTask = allTasks.find(t => !t.done) || allTasks[0]
+              // Prefer placing above the event; flip below if too close to top
+              const placement = blockTop >= 120 ? 'above' : 'below'
+              const top = placement === 'above' ? blockTop - 8 : blockBottom + 8
+              const color = eventColors[hoveredTask.colorIndex] || eventColors[0]
+              return (
+                <div
+                  className={`cal-peek cal-peek--${placement}`}
+                  style={{ top: `${top}px`, borderLeftColor: color.border }}
+                  onMouseEnter={() => clearTimeout(hoverTimerRef.current)}
+                  onMouseLeave={handleEventLeave}
+                >
+                  <div className="cal-peek-head">
+                    <span className="cal-peek-title">{hoveredTask.title}</span>
+                    <span className="cal-peek-time">{formatTimeDisplay(hoveredTask.time)} – {formatTimeDisplay(hoveredTask.endTime)}</span>
+                  </div>
+                  {hoveredTask.aiSummary && (
+                    <div className="cal-peek-ai">
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                      <span>{hoveredTask.aiSummary}</span>
+                    </div>
+                  )}
+                  {keyTask && (
+                    <div className={`cal-peek-task ${keyTask.done ? 'done' : ''}`}>
+                      <span className="cal-peek-task-dot" />
+                      <span className="cal-peek-task-text">{keyTask.text}</span>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Current time line */}
             {isToday && (
