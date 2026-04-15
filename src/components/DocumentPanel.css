@@ -184,13 +184,12 @@
   background: var(--purple-500, #8b5cf6);
 }
 
-/* ── AI response card (wraps the "AI" pill + monospace body) ── */
+/* ── AI response card (wraps the monospace body + optional Implement CTA) ── */
 .ls-ai-card {
   flex: 1;
   display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 10px;
+  flex-direction: column;
+  gap: 6px;
   padding: 9px 14px 9px 12px;
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.055) 0%, rgba(139, 92, 246, 0.018) 100%);
   border-radius: 6px;
@@ -202,7 +201,7 @@
 
 /* AI-authored child block body text (inside the card) */
 .ls-ai-card .ls-block-text-ai {
-  flex: 1;
+  width: 100%;
   min-width: 0;
   padding: 0;
   color: #3a3a52;
@@ -211,6 +210,74 @@
   font-family: 'SF Mono', SFMono-Regular, Menlo, Monaco, 'Courier New', monospace;
   letter-spacing: -0.05px;
   background: transparent;
+}
+
+/* ── Implement CTA footer (rendered after an @-query response finishes) ── */
+.ls-ai-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 7px;
+  margin-top: 1px;
+  border-top: 1px dashed rgba(139, 92, 246, 0.22);
+  animation: lsBlockAiIn 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ls-ai-card-cta {
+  color: #6b7785;
+  font-size: 11px;
+  line-height: 1.4;
+  font-family: 'SF Mono', SFMono-Regular, Menlo, Monaco, 'Courier New', monospace;
+  letter-spacing: -0.05px;
+  user-select: none;
+}
+
+.ls-ai-card-actions {
+  display: inline-flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.ls-ai-card-btn {
+  border: none;
+  padding: 3px 11px;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-family: 'SF Mono', SFMono-Regular, Menlo, Monaco, 'Courier New', monospace;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  letter-spacing: 0.3px;
+}
+
+.ls-ai-card-btn-yes {
+  background: var(--purple-500, #8b5cf6);
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(139, 92, 246, 0.28);
+}
+
+.ls-ai-card-btn-yes:hover {
+  background: var(--purple-600, #7c3aed);
+  box-shadow: 0 2px 4px rgba(139, 92, 246, 0.35);
+}
+
+.ls-ai-card-btn-no {
+  background: transparent;
+  color: #6b7785;
+}
+
+.ls-ai-card-btn-no:hover {
+  background: rgba(107, 119, 133, 0.1);
+  color: #3a3a52;
+}
+
+.ls-ai-card-footer-status .ls-ai-card-status {
+  color: var(--purple-600, #7c3aed);
+  font-size: 10.5px;
+  font-weight: 600;
+  font-family: 'SF Mono', SFMono-Regular, Menlo, Monaco, 'Courier New', monospace;
+  letter-spacing: 0.2px;
 }
 
 .ls-ai-card .ls-block-text-ai:focus {

@@ -596,8 +596,17 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     // 2. Pre-create the empty AI child block so it appears INSTANTLY under the question.
     //    Pre-seeding streamingText[id]='' renders it as an empty AI card with the
     //    existing .ls-block-text-streaming caret — that's our "thinking" affordance.
+    //    sourceQuery / sourceContext are stashed on the block now so the "Implement"
+    //    CTA (added after streaming finishes) can spawn a session with full context.
     const aiBlockId = newBlockId()
-    const aiBlock = { id: aiBlockId, text: '', children: [], isAI: true }
+    const aiBlock = {
+      id: aiBlockId,
+      text: '',
+      children: [],
+      isAI: true,
+      sourceQuery: query,
+      sourceContext: context,
+    }
     setStreamingText(prev => ({ ...prev, [aiBlockId]: '' }))
     applyTreeOp(tree => prependChildren(tree, blockId, [aiBlock]))
 
@@ -612,7 +621,60 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     // 5. Commit the real text to the tree, then stream it in character-by-character.
     applyTreeOp(tree => setBlockText(tree, aiBlockId, paraText))
     await streamBlockText(aiBlockId, paraText)
+
+    // 6. Flip on the Implement CTA now that the card is a complete Q→A. The footer
+    //    renders conditionally on block.canImplement && !implementStatus — declining
+    //    or accepting writes implementStatus to make the footer go away.
+    applyTreeOp(tree => {
+      const next = cloneTree(tree)
+      const ctx = findContext(next, aiBlockId)
+      if (!ctx) return next
+      ctx.block.canImplement = true
+      return next
+    })
   }
+
+  // ── Implement CTA handlers ─────────────────────────────────────────────
+  // The CTA lives inside each @-query AI card. "Yes" spawns a ChatWindows
+  // feature session seeded with the original question + AI answer + the text
+  // that was sitting above the `@` as surrounding context; "No" just flips
+  // implementStatus so the footer disappears.
+  const handleAcceptImplement = useCallback((aiBlockId) => {
+    const currentTree = trees[selectedDate] || materializeTree(selectedDate, legacyEditsRef.current)
+    const ctx = findContext(currentTree, aiBlockId)
+    if (!ctx) return
+    const block = ctx.block
+
+    const query = (block.sourceQuery || '').trim() || 'Ad-hoc feature'
+    const title = query.length > 50 ? query.slice(0, 50) + '…' : query
+    const sessionContext = [
+      block.sourceContext ? `Surrounding context:\n${block.sourceContext}` : '',
+      `Original question:\n${query}`,
+      `Initial AI answer:\n${block.text || ''}`,
+    ].filter(Boolean).join('\n\n')
+    const featId = `adhoc-${aiBlockId}`
+
+    if (onAskAI) onAskAI(featId, title, sessionContext)
+
+    applyTreeOp(tree => {
+      const next = cloneTree(tree)
+      const ctxIn = findContext(next, aiBlockId)
+      if (!ctxIn) return next
+      ctxIn.block.implementStatus = 'accepted'
+      ctxIn.block.sessionId = featId
+      return next
+    })
+  }, [trees, selectedDate, onAskAI, applyTreeOp])
+
+  const handleDeclineImplement = useCallback((aiBlockId) => {
+    applyTreeOp(tree => {
+      const next = cloneTree(tree)
+      const ctx = findContext(next, aiBlockId)
+      if (!ctx) return next
+      ctx.block.implementStatus = 'declined'
+      return next
+    })
+  }, [applyTreeOp])
 
   const removeInsert = (id) => {
     setAtInserts(prev => prev.filter(i => i.id !== id))
@@ -666,6 +728,30 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                 onBlur={e => handleBlockBlur(block.id, e.currentTarget.textContent)}
                 dangerouslySetInnerHTML={{ __html: renderMd(displayText) }}
               />
+              {block.canImplement && !block.implementStatus && !isStreaming && (
+                <div className="ls-ai-card-footer">
+                  <span className="ls-ai-card-cta">Want me to start a session to implement this?</span>
+                  <div className="ls-ai-card-actions">
+                    <button
+                      type="button"
+                      className="ls-ai-card-btn ls-ai-card-btn-yes"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => handleAcceptImplement(block.id)}
+                    >Yes</button>
+                    <button
+                      type="button"
+                      className="ls-ai-card-btn ls-ai-card-btn-no"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => handleDeclineImplement(block.id)}
+                    >No</button>
+                  </div>
+                </div>
+              )}
+              {block.implementStatus === 'accepted' && (
+                <div className="ls-ai-card-footer ls-ai-card-footer-status">
+                  <span className="ls-ai-card-status">Session started → see windows above</span>
+                </div>
+              )}
             </div>
           ) : (
             <span
