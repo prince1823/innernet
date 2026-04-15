@@ -95,6 +95,141 @@ function getEventSummaryData(event, dateStr) {
   return { features, approachSummary, agentSummary, logs }
 }
 
+// ── Time Queries ─────────────────────────────────────────────────────────
+// Power users can type natural language questions into the search box.
+// parseTimeQuery detects the *kind* of question; returns null to fall through
+// to the default text search. runTimeQuery computes the answer from the data.
+
+const LOG_DAY = '2026-04-09' // activityLogs[] is a single-day dataset
+
+function parseTimeQuery(rawQuery) {
+  const q = rawQuery.toLowerCase().trim()
+  if (!q) return null
+  // Productivity — "when was i most productive", "most productive", "peak focus"
+  if (
+    /\b(most|peak|highest|best)\s+(productive|productivity|focused|focus)\b/.test(q) ||
+    /\bwhen\b.*\bproductive\b/.test(q) ||
+    q === 'productivity' || q === 'most productive'
+  ) {
+    return { kind: 'productivity' }
+  }
+  // Time on project — "how much time on colab91", "time on #innernet"
+  const timeOn = q.match(/(?:how much time|time)\s+(?:on|in|with)\s+#?([\w-]+)/)
+  if (timeOn) return { kind: 'timeOn', project: timeOn[1] }
+  // Meetings — "when are my meetings", "show meetings"
+  if (
+    /\bwhen\b.*\bmeetings?\b/.test(q) ||
+    /\bshow\b.*\bmeetings?\b/.test(q) ||
+    /\bmy\s+meetings?\b/.test(q) ||
+    q === 'meetings'
+  ) {
+    return { kind: 'meetings' }
+  }
+  // Free time — "free time", "when am i free", "gaps"
+  if (/\bfree\s+time\b/.test(q) || /\bwhen\b.*\bfree\b/.test(q) || /\bgaps?\b/.test(q) || /\bopen\s+time\b/.test(q)) {
+    return { kind: 'freeTime' }
+  }
+  return null
+}
+
+// Score an event for productivity. Uses real log/session data for today's
+// events and falls back to action-item completion as a cross-day proxy.
+function scoreEventProductivity(ev) {
+  const startMin = timeToMinutes(ev.time)
+  const endMin = timeToMinutes(ev.endTime)
+  const duration = endMin - startMin
+  let logCount = 0
+  let sessionCount = 0
+  let userLogCount = 0
+  let agentLogCount = 0
+  if (ev.date === LOG_DAY) {
+    const logs = activityLogs.filter(l => {
+      const lm = timeToMinutes(l.time)
+      return lm >= startMin && lm < endMin
+    })
+    logCount = logs.length
+    userLogCount = logs.filter(l => l.type === 'user').length
+    agentLogCount = logs.filter(l => l.type === 'agent').length
+    sessionCount = new Set(logs.map(l => l.session).filter(Boolean)).size
+  }
+  let doneCount = 0
+  let totalAction = 0
+  if (ev.actionItems) {
+    for (const group of ev.actionItems) {
+      for (const task of (group.tasks || [])) {
+        totalAction += 1
+        if (task.done) doneCount += 1
+      }
+    }
+  }
+  // Weighted score: logs are concrete evidence, sessions show AI-assisted
+  // work, completed actions show outcome. Duration is a tiebreaker.
+  const score = logCount + sessionCount * 3 + doneCount * 2 + duration / 120
+  return { score, logCount, userLogCount, agentLogCount, sessionCount, doneCount, totalAction, duration }
+}
+
+function runTimeQuery(parsed, currentDateStr) {
+  if (parsed.kind === 'productivity') {
+    const all = getAllEvents()
+    const scored = all
+      .map(ev => ({ ev, ...scoreEventProductivity(ev) }))
+      .filter(r => r.score > 0)
+      .sort((a, b) => b.score - a.score)
+    return { kind: 'productivity', top: scored.slice(0, 5) }
+  }
+  if (parsed.kind === 'timeOn') {
+    const needle = parsed.project.toLowerCase()
+    const all = getAllEvents()
+    const matches = all.filter(ev =>
+      ev.project?.toLowerCase().includes(needle) ||
+      ev.tags?.some(t => t.toLowerCase().includes(needle))
+    )
+    const totalMin = matches.reduce(
+      (n, ev) => n + (timeToMinutes(ev.endTime) - timeToMinutes(ev.time)),
+      0
+    )
+    // Group by date for the breakdown
+    const byDate = {}
+    for (const ev of matches) {
+      byDate[ev.date] = (byDate[ev.date] || 0) + (timeToMinutes(ev.endTime) - timeToMinutes(ev.time))
+    }
+    return { kind: 'timeOn', project: parsed.project, totalMin, events: matches, byDate }
+  }
+  if (parsed.kind === 'meetings') {
+    const all = getAllEvents()
+    const meetings = all
+      .filter(ev => ev.attendees && ev.attendees.length > 0)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
+    return { kind: 'meetings', events: meetings }
+  }
+  if (parsed.kind === 'freeTime') {
+    const dayEvents = [...(calendarTasks[currentDateStr] || [])].sort(
+      (a, b) => timeToMinutes(a.time) - timeToMinutes(b.time)
+    )
+    const DAY_START = 9 * 60
+    const DAY_END = 18 * 60
+    const gaps = []
+    let cursor = DAY_START
+    for (const ev of dayEvents) {
+      const s = timeToMinutes(ev.time)
+      const e = timeToMinutes(ev.endTime)
+      if (s > cursor && s - cursor >= 45) gaps.push({ start: cursor, end: s })
+      cursor = Math.max(cursor, e)
+    }
+    if (DAY_END > cursor && DAY_END - cursor >= 45) gaps.push({ start: cursor, end: DAY_END })
+    const totalFreeMin = gaps.reduce((n, g) => n + (g.end - g.start), 0)
+    return { kind: 'freeTime', gaps, totalFreeMin, dateStr: currentDateStr }
+  }
+  return null
+}
+
+function formatDuration(mins) {
+  if (mins < 60) return `${mins}m`
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return m === 0 ? `${h}h` : `${h}h ${m}m`
+}
+
 export default function CalendarPanel({ selectedDate, setSelectedDate, selectedEvent, setSelectedEvent, onSlotClick, quickSlot, thoughts = {}, onDatePanelOpen }) {
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 9))
   const [showMiniCal, setShowMiniCal] = useState(false)
@@ -151,12 +286,22 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
       })
   }, [dateStr, thoughts])
 
-  // Search logic
+  // Search logic — first tries Time Queries (productivity / time-on / meetings /
+  // free-time), then falls back to text search over events.
   const handleSearch = useCallback((query) => {
     setSearchQuery(query)
     if (!query.trim()) {
-      setSearchResults(null)
+      setSearchResults({ kind: 'empty' })
       return
+    }
+    // Try time-query intent first
+    const parsed = parseTimeQuery(query)
+    if (parsed) {
+      const result = runTimeQuery(parsed, dateStr)
+      if (result) {
+        setSearchResults(result)
+        return
+      }
     }
     const q = query.toLowerCase().trim()
     const allEvents = getAllEvents()
@@ -185,8 +330,8 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
       if (!grouped[ev.date]) grouped[ev.date] = []
       grouped[ev.date].push(ev)
     })
-    setSearchResults(grouped)
-  }, [])
+    setSearchResults({ kind: 'search', grouped })
+  }, [dateStr])
 
   const goToPrev = () => setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() - 1); return d })
   const goToNext = () => setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() + 1); return d })
@@ -340,11 +485,21 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
     if (onDatePanelOpen) onDatePanelOpen(dateStr)
   }
 
+  // Jump to a specific date+event from any search result
+  const jumpToEvent = (date, ev) => {
+    const nd = new Date(date + 'T00:00:00')
+    setCurrentDate(nd)
+    if (ev) setSelectedEvent(ev)
+    setSearchResults(null)
+    setSearchQuery('')
+  }
+  const jumpToDate = (date) => jumpToEvent(date, null)
+
   // Search results view
   if (searchResults) {
-    const dates = Object.keys(searchResults).sort()
+    const kind = searchResults.kind || 'search'
     return (
-      <div className="calendar-panel">
+      <div className="calendar-panel" ref={panelRef}>
         <div className="cal-header">
           <div className="cal-header-left" style={{ flex: 1 }}>
             <div className="cal-search-box active">
@@ -352,7 +507,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               <input
                 ref={searchRef}
                 type="text"
-                placeholder="Search #project or name..."
+                placeholder="Try: when was I most productive?"
                 value={searchQuery}
                 onChange={e => handleSearch(e.target.value)}
                 autoFocus
@@ -364,47 +519,261 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
           </div>
         </div>
         <div className="cal-search-results">
-          {dates.length === 0 && (
-            <div className="cal-search-empty">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <p>No results found</p>
+          {/* Empty / initial state — show suggested time queries */}
+          {kind === 'empty' && (
+            <div className="cal-query-suggestions">
+              <div className="cal-query-suggest-label">Try asking…</div>
+              {[
+                'When was I most productive?',
+                'How much time on innernet?',
+                'When are my meetings?',
+                'Free time today',
+              ].map(s => (
+                <button key={s} className="cal-query-suggest-btn" onClick={() => handleSearch(s)}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span>{s}</span>
+                </button>
+              ))}
             </div>
           )}
-          {dates.map(date => {
-            const d = new Date(date + 'T00:00:00')
+
+          {/* Productivity answer card */}
+          {kind === 'productivity' && (() => {
+            const top = searchResults.top
+            if (!top || top.length === 0) {
+              return <div className="cal-search-empty"><p>Not enough data to rank productivity yet.</p></div>
+            }
+            const winner = top[0]
+            const winnerDate = new Date(winner.ev.date + 'T00:00:00')
+            const maxScore = winner.score
             return (
-              <div key={date} className="cal-search-date-group">
-                <div className="cal-search-date-header">
-                  <span className="cal-search-date-day">{d.toLocaleDateString('en-US', { weekday: 'short' })}</span>
-                  <span className="cal-search-date-full">{d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+              <div className="cal-query-result">
+                <div className="cal-query-badge">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                  <span>Productivity analysis</span>
                 </div>
-                {searchResults[date].map(ev => {
-                  const color = eventColors[ev.colorIndex] || eventColors[0]
-                  return (
-                    <div key={ev.id} className="cal-search-event" onClick={() => {
-                      const nd = new Date(date + 'T00:00:00')
-                      setCurrentDate(nd)
-                      setSelectedEvent(ev)
-                      setSearchResults(null)
-                      setSearchQuery('')
-                    }}>
-                      <div className="cal-search-event-color" style={{ background: color.border }} />
-                      <div className="cal-search-event-info">
-                        <span className="cal-search-event-title">{ev.title}</span>
-                        <span className="cal-search-event-time">{formatTimeDisplay(ev.time)} – {formatTimeDisplay(ev.endTime)}</span>
-                      </div>
-                      {ev.attendees && (
-                        <div className="cal-search-event-attendees">
-                          {ev.attendees.slice(0, 2).map((a, i) => <span key={i} className="cal-search-attendee">{a}</span>)}
-                          {ev.attendees.length > 2 && <span className="cal-search-attendee-more">+{ev.attendees.length - 2}</span>}
-                        </div>
-                      )}
+                <div className="cal-query-headline">
+                  <div className="cal-query-answer-label">Most productive window</div>
+                  <div className="cal-query-answer-time">
+                    {formatTimeDisplay(winner.ev.time)} – {formatTimeDisplay(winner.ev.endTime)}
+                  </div>
+                  <div className="cal-query-answer-title">{winner.ev.title}</div>
+                  <div className="cal-query-answer-date">
+                    {winnerDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                  </div>
+                </div>
+                <div className="cal-query-metrics">
+                  {winner.logCount > 0 && (
+                    <div className="cal-query-metric">
+                      <span className="cal-query-metric-val">{winner.logCount}</span>
+                      <span className="cal-query-metric-label">activity logs</span>
                     </div>
-                  )
-                })}
+                  )}
+                  {winner.sessionCount > 0 && (
+                    <div className="cal-query-metric">
+                      <span className="cal-query-metric-val">{winner.sessionCount}</span>
+                      <span className="cal-query-metric-label">agent {winner.sessionCount === 1 ? 'session' : 'sessions'}</span>
+                    </div>
+                  )}
+                  {winner.doneCount > 0 && (
+                    <div className="cal-query-metric">
+                      <span className="cal-query-metric-val">{winner.doneCount}/{winner.totalAction}</span>
+                      <span className="cal-query-metric-label">tasks done</span>
+                    </div>
+                  )}
+                  <div className="cal-query-metric">
+                    <span className="cal-query-metric-val">{formatDuration(winner.duration)}</span>
+                    <span className="cal-query-metric-label">focus time</span>
+                  </div>
+                </div>
+                <button className="cal-query-jump" onClick={() => jumpToEvent(winner.ev.date, winner.ev)}>
+                  <span>Jump to this window</span>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                </button>
+                {top.length > 1 && (
+                  <>
+                    <div className="cal-query-runners-label">Runner-ups</div>
+                    <div className="cal-query-runners">
+                      {top.slice(1, 4).map((r, i) => {
+                        const d = new Date(r.ev.date + 'T00:00:00')
+                        const pct = Math.max(12, Math.round((r.score / maxScore) * 100))
+                        const color = eventColors[r.ev.colorIndex] || eventColors[0]
+                        return (
+                          <button key={r.ev.id + '-' + i} className="cal-query-runner" onClick={() => jumpToEvent(r.ev.date, r.ev)}>
+                            <div className="cal-query-runner-bar" style={{ width: `${pct}%`, background: color.border }} />
+                            <div className="cal-query-runner-info">
+                              <span className="cal-query-runner-title">{r.ev.title}</span>
+                              <span className="cal-query-runner-meta">
+                                {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {formatTimeDisplay(r.ev.time)}
+                              </span>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
               </div>
             )
-          })}
+          })()}
+
+          {/* Time on project answer card */}
+          {kind === 'timeOn' && (() => {
+            const { project, totalMin, events, byDate } = searchResults
+            if (!events || events.length === 0) {
+              return <div className="cal-search-empty"><p>No time logged on <strong>{project}</strong>.</p></div>
+            }
+            const maxDayMin = Math.max(...Object.values(byDate))
+            const sortedDates = Object.keys(byDate).sort()
+            return (
+              <div className="cal-query-result">
+                <div className="cal-query-badge">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span>Time investment</span>
+                </div>
+                <div className="cal-query-headline">
+                  <div className="cal-query-answer-label">Total time on <strong>#{project}</strong></div>
+                  <div className="cal-query-answer-time">{formatDuration(totalMin)}</div>
+                  <div className="cal-query-answer-title">{events.length} {events.length === 1 ? 'event' : 'events'} across {sortedDates.length} {sortedDates.length === 1 ? 'day' : 'days'}</div>
+                </div>
+                <div className="cal-query-runners-label">Daily breakdown</div>
+                <div className="cal-query-runners">
+                  {sortedDates.map(d => {
+                    const pct = Math.max(12, Math.round((byDate[d] / maxDayMin) * 100))
+                    const label = new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                    return (
+                      <button key={d} className="cal-query-runner" onClick={() => jumpToDate(d)}>
+                        <div className="cal-query-runner-bar" style={{ width: `${pct}%` }} />
+                        <div className="cal-query-runner-info">
+                          <span className="cal-query-runner-title">{label}</span>
+                          <span className="cal-query-runner-meta">{formatDuration(byDate[d])}</span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Meetings answer card */}
+          {kind === 'meetings' && (() => {
+            const events = searchResults.events
+            if (!events || events.length === 0) {
+              return <div className="cal-search-empty"><p>No meetings found.</p></div>
+            }
+            const totalMin = events.reduce((n, ev) => n + (timeToMinutes(ev.endTime) - timeToMinutes(ev.time)), 0)
+            const people = new Set(events.flatMap(ev => ev.attendees || []))
+            return (
+              <div className="cal-query-result">
+                <div className="cal-query-badge">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  <span>Meetings</span>
+                </div>
+                <div className="cal-query-headline">
+                  <div className="cal-query-answer-label">Upcoming &amp; past</div>
+                  <div className="cal-query-answer-time">{events.length} {events.length === 1 ? 'meeting' : 'meetings'}</div>
+                  <div className="cal-query-answer-title">{formatDuration(totalMin)} total · {people.size} {people.size === 1 ? 'person' : 'people'}</div>
+                </div>
+                <div className="cal-query-runners-label">All meetings</div>
+                <div className="cal-query-runners">
+                  {events.slice(0, 8).map(ev => {
+                    const d = new Date(ev.date + 'T00:00:00')
+                    const color = eventColors[ev.colorIndex] || eventColors[0]
+                    return (
+                      <button key={ev.id} className="cal-query-runner" onClick={() => jumpToEvent(ev.date, ev)}>
+                        <div className="cal-query-runner-dot" style={{ background: color.border }} />
+                        <div className="cal-query-runner-info">
+                          <span className="cal-query-runner-title">{ev.title}</span>
+                          <span className="cal-query-runner-meta">
+                            {d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · {formatTimeDisplay(ev.time)}
+                          </span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Free-time answer card */}
+          {kind === 'freeTime' && (() => {
+            const { gaps, totalFreeMin, dateStr: dStr } = searchResults
+            const d = new Date(dStr + 'T00:00:00')
+            if (!gaps || gaps.length === 0) {
+              return <div className="cal-search-empty"><p>No free blocks of 45+ min on {d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}.</p></div>
+            }
+            return (
+              <div className="cal-query-result">
+                <div className="cal-query-badge">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span>Free time</span>
+                </div>
+                <div className="cal-query-headline">
+                  <div className="cal-query-answer-label">Open blocks on {d.toLocaleDateString('en-US', { weekday: 'long' })}</div>
+                  <div className="cal-query-answer-time">{formatDuration(totalFreeMin)}</div>
+                  <div className="cal-query-answer-title">{gaps.length} {gaps.length === 1 ? 'block' : 'blocks'} of 45+ min</div>
+                </div>
+                <div className="cal-query-runners-label">Blocks</div>
+                <div className="cal-query-runners">
+                  {gaps.map((g, i) => (
+                    <button key={i} className="cal-query-runner" onClick={() => jumpToDate(dStr)}>
+                      <div className="cal-query-runner-info">
+                        <span className="cal-query-runner-title">
+                          {formatTimeDisplay(`${String(Math.floor(g.start/60)).padStart(2,'0')}:${String(g.start%60).padStart(2,'0')}`)} – {formatTimeDisplay(`${String(Math.floor(g.end/60)).padStart(2,'0')}:${String(g.end%60).padStart(2,'0')}`)}
+                        </span>
+                        <span className="cal-query-runner-meta">{formatDuration(g.end - g.start)}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Default text-search results */}
+          {kind === 'search' && (() => {
+            const grouped = searchResults.grouped || {}
+            const dates = Object.keys(grouped).sort()
+            if (dates.length === 0) {
+              return (
+                <div className="cal-search-empty">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <p>No results found</p>
+                </div>
+              )
+            }
+            return dates.map(date => {
+              const d = new Date(date + 'T00:00:00')
+              return (
+                <div key={date} className="cal-search-date-group">
+                  <div className="cal-search-date-header">
+                    <span className="cal-search-date-day">{d.toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                    <span className="cal-search-date-full">{d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                  </div>
+                  {grouped[date].map(ev => {
+                    const color = eventColors[ev.colorIndex] || eventColors[0]
+                    return (
+                      <div key={ev.id} className="cal-search-event" onClick={() => jumpToEvent(date, ev)}>
+                        <div className="cal-search-event-color" style={{ background: color.border }} />
+                        <div className="cal-search-event-info">
+                          <span className="cal-search-event-title">{ev.title}</span>
+                          <span className="cal-search-event-time">{formatTimeDisplay(ev.time)} – {formatTimeDisplay(ev.endTime)}</span>
+                        </div>
+                        {ev.attendees && (
+                          <div className="cal-search-event-attendees">
+                            {ev.attendees.slice(0, 2).map((a, i) => <span key={i} className="cal-search-attendee">{a}</span>)}
+                            {ev.attendees.length > 2 && <span className="cal-search-attendee-more">+{ev.attendees.length - 2}</span>}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })
+          })()}
         </div>
       </div>
     )
@@ -428,7 +797,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
           </button>
         </div>
         <div className="cal-header-right">
-          <button className="cal-search-btn" onClick={() => { setSearchResults({}); setTimeout(() => searchRef.current?.focus(), 50) }} title="Search">
+          <button className="cal-search-btn" onClick={() => { setSearchResults({ kind: 'empty' }); setTimeout(() => searchRef.current?.focus(), 50) }} title="Search">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           </button>
           <div className="cal-zoom-btns">
