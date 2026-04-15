@@ -659,246 +659,431 @@
   flex-shrink: 0;
 }
 
+/* Marker class for the source event block — hide it while overlay is open so the overlay appears to unfold from it */
+.cal-event-block.is-overlay-source {
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* ══════════════════════════════════════════════
-   Expanded Event Block — Inline Summary
+   Pull-to-flip day hints (infinite scroll days)
    ══════════════════════════════════════════════ */
-.cal-event-block.expanded {
-  z-index: 10;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
-  overflow-y: auto;
-  overflow-x: hidden;
-  cursor: default;
-  padding-bottom: 10px;
-  background: white !important;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-left-width: 4px;
-  color: var(--text-primary);
-  scrollbar-width: thin;
-}
-
-.cal-event-block.expanded .cal-event-title,
-.cal-event-block.expanded .cal-event-time {
-  color: var(--text-primary) !important;
-}
-
-.cal-event-block.expanded .cal-event-time {
-  opacity: 0.6;
-}
-
-.cal-event-top-row {
+.cal-pull-hint {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--purple-500);
+  color: white;
+  border-radius: var(--radius-full);
+  font-size: 10.5px;
+  font-weight: 600;
+  z-index: 20;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.35);
+  transition: opacity 0.12s ease;
+  white-space: nowrap;
 }
 
-.cal-event-collapse-hint {
-  opacity: 0.5;
-  flex-shrink: 0;
-  cursor: pointer;
+.cal-pull-hint--top { top: 46px; }
+.cal-pull-hint--bottom { bottom: 12px; }
+
+.cal-pull-hint svg { flex-shrink: 0; }
+
+/* ══════════════════════════════════════════════
+   Day Transition — subtle fade when flipping days
+   ══════════════════════════════════════════════ */
+.cal-grid-scroll--prev { animation: dayFlipPrev 280ms cubic-bezier(0.22, 1, 0.36, 1); }
+.cal-grid-scroll--next { animation: dayFlipNext 280ms cubic-bezier(0.22, 1, 0.36, 1); }
+
+@keyframes dayFlipPrev {
+  0%   { opacity: 0.3; transform: translateY(-14px); }
+  100% { opacity: 1;   transform: translateY(0); }
 }
 
-.cal-inline-summary {
-  margin-top: 6px;
-  padding-top: 0;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
+@keyframes dayFlipNext {
+  0%   { opacity: 0.3; transform: translateY(14px); }
+  100% { opacity: 1;   transform: translateY(0); }
+}
+
+/* ══════════════════════════════════════════════
+   Event Detail Overlay — unfolds from clicked event
+   ══════════════════════════════════════════════ */
+.cal-overlay-root {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: auto;
+}
+
+.cal-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(17, 17, 24, 0.42);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  animation: overlayBackdropIn 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cal-overlay-root.is-closing .cal-overlay-backdrop {
+  animation: overlayBackdropOut 200ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes overlayBackdropIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes overlayBackdropOut { from { opacity: 1; } to { opacity: 0; } }
+
+/* The card itself uses clip-path to unfold from the origin rect into the full panel */
+.cal-overlay-card {
+  position: absolute;
+  inset: 8px 8px 8px 8px;
+  background: var(--bg-white);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-left: 4px solid var(--purple-500);
+  border-radius: 8px;
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.22), 0 4px 16px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  animation: isSlideIn 0.2s ease;
+  overflow: hidden;
+  clip-path: inset(
+    calc(var(--origin-top) - 8px)
+    calc(var(--origin-right) - 8px)
+    calc(var(--origin-bottom) - 8px)
+    calc(var(--origin-left) - 8px)
+    round 6px
+  );
+  animation: overlayUnfold 320ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  transform-origin: top left;
 }
 
-/* ── Inline Summary Tabs ── */
-.cal-is-tabs {
+.cal-overlay-root.is-closing .cal-overlay-card {
+  animation: overlayRefold 260ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes overlayUnfold {
+  0% {
+    clip-path: inset(
+      calc(var(--origin-top) - 8px)
+      calc(var(--origin-right) - 8px)
+      calc(var(--origin-bottom) - 8px)
+      calc(var(--origin-left) - 8px)
+      round 6px
+    );
+    opacity: 0.4;
+  }
+  50% { opacity: 0.85; }
+  100% {
+    clip-path: inset(0 0 0 0 round 8px);
+    opacity: 1;
+  }
+}
+
+@keyframes overlayRefold {
+  0% {
+    clip-path: inset(0 0 0 0 round 8px);
+    opacity: 1;
+  }
+  100% {
+    clip-path: inset(
+      calc(var(--origin-top) - 8px)
+      calc(var(--origin-right) - 8px)
+      calc(var(--origin-bottom) - 8px)
+      calc(var(--origin-left) - 8px)
+      round 6px
+    );
+    opacity: 0;
+  }
+}
+
+/* Overlay header */
+.cal-overlay-header {
   display: flex;
-  gap: 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  margin-bottom: 2px;
-}
-
-.cal-is-tab {
-  flex: 1;
-  padding: 4px 0;
-  font-size: 9px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: rgba(0, 0, 0, 0.35);
-  background: none;
-  border: none;
-  border-bottom: 1.5px solid transparent;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-  text-align: center;
-}
-
-.cal-is-tab:hover { color: rgba(0, 0, 0, 0.6); }
-
-.cal-is-tab.active {
-  color: var(--text-primary);
-  border-bottom-color: var(--text-primary);
-}
-
-@keyframes isSlideIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* AI Summary row */
-.cal-is-row {
-  display: flex;
-  gap: 6px;
   align-items: flex-start;
-}
-
-.cal-is-row svg {
+  justify-content: space-between;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  gap: 10px;
   flex-shrink: 0;
-  margin-top: 2px;
-  opacity: 0.6;
 }
 
-.cal-is-text {
-  font-size: 9px;
-  line-height: 1.5;
-  opacity: 0.85;
-}
-
-/* Label */
-.cal-is-label {
-  font-size: 9px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.5;
-  display: block;
-  margin-bottom: 3px;
-}
-
-/* Approach: Planned vs Actual */
-.cal-is-approach {
-  padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.5);
-  border-radius: 5px;
-}
-
-.cal-is-approach-text {
-  font-size: 9px;
-  line-height: 1.5;
-  margin: 2px 0;
-  opacity: 0.8;
-}
-
-.cal-is-approach-text strong {
-  font-weight: 600;
-  opacity: 1;
-}
-
-/* Feature docs */
-.cal-is-features {
-  padding: 5px 8px;
-  background: rgba(255, 255, 255, 0.5);
-  border-radius: 5px;
-}
-
-.cal-is-feat-row {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 2px 0;
-}
-
-.cal-is-feat-row svg { opacity: 0.5; flex-shrink: 0; }
-
-.cal-is-feat-title {
-  font-size: 9px;
-  font-weight: 500;
+.cal-overlay-header-text {
   flex: 1;
   min-width: 0;
+}
+
+.cal-overlay-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Agent session */
-.cal-is-agent {
-  padding: 5px 8px;
-  background: rgba(255, 255, 255, 0.5);
-  border-radius: 5px;
-}
-
-.cal-is-agent-text {
+.cal-overlay-sub {
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: 10.5px;
-  line-height: 1.5;
-  opacity: 0.8;
-  margin: 2px 0 0;
-  font-style: italic;
+  color: rgba(0, 0, 0, 0.55);
+  font-weight: 500;
+  flex-wrap: wrap;
 }
 
-/* ══════════════════════════════════════════════
-   Activity Log Tab
-   ══════════════════════════════════════════════ */
-.cal-is-activity {
+.cal-overlay-dot { opacity: 0.4; }
+
+.cal-overlay-project {
+  font-family: var(--font-mono, monospace);
+  color: var(--purple-600);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.cal-overlay-close {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: rgba(0, 0, 0, 0.6);
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.cal-overlay-close:hover { background: rgba(0, 0, 0, 0.1); color: var(--text-primary); }
+
+/* Split content — left = summary, right = activity */
+.cal-overlay-split {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.cal-overlay-col {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  overflow: hidden;
 }
 
-.cal-is-activity-empty {
-  font-size: 9.5px;
-  opacity: 0.4;
-  text-align: center;
-  padding: 8px 0;
+.cal-overlay-col-title {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: rgba(0, 0, 0, 0.45);
+  padding: 10px 12px 6px;
+  flex-shrink: 0;
+}
+
+.cal-overlay-col--left .cal-overlay-col-title { color: var(--purple-600); }
+.cal-overlay-col--right .cal-overlay-col-title { color: #ea580c; }
+
+.cal-overlay-col-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 12px 12px;
+  scrollbar-width: thin;
+}
+
+.cal-overlay-col-body::-webkit-scrollbar { width: 4px; }
+.cal-overlay-col-body::-webkit-scrollbar-track { background: transparent; }
+.cal-overlay-col-body::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.15); border-radius: 4px; }
+
+.cal-overlay-divider {
+  width: 1px;
+  background: rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+  margin: 10px 0;
+}
+
+/* Content blocks */
+.cal-overlay-block {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.cal-overlay-block--ai {
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.06), rgba(139, 92, 246, 0.02));
+  border: 1px solid rgba(139, 92, 246, 0.15);
+}
+
+.cal-overlay-block--ai svg {
+  color: var(--purple-500);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.cal-overlay-block--ai p {
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  margin: 0;
+  font-weight: 500;
+}
+
+.cal-overlay-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(0, 0, 0, 0.45);
+  margin-bottom: 4px;
+}
+
+.cal-overlay-ptext {
+  font-size: 10px;
+  line-height: 1.5;
+  margin: 2px 0;
+  color: rgba(0, 0, 0, 0.72);
+}
+
+.cal-overlay-ptext strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cal-overlay-ptext--italic { font-style: italic; opacity: 0.82; }
+
+.cal-overlay-progress {
+  margin-top: 6px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: var(--radius-full);
+  position: relative;
+  overflow: hidden;
+}
+
+.cal-overlay-progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, var(--purple-400), var(--purple-500));
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+}
+
+.cal-overlay-progress span {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-mono, monospace);
+  line-height: 1;
+}
+
+.cal-overlay-feat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.75);
+}
+
+.cal-overlay-feat svg {
+  color: rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+}
+
+.cal-overlay-feat span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Activity column */
+.cal-overlay-empty {
+  font-size: 10px;
   font-style: italic;
+  color: rgba(0, 0, 0, 0.35);
+  text-align: center;
+  padding: 20px 0;
 }
 
-.cal-is-log {
+.cal-overlay-logs {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cal-overlay-log {
   display: flex;
   align-items: flex-start;
-  gap: 5px;
-  padding: 2.5px 4px;
-  border-radius: 3px;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 4px;
   transition: background 0.1s;
 }
 
-.cal-is-log:hover {
-  background: rgba(0, 0, 0, 0.025);
+.cal-overlay-log:hover {
+  background: rgba(0, 0, 0, 0.035);
 }
 
-.cal-is-log-time {
-  font-size: 8.5px;
-  font-weight: 500;
-  color: rgba(0, 0, 0, 0.35);
-  min-width: 38px;
+.cal-overlay-log-time {
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.4);
+  min-width: 44px;
   flex-shrink: 0;
   font-family: var(--font-mono, monospace);
-  line-height: 1.5;
+  line-height: 1.55;
   letter-spacing: -0.2px;
 }
 
-.cal-is-log-dot {
-  width: 5px;
-  height: 5px;
+.cal-overlay-log-dot {
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  margin-top: 3.5px;
+  margin-top: 4px;
 }
 
-.cal-is-log-dot--user { background: #3b82f6; }
-.cal-is-log-dot--agent { background: #a855f7; }
-.cal-is-log-dot--system { background: #6b7280; }
+.cal-overlay-log-dot--user { background: #3b82f6; }
+.cal-overlay-log-dot--agent { background: #a855f7; }
+.cal-overlay-log-dot--system { background: #6b7280; }
 
-.cal-is-log-action {
-  font-size: 9px;
+.cal-overlay-log-action {
+  font-size: 10px;
   line-height: 1.5;
-  color: rgba(0, 0, 0, 0.7);
+  color: rgba(0, 0, 0, 0.72);
   flex: 1;
   min-width: 0;
 }
 
-.cal-is-log--agent .cal-is-log-action {
-  color: rgba(128, 70, 200, 0.8);
+.cal-overlay-log--agent .cal-overlay-log-action {
+  color: rgba(128, 70, 200, 0.85);
 }
 
-.cal-is-log--system .cal-is-log-action {
-  color: rgba(0, 0, 0, 0.45);
+.cal-overlay-log--system .cal-overlay-log-action {
+  color: rgba(0, 0, 0, 0.5);
   font-style: italic;
+}
+
+/* Narrow-panel fallback: stack summary/activity vertically when panel is very narrow */
+@media (max-width: 340px) {
+  .cal-overlay-split { flex-direction: column; }
+  .cal-overlay-divider { width: auto; height: 1px; margin: 0 10px; }
 }

@@ -101,11 +101,17 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState(null)
   const [zoomLevel, setZoomLevel] = useState(56) // pixels per hour: 42, 56, 84
-  const [expandedEvent, setExpandedEvent] = useState(null) // event id to expand inline
-  const [expandedTab, setExpandedTab] = useState('summary') // 'summary' | 'activity'
-  const EXPAND_HEIGHT = 280 // fixed expanded card height in px
+  const [expandedEvent, setExpandedEvent] = useState(null) // event id for overlay
+  const [overlayOrigin, setOverlayOrigin] = useState(null) // { top, left, width, height } for unfold origin
+  const [isClosingOverlay, setIsClosingOverlay] = useState(false)
+  const [pullProgress, setPullProgress] = useState(0) // -1..1 (negative = prev day pull, positive = next day pull)
+  const [dayTransition, setDayTransition] = useState(null) // 'prev' | 'next' during day flip
   const gridRef = useRef(null)
   const searchRef = useRef(null)
+  const panelRef = useRef(null)
+  const pullAccum = useRef(0)
+  const pullTimer = useRef(null)
+  const closeTimeoutRef = useRef(null)
 
   const dateStr = formatDateStr(currentDate)
   const isToday = dateStr === '2026-04-09'
@@ -179,21 +185,12 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
     setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + dir, 1))
   }
 
-  // Compute how much extra height the expanded event needs beyond its slot
+  // Resolve the expanded event object and its rich summary for the overlay
   const expandedTask = expandedEvent ? tasks.find(t => t.id === expandedEvent) : null
-  const expandedSlotHeight = expandedTask
-    ? ((timeToMinutes(expandedTask.endTime) - timeToMinutes(expandedTask.time)) / 60) * zoomLevel
-    : 0
-  const expandExtra = expandedTask ? Math.max(0, EXPAND_HEIGHT - expandedSlotHeight) : 0
-  // The hour in which the expanded event starts — extra goes into this slot
-  const expandedStartHour = expandedTask ? parseInt(expandedTask.time.split(':')[0]) : -1
-
-  // Get extra offset for absolutely positioned elements below the expanded slot
-  const getExtraOffset = (minutes) => {
-    if (!expandedTask || expandExtra === 0) return 0
-    const thresholdMin = (expandedStartHour + 1) * 60 // start of next hour after event start
-    return minutes >= thresholdMin ? expandExtra : 0
-  }
+  const expandedSummary = useMemo(() => {
+    if (!expandedTask) return null
+    return getEventSummaryData(expandedTask, dateStr)
+  }, [expandedTask, dateStr])
 
   useEffect(() => {
     if (gridRef.current) gridRef.current.scrollTop = zoomLevel * 7
@@ -201,15 +198,91 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
 
   useEffect(() => { setSelectedDate(dateStr) }, [dateStr])
 
+  const closeOverlay = useCallback(() => {
+    setIsClosingOverlay(true)
+    clearTimeout(closeTimeoutRef.current)
+    closeTimeoutRef.current = setTimeout(() => {
+      setExpandedEvent(null)
+      setOverlayOrigin(null)
+      setIsClosingOverlay(false)
+    }, 220)
+  }, [])
+
   const handleEventClick = (e, event) => {
     e.stopPropagation()
     setSelectedEvent(event)
-    setExpandedEvent(prev => {
-      if (prev === event.id) return null
-      setExpandedTab('summary')
-      return event.id
-    })
+    if (expandedEvent === event.id) {
+      closeOverlay()
+      return
+    }
+    // Cancel any pending close so re-opening a different event doesn't play refold
+    clearTimeout(closeTimeoutRef.current)
+    setIsClosingOverlay(false)
+    const panelRect = panelRef.current?.getBoundingClientRect()
+    const blockRect = e.currentTarget.getBoundingClientRect()
+    if (panelRect) {
+      setOverlayOrigin({
+        top: blockRect.top - panelRect.top,
+        left: blockRect.left - panelRect.left,
+        width: blockRect.width,
+        height: blockRect.height,
+      })
+    }
+    setExpandedEvent(event.id)
   }
+
+  // Escape key closes the overlay
+  useEffect(() => {
+    if (!expandedEvent) return
+    const onKey = (e) => { if (e.key === 'Escape') closeOverlay() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [expandedEvent, closeOverlay])
+
+  // Infinite scroll days: overscroll at grid boundaries flips the date
+  const PULL_THRESHOLD = 140
+  const handleGridWheel = useCallback((e) => {
+    if (expandedEvent) return // don't flip days while overlay is open
+    const scroller = gridRef.current
+    if (!scroller) return
+    const atTop = scroller.scrollTop <= 0
+    const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1
+
+    if (atTop && e.deltaY < 0) {
+      pullAccum.current += e.deltaY // accumulates negative
+      if (pullAccum.current <= -PULL_THRESHOLD) {
+        setDayTransition('prev')
+        setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() - 1); return d })
+        pullAccum.current = 0
+        setPullProgress(0)
+        setTimeout(() => setDayTransition(null), 320)
+        return
+      }
+      setPullProgress(pullAccum.current / PULL_THRESHOLD)
+    } else if (atBottom && e.deltaY > 0) {
+      pullAccum.current += e.deltaY
+      if (pullAccum.current >= PULL_THRESHOLD) {
+        setDayTransition('next')
+        setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() + 1); return d })
+        pullAccum.current = 0
+        setPullProgress(0)
+        setTimeout(() => setDayTransition(null), 320)
+        return
+      }
+      setPullProgress(pullAccum.current / PULL_THRESHOLD)
+    } else {
+      if (pullAccum.current !== 0) {
+        pullAccum.current = 0
+        setPullProgress(0)
+      }
+    }
+    // Decay accumulator if user stops scrolling
+    clearTimeout(pullTimer.current)
+    pullTimer.current = setTimeout(() => {
+      pullAccum.current = 0
+      setPullProgress(0)
+    }, 240)
+  }, [expandedEvent])
 
   const handleSlotClick = (e) => {
     if (!onSlotClick) return
@@ -301,7 +374,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   }
 
   return (
-    <div className="calendar-panel">
+    <div className="calendar-panel" ref={panelRef}>
       {/* Header */}
       <div className="cal-header">
         <div className="cal-header-left">
@@ -368,12 +441,26 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
         </div>
       )}
 
+      {/* Pull-to-flip hints */}
+      {pullProgress < 0 && !expandedEvent && (
+        <div className="cal-pull-hint cal-pull-hint--top" style={{ opacity: Math.min(1, -pullProgress), transform: `translateY(${Math.min(0, pullProgress * 8)}px)` }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+          <span>Keep scrolling for previous day</span>
+        </div>
+      )}
+      {pullProgress > 0 && !expandedEvent && (
+        <div className="cal-pull-hint cal-pull-hint--bottom" style={{ opacity: Math.min(1, pullProgress), transform: `translateY(${Math.max(0, pullProgress * 8)}px)` }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          <span>Keep scrolling for next day</span>
+        </div>
+      )}
+
       {/* Time grid */}
-      <div className="cal-grid-scroll" ref={gridRef}>
+      <div className={`cal-grid-scroll ${dayTransition ? `cal-grid-scroll--${dayTransition}` : ''}`} ref={gridRef} onWheel={handleGridWheel}>
         <div className="cal-time-grid">
           <div className="cal-gutter">
             {HOURS.map(hour => (
-              <div key={hour} className="cal-time-label" style={{ height: `${zoomLevel + (hour === expandedStartHour ? expandExtra : 0)}px` }}>
+              <div key={hour} className="cal-time-label" style={{ height: `${zoomLevel}px` }}>
                 {hour > 0 && <span>{formatHourLabel(hour)}</span>}
               </div>
             ))}
@@ -381,14 +468,14 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
 
           <div className="cal-day-col" onClick={handleSlotClick}>
             {HOURS.map(hour => (
-              <div key={hour} className="cal-hour-slot" style={{ height: `${zoomLevel + (hour === expandedStartHour ? expandExtra : 0)}px` }} />
+              <div key={hour} className="cal-hour-slot" style={{ height: `${zoomLevel}px` }} />
             ))}
 
             {/* Thought blocks */}
             {thoughtSlots.map(slot => {
               const [h, m] = slot.time.split(':').map(Number)
               const minutes = h * 60 + m
-              const topOffset = (minutes / 60) * zoomLevel + getExtraOffset(minutes)
+              const topOffset = (minutes / 60) * zoomLevel
               const isActive = quickSlot?.time === slot.time
               return (
                 <div key={slot.time} className={`cal-thought-block ${isActive ? 'active' : ''}`} style={{ top: `${topOffset}px` }}
@@ -404,7 +491,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
             {quickSlot && !thoughtSlots.some(s => s.time === quickSlot.time) && (() => {
               const [h, m] = quickSlot.time.split(':').map(Number)
               const minutes = h * 60 + m
-              const topOffset = (minutes / 60) * zoomLevel + getExtraOffset(minutes)
+              const topOffset = (minutes / 60) * zoomLevel
               return (
                 <div className="cal-quick-slot" style={{ top: `${topOffset}px` }}>
                   <div className="cal-quick-slot-label">{quickSlot.label}</div>
@@ -412,109 +499,40 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               )
             })()}
 
-            {/* Event blocks */}
+            {/* Event blocks — collapsed: title + time only (progressive disclosure) */}
             {tasks.map((task) => {
               const startMin = timeToMinutes(task.time)
               const endMin = timeToMinutes(task.endTime)
               const duration = endMin - startMin
-              const topOffset = (startMin / 60) * zoomLevel + getExtraOffset(startMin)
+              const topOffset = (startMin / 60) * zoomLevel
               const height = (duration / 60) * zoomLevel
               const color = eventColors[task.colorIndex] || eventColors[0]
               const isExpanded = expandedEvent === task.id
-              const summary = isExpanded ? getEventSummaryData(task, dateStr) : null
 
               return (
                 <div
                   key={task.id}
-                  className={`cal-event-block ${selectedEvent?.id === task.id ? 'selected' : ''} ${isExpanded ? 'expanded' : ''}`}
+                  className={`cal-event-block ${selectedEvent?.id === task.id ? 'selected' : ''} ${isExpanded ? 'is-overlay-source' : ''}`}
                   style={{
                     top: `${topOffset}px`,
                     minHeight: `${Math.max(height, 24)}px`,
-                    height: isExpanded ? `${Math.max(height, EXPAND_HEIGHT)}px` : `${Math.max(height, 24)}px`,
+                    height: `${Math.max(height, 24)}px`,
                     backgroundColor: color.bg,
                     borderLeft: `4px solid ${color.border}`,
                   }}
                   onClick={(e) => handleEventClick(e, task)}
                 >
-                  <div className="cal-event-top-row">
-                    <span className="cal-event-title" style={{ color: color.text }}>{task.title}</span>
-                    {isExpanded && (
-                      <span className="cal-event-collapse-hint" style={{ color: color.text }}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="18 15 12 9 6 15"/></svg>
-                      </span>
-                    )}
-                  </div>
-                  <span className="cal-event-time" style={{ color: isExpanded ? 'var(--text-primary)' : color.text }}>
+                  <span className="cal-event-title" style={{ color: color.text }}>{task.title}</span>
+                  <span className="cal-event-time" style={{ color: color.text }}>
                     {formatTimeDisplay(task.time)} – {formatTimeDisplay(task.endTime)}
                   </span>
-
-                  {/* Expanded tabs: Summary / Activity */}
-                  {isExpanded && summary && (
-                    <div className="cal-inline-summary" onClick={(e) => e.stopPropagation()}>
-                      {/* Tab bar */}
-                      <div className="cal-is-tabs">
-                        <button className={`cal-is-tab ${expandedTab === 'summary' ? 'active' : ''}`} onClick={() => setExpandedTab('summary')}>Summary</button>
-                        <button className={`cal-is-tab ${expandedTab === 'activity' ? 'active' : ''}`} onClick={() => setExpandedTab('activity')}>Activity</button>
-                      </div>
-
-                      {/* Summary tab */}
-                      {expandedTab === 'summary' && (
-                        <>
-                          {task.aiSummary && (
-                            <div className="cal-is-row">
-                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                              <span className="cal-is-text">{task.aiSummary}</span>
-                            </div>
-                          )}
-                          {summary.approachSummary && (
-                            <div className="cal-is-approach">
-                              <span className="cal-is-label">Approach</span>
-                              <p className="cal-is-approach-text">
-                                <strong>Planned:</strong> {summary.approachSummary.plannedText}
-                              </p>
-                              <p className="cal-is-approach-text">
-                                <strong>Done:</strong> {summary.approachSummary.doneText}
-                              </p>
-                            </div>
-                          )}
-                          {summary.features.length > 0 && (
-                            <div className="cal-is-features">
-                              <span className="cal-is-label">Feature Docs</span>
-                              {summary.features.map(f => (
-                                <div key={f.id} className="cal-is-feat-row">
-                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                                  <span className="cal-is-feat-title">{f.title}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      {/* Activity tab */}
-                      {expandedTab === 'activity' && (
-                        <div className="cal-is-activity">
-                          {summary.logs.length === 0 && (
-                            <span className="cal-is-activity-empty">No activity during this time</span>
-                          )}
-                          {summary.logs.map(log => (
-                            <div key={log.id} className={`cal-is-log cal-is-log--${log.type}`}>
-                              <span className="cal-is-log-time">{formatTimeDisplay(log.time)}</span>
-                              <span className={`cal-is-log-dot cal-is-log-dot--${log.type}`} />
-                              <span className="cal-is-log-action">{log.action}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               )
             })}
 
             {/* Current time line */}
             {isToday && (
-              <div className="cal-now-line" style={{ top: `${((10 * 60 + 10) / 60) * zoomLevel + getExtraOffset(10 * 60 + 10)}px` }}>
+              <div className="cal-now-line" style={{ top: `${((10 * 60 + 10) / 60) * zoomLevel}px` }}>
                 <div className="cal-now-dot" />
                 <div className="cal-now-rule" />
               </div>
@@ -522,6 +540,108 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
           </div>
         </div>
       </div>
+
+      {/* Event Detail Overlay — unfolds from clicked event, splits into Summary | Activity */}
+      {expandedTask && expandedSummary && overlayOrigin && (() => {
+        const pw = panelRef.current?.offsetWidth || 0
+        const ph = panelRef.current?.offsetHeight || 0
+        const style = {
+          '--origin-top': `${overlayOrigin.top}px`,
+          '--origin-left': `${overlayOrigin.left}px`,
+          '--origin-right': `${Math.max(0, pw - overlayOrigin.left - overlayOrigin.width)}px`,
+          '--origin-bottom': `${Math.max(0, ph - overlayOrigin.top - overlayOrigin.height)}px`,
+          '--origin-width': `${overlayOrigin.width}px`,
+          '--origin-height': `${overlayOrigin.height}px`,
+          '--origin-bg': eventColors[expandedTask.colorIndex]?.bg || eventColors[0].bg,
+          '--origin-border': eventColors[expandedTask.colorIndex]?.border || eventColors[0].border,
+        }
+        const color = eventColors[expandedTask.colorIndex] || eventColors[0]
+        return (
+          <div className={`cal-overlay-root ${isClosingOverlay ? 'is-closing' : 'is-opening'}`} style={style}>
+            <div className="cal-overlay-backdrop" onClick={closeOverlay} />
+            <div className="cal-overlay-card" style={{ borderLeftColor: color.border }}>
+              <div className="cal-overlay-header">
+                <div className="cal-overlay-header-text">
+                  <div className="cal-overlay-title">{expandedTask.title}</div>
+                  <div className="cal-overlay-sub">
+                    <span>{formatTimeDisplay(expandedTask.time)} – {formatTimeDisplay(expandedTask.endTime)}</span>
+                    {expandedTask.project && <span className="cal-overlay-dot">·</span>}
+                    {expandedTask.project && <span className="cal-overlay-project">#{expandedTask.project}</span>}
+                  </div>
+                </div>
+                <button className="cal-overlay-close" onClick={closeOverlay} aria-label="Close">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+
+              <div className="cal-overlay-split">
+                {/* LEFT: Summary */}
+                <div className="cal-overlay-col cal-overlay-col--left">
+                  <div className="cal-overlay-col-title">Summary</div>
+                  <div className="cal-overlay-col-body">
+                    {expandedTask.aiSummary && (
+                      <div className="cal-overlay-block cal-overlay-block--ai">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        <p>{expandedTask.aiSummary}</p>
+                      </div>
+                    )}
+                    {expandedSummary.approachSummary && (
+                      <div className="cal-overlay-block">
+                        <div className="cal-overlay-label">Approach</div>
+                        <p className="cal-overlay-ptext"><strong>Planned:</strong> {expandedSummary.approachSummary.plannedText}</p>
+                        <p className="cal-overlay-ptext"><strong>Done:</strong> {expandedSummary.approachSummary.doneText}</p>
+                        <div className="cal-overlay-progress">
+                          <div className="cal-overlay-progress-bar" style={{ width: `${(expandedSummary.approachSummary.doneCount / expandedSummary.approachSummary.totalCount) * 100}%` }} />
+                          <span>{expandedSummary.approachSummary.doneCount}/{expandedSummary.approachSummary.totalCount}</span>
+                        </div>
+                      </div>
+                    )}
+                    {expandedSummary.features.length > 0 && (
+                      <div className="cal-overlay-block">
+                        <div className="cal-overlay-label">Feature Docs</div>
+                        {expandedSummary.features.map(f => (
+                          <div key={f.id} className="cal-overlay-feat">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            <span>{f.title}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {expandedSummary.agentSummary && (
+                      <div className="cal-overlay-block">
+                        <div className="cal-overlay-label">Agent Session</div>
+                        <p className="cal-overlay-ptext cal-overlay-ptext--italic">{expandedSummary.agentSummary}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="cal-overlay-divider" />
+
+                {/* RIGHT: Activity logs */}
+                <div className="cal-overlay-col cal-overlay-col--right">
+                  <div className="cal-overlay-col-title">Activity</div>
+                  <div className="cal-overlay-col-body">
+                    {expandedSummary.logs.length === 0 ? (
+                      <div className="cal-overlay-empty">No activity logged during this event</div>
+                    ) : (
+                      <div className="cal-overlay-logs">
+                        {expandedSummary.logs.map(log => (
+                          <div key={log.id} className={`cal-overlay-log cal-overlay-log--${log.type}`}>
+                            <span className="cal-overlay-log-time">{formatTimeDisplay(log.time)}</span>
+                            <span className={`cal-overlay-log-dot cal-overlay-log-dot--${log.type}`} />
+                            <span className="cal-overlay-log-action">{log.action}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
