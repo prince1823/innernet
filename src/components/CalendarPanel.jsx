@@ -235,7 +235,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const [showMiniCal, setShowMiniCal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState(null)
-  const [zoomLevel, setZoomLevel] = useState(56) // pixels per hour: 42, 56, 84
+  const [zoomLevel, setZoomLevel] = useState(56) // pixels per hour; continuous 24..240
   const [expandedEvent, setExpandedEvent] = useState(null) // event id for overlay
   const [overlayOrigin, setOverlayOrigin] = useState(null) // { top, left, width, height } for unfold origin
   const [isClosingOverlay, setIsClosingOverlay] = useState(false)
@@ -249,6 +249,19 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const pullTimer = useRef(null)
   const closeTimeoutRef = useRef(null)
   const hoverTimerRef = useRef(null)
+  const zoomAnimRef = useRef(null) // rAF handle for button-triggered zoom animations
+
+  // ── Zoom Continuity ──
+  // Continuous range — 24 px/hr (whole day compressed) to 240 px/hr (fine-grained).
+  const MIN_ZOOM = 24
+  const MAX_ZOOM = 240
+  // Sub-hour tick opacities interpolate with zoom so granularity fades in/out
+  // instead of snapping. At 48 px/hr the 30-min ticks begin appearing; at 72
+  // they are fully visible. At 96 the 15-min ticks start; at 120 they are full.
+  const halfOpacity = Math.max(0, Math.min(1, (zoomLevel - 48) / 24))
+  const quarterOpacity = Math.max(0, Math.min(1, (zoomLevel - 96) / 24))
+  // At very low zoom the hour labels overlap — thin them to every other hour.
+  const labelStride = zoomLevel < 32 ? 2 : 1
 
   const dateStr = formatDateStr(currentDate)
   const TODAY_STR = '2026-04-09'
@@ -337,6 +350,62 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const goToNext = () => setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() + 1); return d })
   const goToToday = () => setCurrentDate(new Date(2026, 3, 9))
 
+  // Animated zoom — used by +/− buttons. Tweens zoomLevel AND scrollTop over
+  // ~260ms so the time point at the viewport center stays visually anchored.
+  // Without this, zooming in makes the viewport "scroll" as events grow taller.
+  const animateZoomTo = useCallback((targetZoom) => {
+    if (zoomAnimRef.current) cancelAnimationFrame(zoomAnimRef.current)
+    const scroller = gridRef.current
+    if (!scroller) { setZoomLevel(targetZoom); return }
+    const startZoom = zoomLevel
+    if (startZoom === targetZoom) return
+    const viewportH = scroller.clientHeight
+    const anchorPx = scroller.scrollTop + viewportH / 2
+    const anchorMin = (anchorPx / startZoom) * 60
+    const startTime = performance.now()
+    const duration = 260
+    const step = (now) => {
+      const t = Math.min(1, (now - startTime) / duration)
+      const eased = 1 - Math.pow(1 - t, 3) // ease-out cubic
+      const z = startZoom + (targetZoom - startZoom) * eased
+      setZoomLevel(z)
+      const newAnchorPx = (anchorMin / 60) * z
+      scroller.scrollTop = newAnchorPx - viewportH / 2
+      if (t < 1) {
+        zoomAnimRef.current = requestAnimationFrame(step)
+      } else {
+        zoomAnimRef.current = null
+      }
+    }
+    zoomAnimRef.current = requestAnimationFrame(step)
+  }, [zoomLevel])
+
+  const zoomIn = () => animateZoomTo(Math.min(zoomLevel + 24, MAX_ZOOM))
+  const zoomOut = () => animateZoomTo(Math.max(zoomLevel - 24, MIN_ZOOM))
+
+  // Cmd/Ctrl + wheel: continuous zoom anchored on the cursor position.
+  // The point in time under the cursor stays under the cursor as zoom changes.
+  const handleZoomWheel = useCallback((e) => {
+    if (zoomAnimRef.current) cancelAnimationFrame(zoomAnimRef.current)
+    const scroller = gridRef.current
+    if (!scroller) return
+    // Normalize delta — some devices report big jumps, clamp for sanity
+    const delta = Math.max(-80, Math.min(80, -e.deltaY)) * 0.35
+    const rect = scroller.getBoundingClientRect()
+    const cursorY = e.clientY - rect.top + scroller.scrollTop
+    setZoomLevel(prev => {
+      const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, prev + delta))
+      if (next === prev) return prev
+      // Re-anchor scroll so cursor stays over the same minute
+      const anchorMin = (cursorY / prev) * 60
+      requestAnimationFrame(() => {
+        const newCursorPx = (anchorMin / 60) * next
+        scroller.scrollTop = newCursorPx - (e.clientY - rect.top)
+      })
+      return next
+    })
+  }, [])
+
   const handleMiniCalClick = (day, inMonth) => {
     if (!inMonth) return
     const d = new Date(currentDate.getFullYear(), currentDate.getMonth(), day)
@@ -357,7 +426,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
 
   useEffect(() => {
     if (gridRef.current) gridRef.current.scrollTop = zoomLevel * 7
-  }, [currentDate, zoomLevel])
+  }, [currentDate]) // only on day change — zoom changes manage their own scroll anchor
 
   useEffect(() => { setSelectedDate(dateStr) }, [dateStr])
 
@@ -424,6 +493,12 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   // Infinite scroll days: overscroll at grid boundaries flips the date
   const PULL_THRESHOLD = 140
   const handleGridWheel = useCallback((e) => {
+    // Cmd/Ctrl + wheel: zoom the time axis (pre-empts day-flipping)
+    if (e.metaKey || e.ctrlKey) {
+      e.preventDefault()
+      handleZoomWheel(e)
+      return
+    }
     if (expandedEvent) return // don't flip days while overlay is open
     const scroller = gridRef.current
     if (!scroller) return
@@ -464,7 +539,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
       pullAccum.current = 0
       setPullProgress(0)
     }, 240)
-  }, [expandedEvent])
+  }, [expandedEvent, handleZoomWheel])
 
   const handleSlotClick = (e) => {
     if (!onSlotClick) return
@@ -801,10 +876,10 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           </button>
           <div className="cal-zoom-btns">
-            <button className="cal-zoom-btn" onClick={() => setZoomLevel(z => Math.max(z - 14, 28))} title="Zoom out">
+            <button className="cal-zoom-btn" onClick={zoomOut} disabled={zoomLevel <= MIN_ZOOM + 0.5} title="Zoom out (or hold Cmd/Ctrl and scroll)">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
-            <button className="cal-zoom-btn" onClick={() => setZoomLevel(z => Math.min(z + 14, 112))} title="Zoom in">
+            <button className="cal-zoom-btn" onClick={zoomIn} disabled={zoomLevel >= MAX_ZOOM - 0.5} title="Zoom in (or hold Cmd/Ctrl and scroll)">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
           </div>
@@ -870,15 +945,58 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
           <div className="cal-gutter">
             {HOURS.map(hour => (
               <div key={hour} className="cal-time-label" style={{ height: `${zoomLevel}px` }}>
-                {hour > 0 && <span>{formatHourLabel(hour)}</span>}
+                {hour > 0 && hour % labelStride === 0 && <span>{formatHourLabel(hour)}</span>}
               </div>
             ))}
+            {/* Sub-hour gutter labels — fade in with zoom. :30 appears first,
+               then :15 and :45 as the user zooms in further. */}
+            {halfOpacity > 0.01 && HOURS.map(hour => (
+              <div
+                key={`sub-${hour}-30`}
+                className="cal-subtick-label cal-subtick-label--half"
+                style={{ top: `${((hour * 60 + 30) / 60) * zoomLevel}px`, opacity: halfOpacity * 0.75 }}
+              >:30</div>
+            ))}
+            {quarterOpacity > 0.01 && HOURS.flatMap(hour => [
+              <div
+                key={`sub-${hour}-15`}
+                className="cal-subtick-label cal-subtick-label--quarter"
+                style={{ top: `${((hour * 60 + 15) / 60) * zoomLevel}px`, opacity: quarterOpacity * 0.55 }}
+              >:15</div>,
+              <div
+                key={`sub-${hour}-45`}
+                className="cal-subtick-label cal-subtick-label--quarter"
+                style={{ top: `${((hour * 60 + 45) / 60) * zoomLevel}px`, opacity: quarterOpacity * 0.55 }}
+              >:45</div>,
+            ])}
           </div>
 
           <div className={`cal-day-col cal-day-col--${dayRelation}`} onClick={handleSlotClick}>
             {HOURS.map(hour => (
               <div key={hour} className="cal-hour-slot" style={{ height: `${zoomLevel}px` }} />
             ))}
+            {/* Sub-hour grid lines — dashed hairlines that fade in with zoom.
+               30-min ticks are stronger than 15-min ticks. z-index 1 so they
+               sit above the hour slots but below events (z 2+). */}
+            {halfOpacity > 0.01 && HOURS.map(hour => (
+              <div
+                key={`tick-${hour}-30`}
+                className="cal-subtick cal-subtick--half"
+                style={{ top: `${((hour * 60 + 30) / 60) * zoomLevel}px`, opacity: halfOpacity }}
+              />
+            ))}
+            {quarterOpacity > 0.01 && HOURS.flatMap(hour => [
+              <div
+                key={`tick-${hour}-15`}
+                className="cal-subtick cal-subtick--quarter"
+                style={{ top: `${((hour * 60 + 15) / 60) * zoomLevel}px`, opacity: quarterOpacity * 0.7 }}
+              />,
+              <div
+                key={`tick-${hour}-45`}
+                className="cal-subtick cal-subtick--quarter"
+                style={{ top: `${((hour * 60 + 45) / 60) * zoomLevel}px`, opacity: quarterOpacity * 0.7 }}
+              />,
+            ])}
 
             {/* Thought blocks */}
             {thoughtSlots.map(slot => {

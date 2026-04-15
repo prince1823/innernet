@@ -717,7 +717,6 @@
   justify-content: flex-end;
   padding-right: 6px;
   position: relative;
-  transition: height 0.2s ease;
 }
 
 .cal-time-label span {
@@ -727,6 +726,45 @@
   transform: translateY(-7px);
   font-family: var(--font-sans);
   white-space: nowrap;
+}
+
+/* ── Sub-hour Ticks (Zoom Continuity) ── */
+/* Sub-hour hairlines inside the day column. Opacity is set inline and
+   interpolates with zoomLevel for a continuous fade, not a discrete switch. */
+.cal-subtick {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.cal-subtick--half {
+  border-top: 1px dashed rgba(112, 117, 122, 0.35);
+}
+
+.cal-subtick--quarter {
+  border-top: 1px dashed rgba(112, 117, 122, 0.22);
+}
+
+/* Sub-hour labels in the gutter — :30, :15, :45.
+   Positioned absolutely so they can overlap the hour labels as zoom changes. */
+.cal-subtick-label {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-6px);
+  font-size: 9px;
+  font-weight: 400;
+  color: #9aa0a6;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.cal-subtick-label--quarter {
+  font-size: 8px;
+  color: #b4b8bd;
 }
 
 /* ── Day Column ── */
@@ -739,7 +777,7 @@
   height: 56px;
   border-bottom: 1px solid #e8eaed;
   cursor: pointer;
-  transition: background 0.15s, height 0.2s ease;
+  transition: background 0.15s;
 }
 
 .cal-hour-slot:hover { background: rgba(245, 158, 11, 0.04); }
