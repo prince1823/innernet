@@ -116,10 +116,26 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const hoverTimerRef = useRef(null)
 
   const dateStr = formatDateStr(currentDate)
-  const isToday = dateStr === '2026-04-09'
+  const TODAY_STR = '2026-04-09'
+  const NOW_MIN = 10 * 60 + 10 // hardcoded 'now' at 10:10 to match cal-now-line
+  const isToday = dateStr === TODAY_STR
+  const dayRelation = dateStr < TODAY_STR ? 'past' : dateStr > TODAY_STR ? 'future' : 'today'
+  const nowPx = (NOW_MIN / 60) * zoomLevel
   const headerLabel = `${currentDate.getDate()} ${MONTHS[currentDate.getMonth()]} ${currentDate.getFullYear()}`
 
   const tasks = calendarTasks[dateStr] || []
+
+  // Classify an event's relationship to "now" for the temporal fade/glow treatment
+  const getTemporalState = (task) => {
+    if (dayRelation === 'past') return 'past'
+    if (dayRelation === 'future') return 'future'
+    // today — event is past if fully before now, future if fully after, else 'now' (brackets now)
+    const start = timeToMinutes(task.time)
+    const end = timeToMinutes(task.endTime)
+    if (end <= NOW_MIN) return 'past'
+    if (start >= NOW_MIN) return 'future'
+    return 'now'
+  }
 
   const monthGrid = useMemo(() => getMonthGrid(currentDate.getFullYear(), currentDate.getMonth()), [currentDate.getFullYear(), currentDate.getMonth()])
 
@@ -478,7 +494,10 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
 
       {/* Time grid */}
       <div className={`cal-grid-scroll ${dayTransition ? `cal-grid-scroll--${dayTransition}` : ''}`} ref={gridRef} onWheel={handleGridWheel}>
-        <div className="cal-time-grid">
+        <div
+          className={`cal-time-grid cal-time-grid--${dayRelation}`}
+          style={{ '--now-px': `${nowPx}px` }}
+        >
           <div className="cal-gutter">
             {HOURS.map(hour => (
               <div key={hour} className="cal-time-label" style={{ height: `${zoomLevel}px` }}>
@@ -487,7 +506,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
             ))}
           </div>
 
-          <div className="cal-day-col" onClick={handleSlotClick}>
+          <div className={`cal-day-col cal-day-col--${dayRelation}`} onClick={handleSlotClick}>
             {HOURS.map(hour => (
               <div key={hour} className="cal-hour-slot" style={{ height: `${zoomLevel}px` }} />
             ))}
@@ -529,11 +548,12 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               const height = (duration / 60) * zoomLevel
               const color = eventColors[task.colorIndex] || eventColors[0]
               const isExpanded = expandedEvent === task.id
+              const temporal = getTemporalState(task)
 
               return (
                 <div
                   key={task.id}
-                  className={`cal-event-block ${selectedEvent?.id === task.id ? 'selected' : ''} ${isExpanded ? 'is-overlay-source' : ''}`}
+                  className={`cal-event-block cal-event-block--${temporal} ${selectedEvent?.id === task.id ? 'selected' : ''} ${isExpanded ? 'is-overlay-source' : ''}`}
                   style={{
                     top: `${topOffset}px`,
                     minHeight: `${Math.max(height, 24)}px`,

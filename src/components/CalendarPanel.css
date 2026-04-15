@@ -492,6 +492,86 @@
 .cal-event-block:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12); z-index: 3; }
 .cal-event-block.selected { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); z-index: 4; }
 
+/* ── Temporal Awareness ── */
+/* "Past" events fade and desaturate — they've already happened.
+   "Future" events pop slightly — they're what's ahead.
+   "Now" events glow — this is live. Hovering any state restores full color. */
+.cal-event-block {
+  transition: box-shadow 0.15s ease, opacity 0.35s ease, filter 0.35s ease, transform 0.35s ease;
+}
+
+.cal-event-block--past {
+  opacity: 0.68;
+  filter: saturate(0.72) brightness(0.99);
+}
+
+.cal-event-block--past:hover {
+  opacity: 1;
+  filter: saturate(1) brightness(1);
+}
+
+.cal-event-block--future {
+  opacity: 1;
+  filter: saturate(1.1) brightness(1.02);
+}
+
+.cal-event-block--now {
+  opacity: 1;
+  filter: saturate(1.15) brightness(1.04);
+  box-shadow:
+    0 0 0 2px rgba(139, 92, 246, 0.18),
+    0 4px 16px rgba(139, 92, 246, 0.14);
+  animation: cal-now-pulse 2.8s ease-in-out infinite;
+}
+
+@keyframes cal-now-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 2px rgba(139, 92, 246, 0.18),
+      0 4px 16px rgba(139, 92, 246, 0.14);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(139, 92, 246, 0.28),
+      0 6px 22px rgba(139, 92, 246, 0.22);
+  }
+}
+
+/* Day-level treatments: past day → dim everything slightly,
+   future day → very subtle brightness bump.
+   Use a CSS filter on the day column so hour lines and thoughts inherit too. */
+.cal-time-grid--past .cal-day-col {
+  filter: saturate(0.82) brightness(0.99);
+}
+
+.cal-time-grid--future .cal-day-col {
+  filter: saturate(1.04) brightness(1.01);
+}
+
+/* Today — gradient overlay that shifts around the NOW line.
+   Past region of the day above --now-px is slightly cooler/dimmer,
+   future region below --now-px is slightly warmer/brighter.
+   Pointer-events: none so it never blocks clicks. */
+.cal-day-col--today::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(148, 163, 184, 0.06) 0%,
+    rgba(148, 163, 184, 0.03) calc(var(--now-px, 0px) - 40px),
+    rgba(255, 255, 255, 0) var(--now-px, 0px),
+    rgba(251, 191, 36, 0.025) calc(var(--now-px, 0px) + 40px),
+    rgba(251, 191, 36, 0.05) 100%
+  );
+  transition: background 0.4s ease;
+}
+
 .cal-event-title {
   font-size: 12px;
   font-weight: 600;
