@@ -12,6 +12,9 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [thoughts, setThoughts] = useState({})
   const [quickSlot, setQuickSlot] = useState(null)
+  // User-created events from the natural-language scheduler — keyed by date
+  // string, same shape as calendarTasks. Merged with static data in the panel.
+  const [userEvents, setUserEvents] = useState({})
 
   // Bottom panel state
   const [bottomCollapsed, setBottomCollapsed] = useState(false)
@@ -26,7 +29,7 @@ function App() {
 
   // Auto-select first event of the day
   useEffect(() => {
-    const dayEvents = calendarTasks[selectedDate] || []
+    const dayEvents = [...(calendarTasks[selectedDate] || []), ...(userEvents[selectedDate] || [])]
     if (dayEvents.length > 0) {
       setSelectedEvent(dayEvents[0])
     } else {
@@ -34,6 +37,17 @@ function App() {
     }
     setQuickSlot(null)
   }, [selectedDate])
+
+  // Called when the search box parses a "schedule …" intent. Appends the new
+  // event to userEvents so the calendar merges it alongside the static data.
+  const handleScheduleEvent = useCallback((date, event) => {
+    setUserEvents(prev => ({
+      ...prev,
+      [date]: [...(prev[date] || []), event],
+    }))
+    setSelectedDate(date)
+    setSelectedEvent(event)
+  }, [])
 
   const handleSlotClick = useCallback((time, label) => {
     setSelectedEvent(null)
@@ -151,6 +165,8 @@ function App() {
             onQuickSlotClear={clearQuickSlot}
             quickSlot={quickSlot}
             thoughts={thoughts}
+            userEvents={userEvents}
+            onScheduleEvent={handleScheduleEvent}
           />
         </aside>
       )}

@@ -44,10 +44,14 @@ function getMonthGrid(year, month) {
   return grid
 }
 
-// Get all events across all dates for search
-function getAllEvents() {
+// Get all events across all dates for search. Merges static calendarTasks
+// with any user-created events passed in.
+function getAllEvents(userEvents = {}) {
   const all = []
   Object.entries(calendarTasks).forEach(([date, events]) => {
+    events.forEach(ev => all.push({ ...ev, date }))
+  })
+  Object.entries(userEvents).forEach(([date, events]) => {
     events.forEach(ev => all.push({ ...ev, date }))
   })
   return all
@@ -93,6 +97,118 @@ function getEventSummaryData(event, dateStr) {
   })
 
   return { features, approachSummary, agentSummary, logs }
+}
+
+// ── Natural-language Scheduling ─────────────────────────────────────────
+// Parses phrases like "schedule a meeting with tanuj on 10 april 3 pm" into
+// a structured event spec. Requires a resolvable date AND time to match — if
+// either is missing we return null and let the search fall through.
+
+const MONTH_MAP = {
+  jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
+  apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6,
+  aug: 7, august: 7, sep: 8, sept: 8, september: 8,
+  oct: 9, october: 9, nov: 10, november: 10, dec: 11, december: 11,
+}
+const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+
+function capitalizeWord(s) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s
+}
+
+function parseDateFromText(q, todayStr) {
+  const today = new Date(todayStr + 'T00:00:00')
+  if (/\btoday\b/.test(q)) return formatDateStr(today)
+  if (/\btomorrow\b/.test(q)) {
+    const d = new Date(today); d.setDate(d.getDate() + 1); return formatDateStr(d)
+  }
+  const wdMatch = q.match(/\b(next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/)
+  if (wdMatch) {
+    const targetIdx = WEEKDAYS.indexOf(wdMatch[2])
+    const next = !!wdMatch[1]
+    const d = new Date(today)
+    let diff = (targetIdx - d.getDay() + 7) % 7
+    if (diff === 0) diff = 7
+    if (next) diff += 7
+    d.setDate(d.getDate() + diff)
+    return formatDateStr(d)
+  }
+  // "10 april", "10th apr", "april 10", "apr 10th"
+  const dayFirst = q.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b/)
+  const monthFirst = q.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\s+(\d{1,2})(?:st|nd|rd|th)?\b/)
+  let day = null, monthName = null
+  if (dayFirst) { day = parseInt(dayFirst[1], 10); monthName = dayFirst[2] }
+  else if (monthFirst) { day = parseInt(monthFirst[2], 10); monthName = monthFirst[1] }
+  if (day != null && monthName != null) {
+    const monthIdx = MONTH_MAP[monthName]
+    if (monthIdx != null && day >= 1 && day <= 31) {
+      // Anchor to the year of todayStr — year rollover intentionally ignored
+      // for simplicity; users can type the year explicitly in a future pass.
+      return formatDateStr(new Date(today.getFullYear(), monthIdx, day))
+    }
+  }
+  return null
+}
+
+function parseTimeFromText(q) {
+  // 12-hour: "3 pm", "3pm", "3:30pm", "at 11:15 am"
+  const m12 = q.match(/\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/)
+  if (m12) {
+    let h = parseInt(m12[1], 10)
+    const mm = m12[2] ? parseInt(m12[2], 10) : 0
+    const period = m12[3]
+    if (h < 1 || h > 12 || mm > 59) return null
+    if (period === 'pm' && h !== 12) h += 12
+    if (period === 'am' && h === 12) h = 0
+    return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
+  }
+  // 24-hour: "15:00", "at 9:30" — require colon to avoid swallowing day numbers
+  const m24 = q.match(/\bat\s+(\d{1,2}):(\d{2})\b/) || q.match(/\b(\d{1,2}):(\d{2})\b/)
+  if (m24) {
+    const h = parseInt(m24[1], 10)
+    const mm = parseInt(m24[2], 10)
+    if (h <= 23 && mm <= 59) return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
+  }
+  return null
+}
+
+const EVENT_TYPE_RE = /\b(meeting|call|sync|standup|catchup|catch[- ]up|chat|1:1|one[- ]on[- ]one|interview|review|lunch|coffee|event)\b/
+
+function parseScheduleQuery(rawQuery, todayStr) {
+  const q = rawQuery.toLowerCase().trim()
+  if (!q) return null
+  // Intent gate: must start with an action verb OR mention both "schedule"
+  // (or similar) and a recognized event type somewhere.
+  const hasIntent = /^(schedule|add|create|book|set\s*up|new)\b/.test(q) ||
+    (/(schedule|book|add|create)/.test(q) && EVENT_TYPE_RE.test(q))
+  if (!hasIntent) return null
+
+  const typeMatch = q.match(EVENT_TYPE_RE)
+  const type = typeMatch ? typeMatch[1].replace(/[- ]/g, ' ') : 'meeting'
+
+  // Attendees: capture everything after "with " until we hit a boundary word
+  let attendees = []
+  const withMatch = q.match(/\bwith\s+(.+?)(?=\s+(?:on|at|for|about|tomorrow|today|next|this|from)\b|\s+\d|$)/)
+  if (withMatch) {
+    attendees = withMatch[1]
+      .split(/,|\band\b|&/)
+      .map(s => s.trim())
+      .filter(Boolean)
+      .map(name => name.split(/\s+/).map(capitalizeWord).join(' '))
+  }
+
+  const date = parseDateFromText(q, todayStr)
+  const time = parseTimeFromText(q)
+  if (!date || !time) return null
+  return { type, attendees, date, time }
+}
+
+function addMinutesToTimeStr(timeStr, minutes) {
+  const [h, m] = timeStr.split(':').map(Number)
+  const total = h * 60 + m + minutes
+  const nh = Math.min(23, Math.floor(total / 60))
+  const nm = total % 60
+  return `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}`
 }
 
 // ── Time Queries ─────────────────────────────────────────────────────────
@@ -168,9 +284,9 @@ function scoreEventProductivity(ev) {
   return { score, logCount, userLogCount, agentLogCount, sessionCount, doneCount, totalAction, duration }
 }
 
-function runTimeQuery(parsed, currentDateStr) {
+function runTimeQuery(parsed, currentDateStr, userEvents = {}) {
   if (parsed.kind === 'productivity') {
-    const all = getAllEvents()
+    const all = getAllEvents(userEvents)
     const scored = all
       .map(ev => ({ ev, ...scoreEventProductivity(ev) }))
       .filter(r => r.score > 0)
@@ -179,7 +295,7 @@ function runTimeQuery(parsed, currentDateStr) {
   }
   if (parsed.kind === 'timeOn') {
     const needle = parsed.project.toLowerCase()
-    const all = getAllEvents()
+    const all = getAllEvents(userEvents)
     const matches = all.filter(ev =>
       ev.project?.toLowerCase().includes(needle) ||
       ev.tags?.some(t => t.toLowerCase().includes(needle))
@@ -196,14 +312,17 @@ function runTimeQuery(parsed, currentDateStr) {
     return { kind: 'timeOn', project: parsed.project, totalMin, events: matches, byDate }
   }
   if (parsed.kind === 'meetings') {
-    const all = getAllEvents()
+    const all = getAllEvents(userEvents)
     const meetings = all
       .filter(ev => ev.attendees && ev.attendees.length > 0)
       .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
     return { kind: 'meetings', events: meetings }
   }
   if (parsed.kind === 'freeTime') {
-    const dayEvents = [...(calendarTasks[currentDateStr] || [])].sort(
+    const dayEvents = [
+      ...(calendarTasks[currentDateStr] || []),
+      ...((userEvents && userEvents[currentDateStr]) || []),
+    ].sort(
       (a, b) => timeToMinutes(a.time) - timeToMinutes(b.time)
     )
     const DAY_START = 9 * 60
@@ -230,7 +349,7 @@ function formatDuration(mins) {
   return m === 0 ? `${h}h` : `${h}h ${m}m`
 }
 
-export default function CalendarPanel({ selectedDate, setSelectedDate, selectedEvent, setSelectedEvent, onSlotClick, onQuickNoteAdd, onQuickSlotClear, quickSlot, thoughts = {}, onDatePanelOpen }) {
+export default function CalendarPanel({ selectedDate, setSelectedDate, selectedEvent, setSelectedEvent, onSlotClick, onQuickNoteAdd, onQuickSlotClear, quickSlot, thoughts = {}, onDatePanelOpen, userEvents = {}, onScheduleEvent }) {
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 9))
   const [showMiniCal, setShowMiniCal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -274,7 +393,11 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const nowPx = (NOW_MIN / 60) * zoomLevel
   const headerLabel = `${currentDate.getDate()} ${MONTHS[currentDate.getMonth()]} ${currentDate.getFullYear()}`
 
-  const tasks = calendarTasks[dateStr] || []
+  // Merge static events with any user-scheduled ones for this date
+  const tasks = useMemo(
+    () => [...(calendarTasks[dateStr] || []), ...((userEvents && userEvents[dateStr]) || [])],
+    [dateStr, userEvents]
+  )
 
   // Classify an event's relationship to "now" for the temporal fade/glow treatment
   const getTemporalState = (task) => {
@@ -310,17 +433,48 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
       setSearchResults({ kind: 'empty' })
       return
     }
-    // Try time-query intent first
+    // Schedule intent first — "schedule a meeting with tanuj on 10 april 3pm".
+    // If parseScheduleQuery succeeds we create the event, jump to its date,
+    // and clear the search. Falls through to other intents if it doesn't match.
+    const schedule = parseScheduleQuery(query, TODAY_STR)
+    if (schedule && onScheduleEvent) {
+      const endTime = addMinutesToTimeStr(schedule.time, 60)
+      const typeTitle = schedule.type
+        .split(' ')
+        .map(w => w === '1:1' ? '1:1' : capitalizeWord(w))
+        .join(' ')
+      const title = schedule.attendees.length
+        ? `${typeTitle} with ${schedule.attendees.join(', ')}`
+        : typeTitle
+      const newEvent = {
+        id: `U-${Date.now().toString(36)}`,
+        title,
+        time: schedule.time,
+        endTime,
+        colorIndex: 4,
+        tags: [],
+        attendees: schedule.attendees,
+        userCreated: true,
+      }
+      onScheduleEvent(schedule.date, newEvent)
+      // Navigate the calendar view to the new event's day
+      const nd = new Date(schedule.date + 'T00:00:00')
+      setCurrentDate(nd)
+      setSearchResults(null)
+      setSearchQuery('')
+      return
+    }
+    // Try time-query intent next
     const parsed = parseTimeQuery(query)
     if (parsed) {
-      const result = runTimeQuery(parsed, dateStr)
+      const result = runTimeQuery(parsed, dateStr, userEvents)
       if (result) {
         setSearchResults(result)
         return
       }
     }
     const q = query.toLowerCase().trim()
-    const allEvents = getAllEvents()
+    const allEvents = getAllEvents(userEvents)
     let filtered
 
     if (q.startsWith('#')) {
@@ -347,7 +501,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
       grouped[ev.date].push(ev)
     })
     setSearchResults({ kind: 'search', grouped })
-  }, [dateStr])
+  }, [dateStr, userEvents, onScheduleEvent])
 
   const goToPrev = () => setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() - 1); return d })
   const goToNext = () => setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() + 1); return d })
@@ -446,11 +600,13 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   // Hover peek: show a small floating preview card after a short delay
   const handleEventEnter = useCallback((event) => {
     if (expandedEvent) return
+    // Future events have no summary/activity yet — suppress the hover peek
+    if (getTemporalState(event) === 'future') return
     clearTimeout(hoverTimerRef.current)
     hoverTimerRef.current = setTimeout(() => {
       setHoveredEventId(event.id)
     }, 380)
-  }, [expandedEvent])
+  }, [expandedEvent, dayRelation])
 
   const handleEventLeave = useCallback(() => {
     clearTimeout(hoverTimerRef.current)
@@ -464,6 +620,8 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
 
   const handleEventClick = (e, event) => {
     e.stopPropagation()
+    // Future events have no summary/activity to show yet — clicking is inert
+    if (getTemporalState(event) === 'future') return
     setSelectedEvent(event)
     if (expandedEvent === event.id) {
       closeOverlay()
@@ -586,7 +744,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               <input
                 ref={searchRef}
                 type="text"
-                placeholder="Try: when was I most productive?"
+                placeholder="Ask, search, or schedule — “meeting with Tanuj on 10 Apr 3pm”"
                 value={searchQuery}
                 onChange={e => handleSearch(e.target.value)}
                 autoFocus
@@ -607,6 +765,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                 'How much time on innernet?',
                 'When are my meetings?',
                 'Free time today',
+                'Schedule a meeting with Tanuj on 16 April 3 pm',
               ].map(s => (
                 <button key={s} className="cal-query-suggest-btn" onClick={() => handleSearch(s)}>
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -908,7 +1067,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
           <div className="cal-mini-grid">
             {monthGrid.map((cell, i) => {
               const cellDate = cell.inMonth ? formatDateStr(new Date(currentDate.getFullYear(), currentDate.getMonth(), cell.day)) : null
-              const hasEvents = cellDate && calendarTasks[cellDate]?.length > 0
+              const hasEvents = cellDate && ((calendarTasks[cellDate]?.length > 0) || (userEvents?.[cellDate]?.length > 0))
               const isSelected = cellDate === dateStr
               const isTodayCell = cellDate === '2026-04-09'
               return (
