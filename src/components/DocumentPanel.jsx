@@ -444,6 +444,16 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
       const newId = newBlockId()
       const newBlock = { id: newId, text: after, children: [] }
 
+      // If the current block is top-level, stamp the new sibling with the current time
+      const currentTree = trees[selectedDate] || materializeTree(selectedDate, legacyEditsRef.current)
+      const ctx = findContext(currentTree, blockId)
+      if (ctx && ctx.parentChain.length === 0) {
+        const now = new Date()
+        const hh = now.getHours().toString().padStart(2, '0')
+        const mm = now.getMinutes().toString().padStart(2, '0')
+        newBlock.time = `${hh}:${mm}`
+      }
+
       applyTreeOp(tree => {
         const withText = setBlockText(tree, blockId, before)
         return insertSiblingAfter(withText, blockId, newBlock)
