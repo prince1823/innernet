@@ -1856,21 +1856,6 @@
    SEMANTIC ZOOM VIEWS
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── Zoom level label between buttons ── */
-.cal-zoom-level-label {
-  font-size: 9px;
-  font-weight: 600;
-  color: var(--purple-600, #7c3aed);
-  padding: 0 6px;
-  display: flex;
-  align-items: center;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-  border-right: 1px solid #dadce0;
-  background: var(--purple-50, #f5f3ff);
-  white-space: nowrap;
-}
-
 /* ── View Mode 1: Schedule List View ── */
 .cal-schedule-view {
   flex: 1;
