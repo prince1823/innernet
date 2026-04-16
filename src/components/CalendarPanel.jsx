@@ -1318,43 +1318,37 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               </div>
               <div className="cal-detail-stacked">
                 <div className="cal-detail-section">
-                  <div className="cal-overlay-col-title">Summary</div>
-                  <div className="cal-overlay-col-body">
-                    {ev.aiSummary && (
-                      <div className="cal-overlay-block cal-overlay-block--ai">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                        <p>{ev.aiSummary}</p>
-                      </div>
-                    )}
-                    {summary.approachSummary && (
-                      <div className="cal-overlay-block">
-                        <div className="cal-overlay-label">Approach</div>
-                        <p className="cal-overlay-ptext"><strong>Planned:</strong> {summary.approachSummary.plannedText}</p>
-                        <p className="cal-overlay-ptext"><strong>Done:</strong> {summary.approachSummary.doneText}</p>
-                        <div className="cal-overlay-progress">
-                          <div className="cal-overlay-progress-bar" style={{ width: `${(summary.approachSummary.doneCount / summary.approachSummary.totalCount) * 100}%` }} />
-                          <span>{summary.approachSummary.doneCount}/{summary.approachSummary.totalCount}</span>
-                        </div>
-                      </div>
-                    )}
-                    {summary.features.length > 0 && (
-                      <div className="cal-overlay-block">
-                        <div className="cal-overlay-label">Feature Docs</div>
-                        {summary.features.map(f => (
-                          <div key={f.id} className="cal-overlay-feat">
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                            <span>{f.title}</span>
+                  {ev.aiSummary && (
+                    <p className="cal-detail-summary-text">{ev.aiSummary}</p>
+                  )}
+                  {(summary.approachSummary || summary.features.length > 0 || summary.agentSummary) && (
+                    <div className="cal-detail-meta">
+                      {summary.approachSummary && (
+                        <>
+                          <div className="cal-detail-meta-row">
+                            <span className="cal-detail-meta-label">Planned</span>
+                            <span className="cal-detail-meta-value">{summary.approachSummary.plannedText}</span>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                    {summary.agentSummary && (
-                      <div className="cal-overlay-block">
-                        <div className="cal-overlay-label">Agent Session</div>
-                        <p className="cal-overlay-ptext cal-overlay-ptext--italic">{summary.agentSummary}</p>
-                      </div>
-                    )}
-                  </div>
+                          <div className="cal-detail-meta-row">
+                            <span className="cal-detail-meta-label">Done</span>
+                            <span className="cal-detail-meta-value">{summary.approachSummary.doneText}</span>
+                          </div>
+                        </>
+                      )}
+                      {summary.features.length > 0 && (
+                        <div className="cal-detail-meta-row">
+                          <span className="cal-detail-meta-label">Docs</span>
+                          <span className="cal-detail-meta-value">{summary.features.map(f => f.title).join(', ')}</span>
+                        </div>
+                      )}
+                      {summary.agentSummary && (
+                        <div className="cal-detail-meta-row">
+                          <span className="cal-detail-meta-label">Agent</span>
+                          <span className="cal-detail-meta-value cal-detail-meta-value--italic">{summary.agentSummary}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="cal-detail-section">
                   <button className="cal-detail-activity-toggle" onClick={() => setActivityExpanded(prev => !prev)}>
@@ -1511,45 +1505,92 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               </div>
 
               <div className="cal-detail-stacked">
-                {/* Summary — full width */}
+                {/* Summary — flowing layout */}
                 <div className="cal-detail-section">
-                  <div className="cal-overlay-col-title">Summary</div>
-                  <div className="cal-overlay-col-body">
-                    {ev.aiSummary && (
-                      <div className="cal-overlay-block cal-overlay-block--ai">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                        <p>{ev.aiSummary}</p>
-                      </div>
-                    )}
-                    {summary.approachSummary && (
-                      <div className="cal-overlay-block">
-                        <div className="cal-overlay-label">Approach</div>
-                        <p className="cal-overlay-ptext"><strong>Planned:</strong> {summary.approachSummary.plannedText}</p>
-                        <p className="cal-overlay-ptext"><strong>Done:</strong> {summary.approachSummary.doneText}</p>
-                        <div className="cal-overlay-progress">
-                          <div className="cal-overlay-progress-bar" style={{ width: `${(summary.approachSummary.doneCount / summary.approachSummary.totalCount) * 100}%` }} />
-                          <span>{summary.approachSummary.doneCount}/{summary.approachSummary.totalCount}</span>
-                        </div>
-                      </div>
-                    )}
-                    {summary.features.length > 0 && (
-                      <div className="cal-overlay-block">
-                        <div className="cal-overlay-label">Feature Docs</div>
-                        {summary.features.map(f => (
-                          <div key={f.id} className="cal-overlay-feat">
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                            <span>{f.title}</span>
+                  {ev.aiSummary && (
+                    <p className="cal-detail-summary-text">{ev.aiSummary}</p>
+                  )}
+                  {(summary.approachSummary || summary.features.length > 0 || summary.agentSummary) && (
+                    <div className="cal-detail-meta">
+                      {summary.approachSummary && (
+                        <>
+                          <div className="cal-detail-meta-row">
+                            <span className="cal-detail-meta-label">Planned</span>
+                            <span className="cal-detail-meta-value">{summary.approachSummary.plannedText}</span>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                    {summary.agentSummary && (
-                      <div className="cal-overlay-block">
-                        <div className="cal-overlay-label">Agent Session</div>
-                        <p className="cal-overlay-ptext cal-overlay-ptext--italic">{summary.agentSummary}</p>
-                      </div>
-                    )}
-                  </div>
+                          <div className="cal-detail-meta-row">
+                            <span className="cal-detail-meta-label">Done</span>
+                            <span className="cal-detail-meta-value">{summary.approachSummary.doneText}</span>
+                          </div>
+                        </>
+                      )}
+                      {summary.features.length > 0 && (
+                        <div className="cal-detail-meta-row">
+                          <span className="cal-detail-meta-label">Docs</span>
+                          <span className="cal-detail-meta-value">{summary.features.map(f => f.title).join(', ')}</span>
+                        </div>
+                      )}
+                      {summary.agentSummary && (
+                        <div className="cal-detail-meta-row">
+                          <span className="cal-detail-meta-label">Agent</span>
+                          <span className="cal-detail-meta-value cal-detail-meta-value--italic">{summary.agentSummary}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {ev.workActivity && (
+                    <div className="cal-detail-work">
+                      {ev.workActivity.filesChanged && ev.workActivity.filesChanged.length > 0 && (
+                        <div className="cal-detail-work-section">
+                          <div className="cal-detail-work-heading">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            <span>Files changed</span>
+                            <span className="cal-detail-work-stat">
+                              <span className="cal-detail-additions">+{ev.workActivity.filesChanged.reduce((s, f) => s + f.additions, 0)}</span>
+                              <span className="cal-detail-deletions">-{ev.workActivity.filesChanged.reduce((s, f) => s + f.deletions, 0)}</span>
+                            </span>
+                          </div>
+                          <div className="cal-detail-files">
+                            {ev.workActivity.filesChanged.map((f, i) => (
+                              <div key={i} className="cal-detail-file">
+                                <span className="cal-detail-file-name">{f.name}</span>
+                                <span className="cal-detail-file-diff">
+                                  <span className="cal-detail-additions">+{f.additions}</span>
+                                  <span className="cal-detail-deletions">-{f.deletions}</span>
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {ev.workActivity.tabs && ev.workActivity.tabs.length > 0 && (
+                        <div className="cal-detail-work-section">
+                          <div className="cal-detail-work-heading">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
+                            <span>Tabs opened</span>
+                          </div>
+                          <div className="cal-detail-tags-list">
+                            {ev.workActivity.tabs.map((t, i) => (
+                              <span key={i} className="cal-detail-tag">{t}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {ev.workActivity.sites && ev.workActivity.sites.length > 0 && (
+                        <div className="cal-detail-work-section">
+                          <div className="cal-detail-work-heading">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                            <span>Sites visited</span>
+                          </div>
+                          <div className="cal-detail-tags-list">
+                            {ev.workActivity.sites.map((s, i) => (
+                              <span key={i} className="cal-detail-site">{s}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Activity — collapsible */}

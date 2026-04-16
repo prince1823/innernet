@@ -15,6 +15,15 @@ export const calendarTasks = {
   '2026-04-06': [
     { id: 'MF-06', title: 'Colab91 Feature Deep-Dive', time: '10:00', endTime: '11:30', colorIndex: 2, tags: ['colab91', 'feature'], attendees: ['Tanuj', 'Priya'], project: 'colab91',
       aiSummary: 'Deep-dive into Colab91 feature requirements. Discussed supplier taxonomy, LLM evaluation pipeline, and classification system. Timeline set at 6 weeks.',
+      workActivity: {
+        filesChanged: [
+          { name: 'docs/taxonomy-spec.md', additions: 84, deletions: 0 },
+          { name: 'src/models/supplier.ts', additions: 42, deletions: 5 },
+          { name: 'src/api/taxonomy.ts', additions: 31, deletions: 0 },
+        ],
+        tabs: ['VS Code — taxonomy-spec.md', 'Figma — Colab91 Wireframes', 'Notion — Sprint Board'],
+        sites: ['github.com/colab91', 'figma.com', 'notion.so'],
+      },
       topicNotes: [
         { topic: 'Supplier Taxonomy System', timestamp: '10:10', bullets: ['3-level hierarchical taxonomy', 'AI-suggested categories based on supplier description', 'Bulk import/export support'] },
         { topic: 'LLM Evaluation Pipeline', timestamp: '10:40', bullets: ['Test prompts against multiple models', 'Compare outputs and score accuracy', 'Dashboard for results visualization'] },
@@ -40,11 +49,30 @@ export const calendarTasks = {
     { id: 'MF-08b', title: 'Team Standup', time: '11:00', endTime: '11:30', colorIndex: 2, tags: ['standup'], attendees: ['Jason', 'Sarah', 'Mike', 'Tanuj'], project: 'innernet' },
     { id: 'MF-08c', title: 'Colab91 Code Review', time: '14:00', endTime: '15:00', colorIndex: 3, tags: ['colab91', 'review'], attendees: ['Tanuj', 'Raj'], project: 'colab91',
       aiSummary: 'Reviewed initial Colab91 codebase — API layer and database schema. Found issues with query performance on taxonomy lookups.',
+      workActivity: {
+        filesChanged: [
+          { name: 'src/api/taxonomy.ts', additions: 12, deletions: 34 },
+          { name: 'src/db/queries.sql', additions: 8, deletions: 15 },
+          { name: 'tests/taxonomy.test.ts', additions: 45, deletions: 0 },
+        ],
+        tabs: ['GitHub — PR #42 Review', 'VS Code — taxonomy.ts', 'Datadog — Query Performance'],
+        sites: ['github.com/colab91/pull/42', 'app.datadog.com', 'postgresql.org/docs'],
+      },
     },
     { id: 'MF-08d', title: 'DevOps Sync', time: '16:00', endTime: '16:45', colorIndex: 5, tags: ['devops'], attendees: ['Mike'], project: 'innernet' },
   ],
   '2026-04-08': [
-    { id: 'MF-09', title: 'Improve App Performance', time: '9:00', endTime: '10:30', colorIndex: 0, summary: 'Profiling and optimization session.', tags: ['perf', 'optimization'], project: 'innernet' },
+    { id: 'MF-09', title: 'Improve App Performance', time: '9:00', endTime: '10:30', colorIndex: 0, summary: 'Profiling and optimization session.', tags: ['perf', 'optimization'], project: 'innernet',
+      aiSummary: 'Profiling and optimization session. Identified render bottlenecks in the calendar grid and reduced re-renders by 60% with useMemo.',
+      workActivity: {
+        filesChanged: [
+          { name: 'src/components/CalendarPanel.jsx', additions: 15, deletions: 42 },
+          { name: 'src/hooks/useThrottle.js', additions: 22, deletions: 0 },
+        ],
+        tabs: ['Chrome DevTools — Performance', 'VS Code — CalendarPanel.jsx', 'React Profiler'],
+        sites: ['localhost:5175', 'react.dev/reference/react/useMemo', 'web.dev/performance'],
+      },
+    },
     { id: 'MF-10', title: 'Design Jam — Notes UI', time: '13:00', endTime: '14:30', colorIndex: 1, summary: 'Collaborative session on the notes panel design.', tags: ['design', 'notes', 'UI'], attendees: ['Sarah', 'Tanuj'], project: 'innernet' },
     { id: 'MF-10b', title: 'Client Call', time: '15:00', endTime: '16:00', colorIndex: 3, summary: 'Demo\'d early prototype to client.', tags: ['client', 'demo'], attendees: ['Jason', 'Client Team'], project: 'colab91' },
   ],
@@ -100,6 +128,17 @@ export const calendarTasks = {
       tags: ['dev', 'frontend', 'layout'], project: 'innernet',
       attendees: ['You'],
       aiSummary: 'Deep work session focused on implementing the core three-panel sliding layout using CSS transforms. Successfully built the phase-based panel switching mechanism where Calendar & Notes and Notes & Agent views toggle smoothly.',
+      workActivity: {
+        filesChanged: [
+          { name: 'src/components/PanelLayout.jsx', additions: 187, deletions: 23 },
+          { name: 'src/components/PanelLayout.css', additions: 142, deletions: 8 },
+          { name: 'src/App.jsx', additions: 34, deletions: 12 },
+          { name: 'src/components/CalendarPanel.jsx', additions: 28, deletions: 15 },
+          { name: 'src/components/NotesPanel.jsx', additions: 19, deletions: 6 },
+        ],
+        tabs: ['VS Code — PanelLayout.jsx', 'VS Code — PanelLayout.css', 'Chrome — localhost:5175', 'Chrome DevTools — Elements'],
+        sites: ['localhost:5175', 'developer.mozilla.org/CSS/transform', 'css-tricks.com/snippets/css/a-guide-to-flexbox', 'stackoverflow.com'],
+      },
       notesTitle: 'Three-Panel Layout Implementation',
       notesSummary: 'Deep work session focused on building the core sliding panel system using CSS transforms, with successful phase-based switching between Calendar & Notes and Notes & Agent views.',
       topicNotes: [
@@ -140,6 +179,14 @@ export const calendarTasks = {
       tags: ['AI', 'brainstorm', 'agent'], project: 'innernet',
       attendees: ['Priya', 'Raj'],
       aiSummary: 'Explored how the agent panel could leverage conversation context from notes and calendar events. Discussed real-time AI summaries, auto-linking, and contextual awareness across all three panels.',
+      workActivity: {
+        filesChanged: [
+          { name: 'docs/ai-integration-plan.md', additions: 67, deletions: 0 },
+          { name: 'src/utils/contextBuilder.ts', additions: 23, deletions: 0 },
+        ],
+        tabs: ['Notion — AI Strategy', 'Google Docs — Agent Spec', 'VS Code — contextBuilder.ts'],
+        sites: ['platform.openai.com/docs', 'docs.anthropic.com', 'notion.so'],
+      },
       notesTitle: 'AI Integration Strategy',
       notesSummary: 'Explored how the agent panel could leverage full context from notes and calendar events for intelligent assistance, auto-summarization, and smart linking.',
       topicNotes: [
