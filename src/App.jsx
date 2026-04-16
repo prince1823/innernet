@@ -206,22 +206,21 @@ function App() {
         )}
       </div>
 
-      {/* Right: Main area */}
+      {/* Right: Main area — shows either Do (chat) or Think (docs), never both */}
       <div className="app-main">
-        {/* Top area: Chat Windows */}
-        <div className="app-top" style={{ flex: bottomCollapsed ? 1 : undefined }}>
-          <ChatWindows featureWindows={featureWindows} />
-        </div>
+        {/* Do area: Chat Windows — visible when bottomCollapsed (i.e. Think is hidden) */}
+        {bottomCollapsed && (
+          <div className="app-top" style={{ flex: 1 }}>
+            <ChatWindows featureWindows={featureWindows} />
+          </div>
+        )}
 
-        {/* Bottom toggle + resize */}
+        {/* Toggle between Do and Think */}
         <div className="bottom-divider">
-          {!bottomCollapsed && (
-            <div className="resize-handle-left" onMouseDown={handleBottomResizeStart} />
-          )}
           <button
             className="bottom-toggle-btn"
             onClick={() => setBottomCollapsed(prev => !prev)}
-            title={bottomCollapsed ? 'Show Document & Logs' : 'Hide Document & Logs'}
+            title={bottomCollapsed ? 'Switch to Think' : 'Switch to Do'}
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               {bottomCollapsed
@@ -229,16 +228,13 @@ function App() {
                 : <polyline points="6 9 12 15 18 9" />
               }
             </svg>
-            <span>{bottomCollapsed ? 'Think' : ''}</span>
+            <span>{bottomCollapsed ? 'Think' : 'Do'}</span>
           </button>
-          {!bottomCollapsed && (
-            <div className="resize-handle-right" onMouseDown={handleBottomResizeStart} />
-          )}
         </div>
 
-        {/* Bottom area: Document + Logs */}
+        {/* Think area: Document + Logs — visible when NOT bottomCollapsed */}
         {!bottomCollapsed && (
-          <div className="app-bottom" style={{ height: `${bottomHeight}px` }}>
+          <div className="app-bottom" style={{ flex: 1 }}>
             <div className="bottom-split" style={{ flex: 1 }}>
               <DocumentPanel
                 selectedDate={selectedDate}

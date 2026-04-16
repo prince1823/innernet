@@ -166,9 +166,10 @@
 
 /* ── Bottom: Document + Logs ── */
 .app-bottom {
-  flex-shrink: 0;
+  flex: 1;
   display: flex;
   overflow: hidden;
+  min-height: 0;
 }
 
 .bottom-split {
