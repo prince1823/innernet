@@ -1317,14 +1317,19 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                 </div>
               </div>
               <div className="cal-detail-stacked">
-                <div className="cal-detail-section">
-                  {ev.aiSummary && (
+                {/* Summary */}
+                {ev.aiSummary && (
+                  <div className="cal-detail-section">
                     <div className="cal-detail-meta-row cal-detail-summary-row">
                       <span className="cal-detail-meta-label">Summary</span>
                       <span className="cal-detail-meta-value">{ev.aiSummary}</span>
                     </div>
-                  )}
-                  {(summary.approachSummary || summary.features.length > 0 || summary.agentSummary) && (
+                  </div>
+                )}
+
+                {/* Planned / Done / Docs / Agent */}
+                {(summary.approachSummary || summary.features.length > 0 || summary.agentSummary) && (
+                  <div className="cal-detail-section">
                     <div className="cal-detail-meta">
                       {summary.approachSummary && (
                         <>
@@ -1351,8 +1356,10 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+
+                {/* Activity & Logs */}
                 <div className="cal-detail-section">
                   <button className="cal-detail-activity-toggle" onClick={() => setActivityExpanded(prev => !prev)}>
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ transform: activityExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
@@ -1508,15 +1515,19 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               </div>
 
               <div className="cal-detail-stacked">
-                {/* Summary — flowing layout */}
-                <div className="cal-detail-section">
-                  {ev.aiSummary && (
+                {/* Summary */}
+                {ev.aiSummary && (
+                  <div className="cal-detail-section">
                     <div className="cal-detail-meta-row cal-detail-summary-row">
                       <span className="cal-detail-meta-label">Summary</span>
                       <span className="cal-detail-meta-value">{ev.aiSummary}</span>
                     </div>
-                  )}
-                  {(summary.approachSummary || summary.features.length > 0 || summary.agentSummary) && (
+                  </div>
+                )}
+
+                {/* Planned / Done / Docs / Agent */}
+                {(summary.approachSummary || summary.features.length > 0 || summary.agentSummary) && (
+                  <div className="cal-detail-section">
                     <div className="cal-detail-meta">
                       {summary.approachSummary && (
                         <>
@@ -1543,8 +1554,12 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                         </div>
                       )}
                     </div>
-                  )}
-                  {ev.workActivity && (
+                  </div>
+                )}
+
+                {/* Tabs / Sites / Files Changed */}
+                {ev.workActivity && (
+                  <div className="cal-detail-section">
                     <div className="cal-detail-work">
                       {ev.workActivity.tabs && ev.workActivity.tabs.length > 0 && (
                         <div className="cal-detail-work-section">
@@ -1596,10 +1611,10 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
-                {/* Activity — collapsible */}
+                {/* Activity & Logs — collapsible */}
                 <div className="cal-detail-section">
                   <button className="cal-detail-activity-toggle" onClick={() => setActivityExpanded(prev => !prev)}>
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ transform: activityExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
@@ -1919,14 +1934,19 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               </div>
 
               <div className="cal-detail-stacked">
-                <div className="cal-detail-section">
-                  {expandedTask.aiSummary && (
+                {/* Summary */}
+                {expandedTask.aiSummary && (
+                  <div className="cal-detail-section">
                     <div className="cal-detail-meta-row cal-detail-summary-row">
                       <span className="cal-detail-meta-label">Summary</span>
                       <span className="cal-detail-meta-value">{expandedTask.aiSummary}</span>
                     </div>
-                  )}
-                  {(expandedSummary.approachSummary || expandedSummary.features.length > 0 || expandedSummary.agentSummary) && (
+                  </div>
+                )}
+
+                {/* Planned / Done / Docs / Agent */}
+                {(expandedSummary.approachSummary || expandedSummary.features.length > 0 || expandedSummary.agentSummary) && (
+                  <div className="cal-detail-section">
                     <div className="cal-detail-meta">
                       {expandedSummary.approachSummary && (
                         <>
@@ -1953,8 +1973,12 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                         </div>
                       )}
                     </div>
-                  )}
-                  {expandedTask.workActivity && (
+                  </div>
+                )}
+
+                {/* Tabs / Sites / Files Changed */}
+                {expandedTask.workActivity && (
+                  <div className="cal-detail-section">
                     <div className="cal-detail-work">
                       {expandedTask.workActivity.tabs && expandedTask.workActivity.tabs.length > 0 && (
                         <div className="cal-detail-work-section">
@@ -2006,8 +2030,8 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 <div className="cal-detail-section">
                   <button className="cal-detail-activity-toggle" onClick={() => setActivityExpanded(prev => !prev)}>
