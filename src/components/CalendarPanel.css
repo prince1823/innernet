@@ -1420,6 +1420,16 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.cal-overlay-card > .cal-detail-stacked {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+.cal-overlay-card > .cal-detail-stacked::-webkit-scrollbar { width: 4px; }
+.cal-overlay-card > .cal-detail-stacked::-webkit-scrollbar-track { background: transparent; }
+.cal-overlay-card > .cal-detail-stacked::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.15); border-radius: 4px; }
   clip-path: inset(
     calc(var(--origin-top) - 8px)
     calc(var(--origin-right) - 8px)
