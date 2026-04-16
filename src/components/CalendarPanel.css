@@ -1624,3 +1624,119 @@
   .cal-overlay-split { flex-direction: column; }
   .cal-overlay-divider { width: auto; height: 1px; margin: 0 10px; }
 }
+
+/* ── Schedule success card ───────────────────────────────────────────── */
+.cal-schedule-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 28px 20px 24px;
+  margin: 16px 12px;
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.06) 0%, rgba(16, 185, 129, 0.02) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  border-radius: 12px;
+  animation: cal-schedule-pop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes cal-schedule-pop {
+  0%   { opacity: 0; transform: translateY(6px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.cal-schedule-success-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.14);
+  color: #059669;
+  margin-bottom: 12px;
+  animation: cal-schedule-check 0.4s ease 0.05s both;
+}
+
+@keyframes cal-schedule-check {
+  0%   { transform: scale(0.4); opacity: 0; }
+  60%  { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.cal-schedule-success-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #059669;
+  margin-bottom: 6px;
+}
+
+.cal-schedule-success-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+  margin-bottom: 8px;
+  line-height: 1.3;
+}
+
+.cal-schedule-success-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary, #64748b);
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 6px;
+}
+
+.cal-schedule-success-dot {
+  opacity: 0.5;
+}
+
+.cal-schedule-success-attendees {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary, #64748b);
+  margin-bottom: 16px;
+}
+
+.cal-schedule-success-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.cal-schedule-success-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #fff;
+  color: var(--text-primary, #0f172a);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cal-schedule-success-btn:hover {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.18);
+}
+
+.cal-schedule-success-btn.primary {
+  background: #059669;
+  color: #fff;
+  border-color: #059669;
+}
+
+.cal-schedule-success-btn.primary:hover {
+  background: #047857;
+  border-color: #047857;
+}

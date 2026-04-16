@@ -433,38 +433,9 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
       setSearchResults({ kind: 'empty' })
       return
     }
-    // Schedule intent first — "schedule a meeting with tanuj on 10 april 3pm".
-    // If parseScheduleQuery succeeds we create the event, jump to its date,
-    // and clear the search. Falls through to other intents if it doesn't match.
-    const schedule = parseScheduleQuery(query, TODAY_STR)
-    if (schedule && onScheduleEvent) {
-      const endTime = addMinutesToTimeStr(schedule.time, 60)
-      const typeTitle = schedule.type
-        .split(' ')
-        .map(w => w === '1:1' ? '1:1' : capitalizeWord(w))
-        .join(' ')
-      const title = schedule.attendees.length
-        ? `${typeTitle} with ${schedule.attendees.join(', ')}`
-        : typeTitle
-      const newEvent = {
-        id: `U-${Date.now().toString(36)}`,
-        title,
-        time: schedule.time,
-        endTime,
-        colorIndex: 4,
-        tags: [],
-        attendees: schedule.attendees,
-        userCreated: true,
-      }
-      onScheduleEvent(schedule.date, newEvent)
-      // Navigate the calendar view to the new event's day
-      const nd = new Date(schedule.date + 'T00:00:00')
-      setCurrentDate(nd)
-      setSearchResults(null)
-      setSearchQuery('')
-      return
-    }
-    // Try time-query intent next
+    // Note: schedule intent is intentionally NOT handled here — it fires only
+    // on Enter via commitSearch so the user doesn't accidentally create events
+    // while still typing a query.
     const parsed = parseTimeQuery(query)
     if (parsed) {
       const result = runTimeQuery(parsed, dateStr, userEvents)
@@ -501,7 +472,41 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
       grouped[ev.date].push(ev)
     })
     setSearchResults({ kind: 'search', grouped })
-  }, [dateStr, userEvents, onScheduleEvent])
+  }, [dateStr, userEvents])
+
+  // Fired on Enter from the search input. Tries to parse a schedule intent —
+  // on success, creates the event and shows a confirmation card (no instant
+  // redirect). The user clicks "Jump to date" to navigate or "Done" to stay.
+  const commitSearch = useCallback((query) => {
+    const schedule = parseScheduleQuery(query || '', TODAY_STR)
+    if (!schedule || !onScheduleEvent) return false
+    const endTime = addMinutesToTimeStr(schedule.time, 60)
+    const typeTitle = schedule.type
+      .split(' ')
+      .map(w => w === '1:1' ? '1:1' : capitalizeWord(w))
+      .join(' ')
+    const title = schedule.attendees.length
+      ? `${typeTitle} with ${schedule.attendees.join(', ')}`
+      : typeTitle
+    const newEvent = {
+      id: `U-${Date.now().toString(36)}`,
+      title,
+      time: schedule.time,
+      endTime,
+      colorIndex: 4,
+      tags: [],
+      attendees: schedule.attendees,
+      userCreated: true,
+    }
+    onScheduleEvent(schedule.date, newEvent)
+    setSearchResults({
+      kind: 'scheduled',
+      event: newEvent,
+      date: schedule.date,
+      endTime,
+    })
+    return true
+  }, [onScheduleEvent])
 
   const goToPrev = () => setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() - 1); return d })
   const goToNext = () => setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() + 1); return d })
@@ -747,6 +752,12 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                 placeholder="Ask, search, or schedule — “meeting with Tanuj on 10 Apr 3pm”"
                 value={searchQuery}
                 onChange={e => handleSearch(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    commitSearch(searchQuery)
+                  }
+                }}
                 autoFocus
               />
               <button className="cal-search-clear" onClick={() => { setSearchQuery(''); setSearchResults(null) }}>
@@ -767,13 +778,73 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                 'Free time today',
                 'Schedule a meeting with Tanuj on 16 April 3 pm',
               ].map(s => (
-                <button key={s} className="cal-query-suggest-btn" onClick={() => handleSearch(s)}>
+                <button
+                  key={s}
+                  className="cal-query-suggest-btn"
+                  onClick={() => {
+                    setSearchQuery(s)
+                    // Schedule examples commit immediately; asking-style queries
+                    // go through the normal handleSearch path.
+                    if (!commitSearch(s)) handleSearch(s)
+                  }}
+                >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                   <span>{s}</span>
                 </button>
               ))}
             </div>
           )}
+
+          {/* Scheduled success card */}
+          {kind === 'scheduled' && (() => {
+            const ev = searchResults.event
+            const d = new Date(searchResults.date + 'T00:00:00')
+            const dateLabel = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+            return (
+              <div className="cal-schedule-success">
+                <div className="cal-schedule-success-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+                <div className="cal-schedule-success-label">Meeting scheduled</div>
+                <div className="cal-schedule-success-title">{ev.title}</div>
+                <div className="cal-schedule-success-meta">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span>{dateLabel}</span>
+                  <span className="cal-schedule-success-dot">·</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span>{formatTimeDisplay(ev.time)} – {formatTimeDisplay(ev.endTime)}</span>
+                </div>
+                {ev.attendees && ev.attendees.length > 0 && (
+                  <div className="cal-schedule-success-attendees">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>{ev.attendees.join(', ')}</span>
+                  </div>
+                )}
+                <div className="cal-schedule-success-actions">
+                  <button
+                    className="cal-schedule-success-btn primary"
+                    onClick={() => {
+                      setCurrentDate(new Date(searchResults.date + 'T00:00:00'))
+                      setSelectedEvent(ev)
+                      setSearchResults(null)
+                      setSearchQuery('')
+                    }}
+                  >
+                    <span>Jump to date</span>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                  </button>
+                  <button
+                    className="cal-schedule-success-btn"
+                    onClick={() => { setSearchResults(null); setSearchQuery('') }}
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Productivity answer card */}
           {kind === 'productivity' && (() => {

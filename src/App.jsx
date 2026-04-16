@@ -38,15 +38,15 @@ function App() {
     setQuickSlot(null)
   }, [selectedDate])
 
-  // Called when the search box parses a "schedule …" intent. Appends the new
-  // event to userEvents so the calendar merges it alongside the static data.
+  // Called when the search box parses a "schedule …" intent. Only appends the
+  // event to userEvents — intentionally does NOT navigate away from the
+  // current date so the user sees the success confirmation first and jumps
+  // explicitly via the confirmation card.
   const handleScheduleEvent = useCallback((date, event) => {
     setUserEvents(prev => ({
       ...prev,
       [date]: [...(prev[date] || []), event],
     }))
-    setSelectedDate(date)
-    setSelectedEvent(event)
   }, [])
 
   const handleSlotClick = useCallback((time, label) => {
