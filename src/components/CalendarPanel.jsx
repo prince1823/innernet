@@ -1322,10 +1322,14 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                       >
                         <div className="cal-schedule-event-color" style={{ background: color.border }} />
                         <div className="cal-schedule-event-info">
-                          <span className="cal-schedule-event-title">{ev.title}</span>
-                          <span className="cal-schedule-event-time">{formatTimeDisplay(ev.time)} – {formatTimeDisplay(ev.endTime)}</span>
+                          <div className="cal-schedule-event-row">
+                            <span className="cal-schedule-event-title">{ev.title}</span>
+                            <span className="cal-schedule-event-time">{formatTimeDisplay(ev.time)} – {formatTimeDisplay(ev.endTime)}</span>
+                          </div>
+                          {(ev.aiSummary || ev.summary) && (
+                            <span className="cal-schedule-event-summary">{ev.aiSummary || ev.summary}</span>
+                          )}
                         </div>
-                        <svg className="cal-schedule-event-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
                       </button>
                     )
                   })}
