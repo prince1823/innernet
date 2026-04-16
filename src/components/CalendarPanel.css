@@ -62,6 +62,12 @@
   display: flex;
   align-items: center;
 }
+.cal-view-mode-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+  letter-spacing: 0.01em;
+}
 
 .cal-header-right {
   display: flex;
@@ -1972,10 +1978,16 @@
 .cal-schedule-event-summary {
   font-size: 10px;
   color: #9ca3af;
-  line-height: 1.35;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  margin-top: 1px;
+}
+
+.cal-schedule-event-color {
+  margin-top: 3px;
 }
 
 .cal-schedule-event-attendees {
