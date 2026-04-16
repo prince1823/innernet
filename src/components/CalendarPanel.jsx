@@ -408,7 +408,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const [detailIndex, setDetailIndex] = useState(0) // which event is shown in detail view (mode 2)
   const [searchDetailEvent, setSearchDetailEvent] = useState(null)
   const [savedSearchResults, setSavedSearchResults] = useState(null)
-  const [activityExpanded, setActivityExpanded] = useState(false)
+  const [activityExpanded, setActivityExpanded] = useState(true)
   const [expandedEvent, setExpandedEvent] = useState(null) // event id for overlay
   const [overlayOrigin, setOverlayOrigin] = useState(null) // { top, left, width, height } for unfold origin
   const [isClosingOverlay, setIsClosingOverlay] = useState(false)
