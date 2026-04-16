@@ -1286,13 +1286,13 @@
 .cal-grid-scroll--next { animation: dayFlipNext 280ms cubic-bezier(0.22, 1, 0.36, 1); }
 
 @keyframes dayFlipPrev {
-  0%   { opacity: 0.3; transform: translateY(-14px); }
-  100% { opacity: 1;   transform: translateY(0); }
+  0%   { opacity: 0; transform: translateX(-20px); }
+  100% { opacity: 1; transform: translateX(0); }
 }
 
 @keyframes dayFlipNext {
-  0%   { opacity: 0.3; transform: translateY(14px); }
-  100% { opacity: 1;   transform: translateY(0); }
+  0%   { opacity: 0; transform: translateX(20px); }
+  100% { opacity: 1; transform: translateX(0); }
 }
 
 /* ══════════════════════════════════════════════

@@ -574,9 +574,21 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
     return true
   }, [onScheduleEvent])
 
-  const goToPrev = () => setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() - 1); return d })
-  const goToNext = () => setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() + 1); return d })
-  const goToToday = () => setCurrentDate(new Date(2026, 3, 9))
+  const goToPrev = () => {
+    setDayTransition('prev')
+    setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() - 1); return d })
+    setTimeout(() => setDayTransition(null), 300)
+  }
+  const goToNext = () => {
+    setDayTransition('next')
+    setCurrentDate(prev => { const d = new Date(prev); d.setDate(d.getDate() + 1); return d })
+    setTimeout(() => setDayTransition(null), 300)
+  }
+  const goToToday = () => {
+    setDayTransition('next')
+    setCurrentDate(new Date(2026, 3, 9))
+    setTimeout(() => setDayTransition(null), 300)
+  }
 
   // Animated zoom — used by +/− buttons. Tweens zoomLevel AND scrollTop over
   // ~260ms so the time point at the viewport center stays visually anchored.
@@ -652,8 +664,20 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
     return getEventSummaryData(expandedTask, dateStr)
   }, [expandedTask, dateStr])
 
+  // Scroll to a sensible position on day change. On today, center the
+  // now-line in the viewport; on other days, scroll to ~7 AM (start of
+  // working hours).
   useEffect(() => {
-    if (gridRef.current) gridRef.current.scrollTop = zoomLevel * 7
+    const scroller = gridRef.current
+    if (!scroller) return
+    const newDateStr = formatDateStr(currentDate)
+    if (newDateStr === TODAY_STR) {
+      const nowPxPos = (NOW_MIN / 60) * zoomLevel
+      const viewportH = scroller.clientHeight
+      scroller.scrollTop = Math.max(0, nowPxPos - viewportH / 2)
+    } else {
+      scroller.scrollTop = zoomLevel * 7
+    }
   }, [currentDate]) // only on day change — zoom changes manage their own scroll anchor
 
   useEffect(() => { setSelectedDate(dateStr) }, [dateStr])
