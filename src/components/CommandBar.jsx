@@ -664,35 +664,37 @@ export default function CommandBar({ onScheduleEvent, existingEvents = {}, userE
           </button>
         </div>
 
-        <input
-          ref={inputRef}
-          type="text"
-          className="cmdbar-input"
-          placeholder={mode === 'search'
-            ? 'Search events, people, tags...'
-            : (pendingEvent ? 'Modify event — "add Priya", "move to 2pm"...' : 'Type to schedule — "meeting with Tanuj tomorrow 3pm"')
-          }
-          value={query}
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          onFocus={handleFocus}
-          disabled={loading}
-        />
-        {query && (
-          <button className="cmdbar-clear" onClick={() => {
-            setQuery('')
-            if (mode === 'search') { onSearchResults(null); onSearchQueryChange('') }
-          }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        )}
+        <div className="cmdbar-input-field">
+          <input
+            ref={inputRef}
+            type="text"
+            className="cmdbar-input"
+            placeholder={mode === 'search'
+              ? 'Search events, people, tags...'
+              : (pendingEvent ? 'Modify event — "add Priya", "move to 2pm"...' : 'Type to schedule — "meeting with Tanuj tomorrow 3pm"')
+            }
+            value={query}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onFocus={handleFocus}
+            disabled={loading}
+          />
+          {query && (
+            <button className="cmdbar-clear" onClick={() => {
+              setQuery('')
+              if (mode === 'search') { onSearchResults(null); onSearchQueryChange('') }
+            }}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          )}
+        </div>
         {mode === 'ai' && (
           <button
             className="cmdbar-send"
             onClick={handleAISend}
             disabled={!query.trim() || loading}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
             </svg>
           </button>

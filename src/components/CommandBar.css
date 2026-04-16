@@ -5,11 +5,11 @@
   z-index: 20;
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
-  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.04);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.03);
   transition: flex 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s;
 }
 
@@ -25,36 +25,37 @@
 
 .cmdbar-toggle {
   display: flex;
-  gap: 2px;
-  background: #f3f4f6;
-  border-radius: 8px;
-  padding: 2px;
+  gap: 3px;
+  background: #f0f0f3;
+  border-radius: 10px;
+  padding: 3px;
   flex-shrink: 0;
 }
 
 .cmdbar-toggle-btn {
-  width: 30px;
-  height: 28px;
+  width: 32px;
+  height: 30px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
-  color: #9ca3af;
+  color: #b0b0b8;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
 }
 
 .cmdbar-toggle-btn:hover {
-  color: #6b7280;
-  background: rgba(255, 255, 255, 0.5);
+  color: #7c7c8a;
+  background: rgba(255, 255, 255, 0.6);
 }
 
 .cmdbar-toggle-btn--active {
   background: #fff;
   color: #7c3aed;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08), 0 0.5px 1px rgba(0, 0, 0, 0.06);
 }
 
 .cmdbar-toggle-btn--active:hover {
@@ -67,9 +68,9 @@
 .cmdbar-input-area {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  min-height: 44px;
+  gap: 10px;
+  padding: 10px 14px;
+  min-height: 52px;
 }
 
 .cmdbar-input-icon {
@@ -79,19 +80,39 @@
   align-items: center;
 }
 
+.cmdbar-input-field {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  height: 38px;
+  background: #f5f5f7;
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cmdbar-input-field:focus-within {
+  background: #fff;
+  border-color: rgba(124, 58, 237, 0.35);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
 .cmdbar-input {
   flex: 1;
-  padding: 8px 0;
-  font-size: 12.5px;
+  padding: 0;
+  font-size: 13px;
   border: none;
   outline: none;
   background: transparent;
   color: #1f2937;
   font-family: inherit;
+  line-height: 38px;
 }
 
 .cmdbar-input::placeholder {
-  color: #b0b0b0;
+  color: #a0a0a8;
 }
 
 .cmdbar-input:disabled {
@@ -99,11 +120,11 @@
 }
 
 .cmdbar-clear {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
   border: none;
-  background: transparent;
+  background: rgba(0, 0, 0, 0.08);
   color: #9ca3af;
   cursor: pointer;
   display: flex;
@@ -114,33 +135,43 @@
 }
 
 .cmdbar-clear:hover {
-  background: #f3f4f6;
+  background: rgba(0, 0, 0, 0.14);
   color: #6b7280;
 }
 
 .cmdbar-send {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
   border: none;
-  background: #7c3aed;
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
   color: #fff;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: all 0.15s;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
 }
 
 .cmdbar-send:hover {
-  background: #6d28d9;
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);
+  transform: translateY(-1px);
+}
+
+.cmdbar-send:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(124, 58, 237, 0.3);
 }
 
 .cmdbar-send:disabled {
   background: #e5e7eb;
-  color: #9ca3af;
+  color: #b0b0b8;
   cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 /* ── Results / Messages Panel ── */
