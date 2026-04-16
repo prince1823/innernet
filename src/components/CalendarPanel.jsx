@@ -403,9 +403,9 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 9))
   const [showMiniCal, setShowMiniCal] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(56) // pixels per hour; continuous 24..240
-  // Semantic zoom: 0 = normal grid, 1 = expanded cards, 2 = schedule list, 3 = detail view
+  // Semantic zoom: 0 = normal grid (pixel zoom), 1 = schedule list, 2 = detail view
   const [viewMode, setViewMode] = useState(0)
-  const [detailIndex, setDetailIndex] = useState(0) // which event is shown in detail view (mode 3)
+  const [detailIndex, setDetailIndex] = useState(0) // which event is shown in detail view (mode 2)
   const [expandedEvent, setExpandedEvent] = useState(null) // event id for overlay
   const [overlayOrigin, setOverlayOrigin] = useState(null) // { top, left, width, height } for unfold origin
   const [isClosingOverlay, setIsClosingOverlay] = useState(false)
@@ -565,17 +565,39 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const zoomInPixel = () => animateZoomTo(Math.min(zoomLevel + 24, MAX_ZOOM))
   const zoomOutPixel = () => animateZoomTo(Math.max(zoomLevel - 24, MIN_ZOOM))
 
-  // Semantic zoom: cycles through view modes 0→1→2→3
+  // Semantic zoom: first 2 clicks zoom the calendar grid (instant snap),
+  // 3rd click opens schedule list, 4th click opens detail view.
+  const zoomClicksRef = useRef(0)
+  const baseZoom = 56 // default zoom level
+  const zoomStep = 24
+
   const zoomIn = () => {
-    if (viewMode < 3) {
-      const next = viewMode + 1
-      setViewMode(next)
-      if (next === 3) setDetailIndex(0) // reset to first event when entering detail view
+    if (viewMode === 0) {
+      if (zoomClicksRef.current < 2) {
+        zoomClicksRef.current += 1
+        const target = Math.min(baseZoom + zoomClicksRef.current * zoomStep, MAX_ZOOM)
+        if (zoomAnimRef.current) cancelAnimationFrame(zoomAnimRef.current)
+        setZoomLevel(target)
+      } else {
+        setViewMode(1)
+      }
+    } else if (viewMode === 1) {
+      setViewMode(2)
+      setDetailIndex(0)
     }
   }
   const zoomOut = () => {
-    if (viewMode > 0) {
-      setViewMode(viewMode - 1)
+    if (viewMode === 2) {
+      setViewMode(1)
+    } else if (viewMode === 1) {
+      setViewMode(0)
+    } else if (viewMode === 0) {
+      if (zoomClicksRef.current > 0) {
+        zoomClicksRef.current -= 1
+        const target = Math.max(baseZoom + zoomClicksRef.current * zoomStep, MIN_ZOOM)
+        if (zoomAnimRef.current) cancelAnimationFrame(zoomAnimRef.current)
+        setZoomLevel(target)
+      }
     }
   }
 
@@ -602,9 +624,9 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
     })
   }, [])
 
-  // Keyboard navigation for detail view (viewMode 3)
+  // Keyboard navigation for detail view (viewMode 2)
   useEffect(() => {
-    if (viewMode !== 3) return
+    if (viewMode !== 2) return
     const handleKeyDown = (e) => {
       if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
         e.preventDefault()
@@ -613,7 +635,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
         e.preventDefault()
         setDetailIndex(prev => Math.min(scheduleData.flatEvents.length - 1, prev + 1))
       } else if (e.key === 'Escape') {
-        setViewMode(2) // go back to schedule list
+        setViewMode(1) // go back to schedule list
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -970,11 +992,11 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
         </div>
         <div className="cal-header-right">
           <div className="cal-zoom-btns">
-            <button className="cal-zoom-btn" onClick={zoomOut} disabled={viewMode <= 0} title="Zoom out — less detail">
+            <button className="cal-zoom-btn" onClick={zoomOut} disabled={viewMode === 0 && zoomLevel <= MIN_ZOOM + 0.5} title="Zoom out — less detail">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
-            {viewMode > 0 && <span className="cal-zoom-level-label">{['Grid', 'Expanded', 'Schedule', 'Detail'][viewMode]}</span>}
-            <button className="cal-zoom-btn" onClick={zoomIn} disabled={viewMode >= 3} title="Zoom in — more detail">
+            {viewMode > 0 && <span className="cal-zoom-level-label">{['', 'Schedule', 'Detail'][viewMode]}</span>}
+            <button className="cal-zoom-btn" onClick={zoomIn} disabled={viewMode >= 2} title="Zoom in — more detail">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
           </div>
@@ -1269,8 +1291,8 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
       {/* Calendar content — hidden when search results are active */}
       {!searchResults && (<>
 
-      {/* ── VIEW MODE 2: Schedule List ── */}
-      {viewMode === 2 && (
+      {/* ── VIEW MODE 1: Schedule List ── */}
+      {viewMode === 1 && (
         <div className="cal-schedule-view">
           {scheduleData.groups.map(group => {
             const d = new Date(group.date + 'T00:00:00')
@@ -1295,7 +1317,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                           const idx = scheduleData.flatEvents.findIndex(e => e.id === ev.id)
                           if (idx >= 0) {
                             setDetailIndex(idx)
-                            setViewMode(3)
+                            setViewMode(2)
                           }
                         }}
                       >
@@ -1321,8 +1343,8 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
         </div>
       )}
 
-      {/* ── VIEW MODE 3: Detail View with left/right navigation ── */}
-      {viewMode === 3 && (() => {
+      {/* ── VIEW MODE 2: Detail View with left/right navigation ── */}
+      {viewMode === 2 && (() => {
         const ev = scheduleData.flatEvents[detailIndex]
         if (!ev) return null
         const color = eventColors[ev.colorIndex] || eventColors[0]
@@ -1423,8 +1445,8 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
         )
       })()}
 
-      {/* ── VIEW MODE 0 & 1: Time Grid ── */}
-      {viewMode <= 1 && (<>
+      {/* ── VIEW MODE 0: Time Grid ── */}
+      {viewMode === 0 && (<>
       {/* Pull-to-flip hints */}
       {pullProgress < 0 && !expandedEvent && (
         <div className="cal-pull-hint cal-pull-hint--top" style={{ opacity: Math.min(1, -pullProgress), transform: `translateY(${Math.min(0, pullProgress * 8)}px)` }}>
@@ -1583,11 +1605,10 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               const temporal = getTemporalState(task)
               const layout = overlapLayout[task.id] || { col: 0, totalCols: 1 }
 
-              const expandedMinHeight = viewMode === 1 ? Math.max(height, 72) : Math.max(height, 24)
               const eventStyle = {
                 top: `${topOffset}px`,
-                minHeight: `${expandedMinHeight}px`,
-                height: viewMode === 1 ? 'auto' : `${Math.max(height, 24)}px`,
+                minHeight: `${Math.max(height, 24)}px`,
+                height: `${Math.max(height, 24)}px`,
                 '--ev-bg': color.bg,
                 '--ev-border': color.border,
                 '--ev-text': color.text,
@@ -1603,7 +1624,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               return (
                 <div
                   key={task.id}
-                  className={`cal-event-block cal-event-block--${temporal} ${viewMode === 1 ? 'cal-event-block--expanded' : ''} ${selectedEvent?.id === task.id ? 'selected' : ''} ${isExpanded ? 'is-overlay-source' : ''} ${isDragged ? 'is-dragging' : ''} ${isResized ? 'is-resizing' : ''}`}
+                  className={`cal-event-block cal-event-block--${temporal} ${selectedEvent?.id === task.id ? 'selected' : ''} ${isExpanded ? 'is-overlay-source' : ''} ${isDragged ? 'is-dragging' : ''} ${isResized ? 'is-resizing' : ''}`}
                   style={eventStyle}
                   onClick={(e) => handleEventClick(e, task)}
                   onMouseDown={(e) => {
@@ -1617,14 +1638,6 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                   <span className="cal-event-time" style={{ color: color.text }}>
                     {formatTimeDisplay(displayTime)} – {formatTimeDisplay(displayEndTime)}
                   </span>
-                  {viewMode === 1 && task.aiSummary && (
-                    <span className="cal-event-summary" style={{ color: color.text }}>{task.aiSummary}</span>
-                  )}
-                  {viewMode === 1 && task.attendees && task.attendees.length > 0 && (
-                    <span className="cal-event-attendees-inline" style={{ color: color.text }}>
-                      {task.attendees.join(', ')}
-                    </span>
-                  )}
                   <div
                     className="cal-resize-handle"
                     onMouseDown={(e) => handleResizeStart(e, task)}
