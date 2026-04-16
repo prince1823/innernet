@@ -1158,39 +1158,49 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               )
             })()}
 
-            {/* Meetings answer card */}
+            {/* Meetings answer card — schedule-view style */}
             {kind === 'meetings' && (() => {
               const events = searchResults.events
               if (!events || events.length === 0) return <div className="cal-search-empty"><p>No meetings found.</p></div>
-              const totalMin = events.reduce((n, ev) => n + (timeToMinutes(ev.endTime) - timeToMinutes(ev.time)), 0)
-              const people = new Set(events.flatMap(ev => ev.attendees || []))
+              // Group by date
+              const byDate = {}
+              events.forEach(ev => {
+                if (!byDate[ev.date]) byDate[ev.date] = []
+                byDate[ev.date].push(ev)
+              })
+              const dates = Object.keys(byDate).sort()
               return (
-                <div className="cal-query-result">
-                  <div className="cal-query-badge">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    <span>Meetings</span>
-                  </div>
-                  <div className="cal-query-headline">
-                    <div className="cal-query-answer-label">Upcoming &amp; past</div>
-                    <div className="cal-query-answer-time">{events.length} {events.length === 1 ? 'meeting' : 'meetings'}</div>
-                    <div className="cal-query-answer-title">{formatDuration(totalMin)} total · {people.size} {people.size === 1 ? 'person' : 'people'}</div>
-                  </div>
-                  <div className="cal-query-runners-label">All meetings</div>
-                  <div className="cal-query-runners">
-                    {events.slice(0, 8).map(ev => {
-                      const d = new Date(ev.date + 'T00:00:00')
-                      const color = eventColors[ev.colorIndex] || eventColors[0]
-                      return (
-                        <button key={ev.id} className="cal-query-runner" onClick={() => jumpToEvent(ev.date, ev)}>
-                          <div className="cal-query-runner-dot" style={{ background: color.border }} />
-                          <div className="cal-query-runner-info">
-                            <span className="cal-query-runner-title">{ev.title}</span>
-                            <span className="cal-query-runner-meta">{d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · {formatTimeDisplay(ev.time)}</span>
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
+                <div className="cal-schedule-view">
+                  {dates.map(date => {
+                    const d = new Date(date + 'T00:00:00')
+                    const dayLabel = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+                    return (
+                      <div key={date} className="cal-schedule-day">
+                        <div className="cal-schedule-day-header">
+                          <span className="cal-schedule-day-label">{dayLabel}</span>
+                        </div>
+                        <div className="cal-schedule-day-events">
+                          {byDate[date].map(ev => {
+                            const color = eventColors[ev.colorIndex] || eventColors[0]
+                            return (
+                              <div key={ev.id} className="cal-schedule-event" onClick={() => jumpToEvent(ev.date, ev)}>
+                                <div className="cal-schedule-event-color" style={{ background: color.border }} />
+                                <div className="cal-schedule-event-body">
+                                  <div className="cal-schedule-event-row">
+                                    <span className="cal-schedule-event-title">{ev.title}</span>
+                                    <span className="cal-schedule-event-time">{formatTimeDisplay(ev.time)} – {formatTimeDisplay(ev.endTime)}</span>
+                                  </div>
+                                  {ev.aiSummary && (
+                                    <div className="cal-schedule-event-summary">{ev.aiSummary}</div>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )
             })()}
@@ -1228,7 +1238,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               )
             })()}
 
-            {/* Default text-search results */}
+            {/* Default text-search results — schedule-view style */}
             {kind === 'search' && (() => {
               const grouped = searchResults.grouped || {}
               const dates = Object.keys(grouped).sort()
@@ -1240,35 +1250,40 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                   </div>
                 )
               }
-              return dates.map(date => {
-                const d = new Date(date + 'T00:00:00')
-                return (
-                  <div key={date} className="cal-search-date-group">
-                    <div className="cal-search-date-header">
-                      <span className="cal-search-date-day">{d.toLocaleDateString('en-US', { weekday: 'short' })}</span>
-                      <span className="cal-search-date-full">{d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                    </div>
-                    {grouped[date].map(ev => {
-                      const color = eventColors[ev.colorIndex] || eventColors[0]
-                      return (
-                        <div key={ev.id} className="cal-search-event" onClick={() => jumpToEvent(date, ev)}>
-                          <div className="cal-search-event-color" style={{ background: color.border }} />
-                          <div className="cal-search-event-info">
-                            <span className="cal-search-event-title">{ev.title}</span>
-                            <span className="cal-search-event-time">{formatTimeDisplay(ev.time)} – {formatTimeDisplay(ev.endTime)}</span>
-                          </div>
-                          {ev.attendees && (
-                            <div className="cal-search-event-attendees">
-                              {ev.attendees.slice(0, 2).map((a, i) => <span key={i} className="cal-search-attendee">{a}</span>)}
-                              {ev.attendees.length > 2 && <span className="cal-search-attendee-more">+{ev.attendees.length - 2}</span>}
-                            </div>
-                          )}
+              return (
+                <div className="cal-schedule-view">
+                  {dates.map(date => {
+                    const d = new Date(date + 'T00:00:00')
+                    const dayLabel = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+                    return (
+                      <div key={date} className="cal-schedule-day">
+                        <div className="cal-schedule-day-header">
+                          <span className="cal-schedule-day-label">{dayLabel}</span>
                         </div>
-                      )
-                    })}
-                  </div>
-                )
-              })
+                        <div className="cal-schedule-day-events">
+                          {grouped[date].map(ev => {
+                            const color = eventColors[ev.colorIndex] || eventColors[0]
+                            return (
+                              <div key={ev.id} className="cal-schedule-event" onClick={() => jumpToEvent(date, ev)}>
+                                <div className="cal-schedule-event-color" style={{ background: color.border }} />
+                                <div className="cal-schedule-event-body">
+                                  <div className="cal-schedule-event-row">
+                                    <span className="cal-schedule-event-title">{ev.title}</span>
+                                    <span className="cal-schedule-event-time">{formatTimeDisplay(ev.time)} – {formatTimeDisplay(ev.endTime)}</span>
+                                  </div>
+                                  {ev.aiSummary && (
+                                    <div className="cal-schedule-event-summary">{ev.aiSummary}</div>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
             })()}
           </div>
         )
