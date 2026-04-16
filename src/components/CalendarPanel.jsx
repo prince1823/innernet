@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { calendarTasks, eventColors, notes as allNotes, activityLogs, featureDocItems, agentSessions } from '../data/sampleData'
-import AIScheduleModal from './AIScheduleModal'
+import CommandBar from './CommandBar'
 import './CalendarPanel.css'
 
 const DAYS_SHORT = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
@@ -402,8 +402,6 @@ function computeOverlapLayout(events) {
 export default function CalendarPanel({ selectedDate, setSelectedDate, selectedEvent, setSelectedEvent, onSlotClick, onQuickNoteAdd, onQuickSlotClear, quickSlot, thoughts = {}, onDatePanelOpen, userEvents = {}, onScheduleEvent, onEventUpdate, eventOverrides = {} }) {
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 9))
   const [showMiniCal, setShowMiniCal] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState(null)
   const [zoomLevel, setZoomLevel] = useState(56) // pixels per hour; continuous 24..240
   const [expandedEvent, setExpandedEvent] = useState(null) // event id for overlay
   const [overlayOrigin, setOverlayOrigin] = useState(null) // { top, left, width, height } for unfold origin
@@ -411,12 +409,13 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const [pullProgress, setPullProgress] = useState(0) // -1..1 (negative = prev day pull, positive = next day pull)
   const [dayTransition, setDayTransition] = useState(null) // 'prev' | 'next' during day flip
   const [hoveredEventId, setHoveredEventId] = useState(null) // event id for the hover peek card
+  // Search state — lifted from CommandBar so results render in the calendar area
+  const [searchResults, setSearchResults] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
   // Draft text for the inline quick-note input that pops up when an empty slot is clicked
   const [quickNoteText, setQuickNoteText] = useState('')
-  const [showAISchedule, setShowAISchedule] = useState(false)
   const quickNoteInputRef = useRef(null)
   const gridRef = useRef(null)
-  const searchRef = useRef(null)
   const panelRef = useRef(null)
   const pullAccum = useRef(0)
   const pullTimer = useRef(null)
@@ -492,89 +491,6 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
         return { time, items, label: formatTimeDisplay(time) }
       })
   }, [dateStr, thoughts])
-
-  // Search logic — first tries Time Queries (productivity / time-on / meetings /
-  // free-time), then falls back to text search over events.
-  const handleSearch = useCallback((query) => {
-    setSearchQuery(query)
-    if (!query.trim()) {
-      setSearchResults({ kind: 'empty' })
-      return
-    }
-    // Note: schedule intent is intentionally NOT handled here — it fires only
-    // on Enter via commitSearch so the user doesn't accidentally create events
-    // while still typing a query.
-    const parsed = parseTimeQuery(query)
-    if (parsed) {
-      const result = runTimeQuery(parsed, dateStr, userEvents)
-      if (result) {
-        setSearchResults(result)
-        return
-      }
-    }
-    const q = query.toLowerCase().trim()
-    const allEvents = getAllEvents(userEvents)
-    let filtered
-
-    if (q.startsWith('#')) {
-      // Project/tag search
-      const tag = q.slice(1)
-      filtered = allEvents.filter(ev =>
-        ev.project?.toLowerCase().includes(tag) ||
-        ev.tags?.some(t => t.toLowerCase().includes(tag))
-      )
-    } else {
-      // Person name or title search
-      filtered = allEvents.filter(ev =>
-        ev.title?.toLowerCase().includes(q) ||
-        ev.attendees?.some(a => a.toLowerCase().includes(q)) ||
-        ev.tags?.some(t => t.toLowerCase().includes(q)) ||
-        ev.project?.toLowerCase().includes(q)
-      )
-    }
-
-    // Group by date
-    const grouped = {}
-    filtered.forEach(ev => {
-      if (!grouped[ev.date]) grouped[ev.date] = []
-      grouped[ev.date].push(ev)
-    })
-    setSearchResults({ kind: 'search', grouped })
-  }, [dateStr, userEvents])
-
-  // Fired on Enter from the search input. Tries to parse a schedule intent —
-  // on success, creates the event and shows a confirmation card (no instant
-  // redirect). The user clicks "Jump to date" to navigate or "Done" to stay.
-  const commitSearch = useCallback((query) => {
-    const schedule = parseScheduleQuery(query || '', TODAY_STR)
-    if (!schedule || !onScheduleEvent) return false
-    const endTime = addMinutesToTimeStr(schedule.time, 60)
-    const typeTitle = schedule.type
-      .split(' ')
-      .map(w => w === '1:1' ? '1:1' : capitalizeWord(w))
-      .join(' ')
-    const title = schedule.attendees.length
-      ? `${typeTitle} with ${schedule.attendees.join(', ')}`
-      : typeTitle
-    const newEvent = {
-      id: `U-${Date.now().toString(36)}`,
-      title,
-      time: schedule.time,
-      endTime,
-      colorIndex: 4,
-      tags: [],
-      attendees: schedule.attendees,
-      userCreated: true,
-    }
-    onScheduleEvent(schedule.date, newEvent)
-    setSearchResults({
-      kind: 'scheduled',
-      event: newEvent,
-      date: schedule.date,
-      endTime,
-    })
-    return true
-  }, [onScheduleEvent])
 
   const goToPrev = () => {
     setDayTransition('prev')
@@ -938,370 +854,50 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
     if (onDatePanelOpen) onDatePanelOpen(dateStr)
   }
 
-  // Jump to a specific date+event from any search result
-  const jumpToEvent = (date, ev) => {
+  // Jump to a specific date from command bar
+  const handleJumpToDate = (date, ev) => {
     const nd = new Date(date + 'T00:00:00')
     setCurrentDate(nd)
     if (ev) setSelectedEvent(ev)
+  }
+
+  // Search results callbacks — CommandBar pushes results up; CalendarPanel renders them
+  const handleSearchResults = useCallback((results) => {
+    setSearchResults(results)
+  }, [])
+  const handleSearchQueryChange = useCallback((q) => {
+    setSearchQuery(q)
+  }, [])
+
+  // Jump helpers for search result cards
+  const jumpToEvent = (date, ev) => {
+    setCurrentDate(new Date(date + 'T00:00:00'))
+    setSelectedEvent(ev)
     setSearchResults(null)
     setSearchQuery('')
   }
-  const jumpToDate = (date) => jumpToEvent(date, null)
-
-  // Search results view
-  if (searchResults) {
-    const kind = searchResults.kind || 'search'
-    return (
-      <div className="calendar-panel" ref={panelRef}>
-        <div className="cal-header">
-          <div className="cal-header-left" style={{ flex: 1 }}>
-            <div className="cal-search-box active">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input
-                ref={searchRef}
-                type="text"
-                placeholder="Ask, search, or schedule — “meeting with Tanuj on 10 Apr 3pm”"
-                value={searchQuery}
-                onChange={e => handleSearch(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    commitSearch(searchQuery)
-                  }
-                }}
-                autoFocus
-              />
-              <button className="cal-search-clear" onClick={() => { setSearchQuery(''); setSearchResults(null) }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="cal-search-results">
-          {/* Empty / initial state — show suggested time queries */}
-          {kind === 'empty' && (
-            <div className="cal-query-suggestions">
-              <div className="cal-query-suggest-label">Try asking…</div>
-              {[
-                'When was I most productive?',
-                'How much time on innernet?',
-                'When are my meetings?',
-                'Free time today',
-                'Schedule a meeting with Tanuj on 16 April 3 pm',
-              ].map(s => (
-                <button
-                  key={s}
-                  className="cal-query-suggest-btn"
-                  onClick={() => {
-                    setSearchQuery(s)
-                    // Schedule examples commit immediately; asking-style queries
-                    // go through the normal handleSearch path.
-                    if (!commitSearch(s)) handleSearch(s)
-                  }}
-                >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                  <span>{s}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Scheduled success card */}
-          {kind === 'scheduled' && (() => {
-            const ev = searchResults.event
-            const d = new Date(searchResults.date + 'T00:00:00')
-            const dateLabel = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
-            return (
-              <div className="cal-schedule-success">
-                <div className="cal-schedule-success-icon">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                </div>
-                <div className="cal-schedule-success-label">Meeting scheduled</div>
-                <div className="cal-schedule-success-title">{ev.title}</div>
-                <div className="cal-schedule-success-meta">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                  <span>{dateLabel}</span>
-                  <span className="cal-schedule-success-dot">·</span>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                  <span>{formatTimeDisplay(ev.time)} – {formatTimeDisplay(ev.endTime)}</span>
-                </div>
-                {ev.attendees && ev.attendees.length > 0 && (
-                  <div className="cal-schedule-success-attendees">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    <span>{ev.attendees.join(', ')}</span>
-                  </div>
-                )}
-                <div className="cal-schedule-success-actions">
-                  <button
-                    className="cal-schedule-success-btn primary"
-                    onClick={() => {
-                      setCurrentDate(new Date(searchResults.date + 'T00:00:00'))
-                      setSelectedEvent(ev)
-                      setSearchResults(null)
-                      setSearchQuery('')
-                    }}
-                  >
-                    <span>Jump to date</span>
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                  </button>
-                  <button
-                    className="cal-schedule-success-btn"
-                    onClick={() => { setSearchResults(null); setSearchQuery('') }}
-                  >
-                    Done
-                  </button>
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* Productivity answer card */}
-          {kind === 'productivity' && (() => {
-            const top = searchResults.top
-            if (!top || top.length === 0) {
-              return <div className="cal-search-empty"><p>Not enough data to rank productivity yet.</p></div>
-            }
-            const winner = top[0]
-            const winnerDate = new Date(winner.ev.date + 'T00:00:00')
-            const maxScore = winner.score
-            return (
-              <div className="cal-query-result">
-                <div className="cal-query-badge">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-                  <span>Productivity analysis</span>
-                </div>
-                <div className="cal-query-headline">
-                  <div className="cal-query-answer-label">Most productive window</div>
-                  <div className="cal-query-answer-time">
-                    {formatTimeDisplay(winner.ev.time)} – {formatTimeDisplay(winner.ev.endTime)}
-                  </div>
-                  <div className="cal-query-answer-title">{winner.ev.title}</div>
-                  <div className="cal-query-answer-date">
-                    {winnerDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-                  </div>
-                </div>
-                <div className="cal-query-metrics">
-                  {winner.logCount > 0 && (
-                    <div className="cal-query-metric">
-                      <span className="cal-query-metric-val">{winner.logCount}</span>
-                      <span className="cal-query-metric-label">activity logs</span>
-                    </div>
-                  )}
-                  {winner.sessionCount > 0 && (
-                    <div className="cal-query-metric">
-                      <span className="cal-query-metric-val">{winner.sessionCount}</span>
-                      <span className="cal-query-metric-label">agent {winner.sessionCount === 1 ? 'session' : 'sessions'}</span>
-                    </div>
-                  )}
-                  {winner.doneCount > 0 && (
-                    <div className="cal-query-metric">
-                      <span className="cal-query-metric-val">{winner.doneCount}/{winner.totalAction}</span>
-                      <span className="cal-query-metric-label">tasks done</span>
-                    </div>
-                  )}
-                  <div className="cal-query-metric">
-                    <span className="cal-query-metric-val">{formatDuration(winner.duration)}</span>
-                    <span className="cal-query-metric-label">focus time</span>
-                  </div>
-                </div>
-                <button className="cal-query-jump" onClick={() => jumpToEvent(winner.ev.date, winner.ev)}>
-                  <span>Jump to this window</span>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                </button>
-                {top.length > 1 && (
-                  <>
-                    <div className="cal-query-runners-label">Runner-ups</div>
-                    <div className="cal-query-runners">
-                      {top.slice(1, 4).map((r, i) => {
-                        const d = new Date(r.ev.date + 'T00:00:00')
-                        const pct = Math.max(12, Math.round((r.score / maxScore) * 100))
-                        const color = eventColors[r.ev.colorIndex] || eventColors[0]
-                        return (
-                          <button key={r.ev.id + '-' + i} className="cal-query-runner" onClick={() => jumpToEvent(r.ev.date, r.ev)}>
-                            <div className="cal-query-runner-bar" style={{ width: `${pct}%`, background: color.border }} />
-                            <div className="cal-query-runner-info">
-                              <span className="cal-query-runner-title">{r.ev.title}</span>
-                              <span className="cal-query-runner-meta">
-                                {d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {formatTimeDisplay(r.ev.time)}
-                              </span>
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </>
-                )}
-              </div>
-            )
-          })()}
-
-          {/* Time on project answer card */}
-          {kind === 'timeOn' && (() => {
-            const { project, totalMin, events, byDate } = searchResults
-            if (!events || events.length === 0) {
-              return <div className="cal-search-empty"><p>No time logged on <strong>{project}</strong>.</p></div>
-            }
-            const maxDayMin = Math.max(...Object.values(byDate))
-            const sortedDates = Object.keys(byDate).sort()
-            return (
-              <div className="cal-query-result">
-                <div className="cal-query-badge">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                  <span>Time investment</span>
-                </div>
-                <div className="cal-query-headline">
-                  <div className="cal-query-answer-label">Total time on <strong>#{project}</strong></div>
-                  <div className="cal-query-answer-time">{formatDuration(totalMin)}</div>
-                  <div className="cal-query-answer-title">{events.length} {events.length === 1 ? 'event' : 'events'} across {sortedDates.length} {sortedDates.length === 1 ? 'day' : 'days'}</div>
-                </div>
-                <div className="cal-query-runners-label">Daily breakdown</div>
-                <div className="cal-query-runners">
-                  {sortedDates.map(d => {
-                    const pct = Math.max(12, Math.round((byDate[d] / maxDayMin) * 100))
-                    const label = new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-                    return (
-                      <button key={d} className="cal-query-runner" onClick={() => jumpToDate(d)}>
-                        <div className="cal-query-runner-bar" style={{ width: `${pct}%` }} />
-                        <div className="cal-query-runner-info">
-                          <span className="cal-query-runner-title">{label}</span>
-                          <span className="cal-query-runner-meta">{formatDuration(byDate[d])}</span>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* Meetings answer card */}
-          {kind === 'meetings' && (() => {
-            const events = searchResults.events
-            if (!events || events.length === 0) {
-              return <div className="cal-search-empty"><p>No meetings found.</p></div>
-            }
-            const totalMin = events.reduce((n, ev) => n + (timeToMinutes(ev.endTime) - timeToMinutes(ev.time)), 0)
-            const people = new Set(events.flatMap(ev => ev.attendees || []))
-            return (
-              <div className="cal-query-result">
-                <div className="cal-query-badge">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                  <span>Meetings</span>
-                </div>
-                <div className="cal-query-headline">
-                  <div className="cal-query-answer-label">Upcoming &amp; past</div>
-                  <div className="cal-query-answer-time">{events.length} {events.length === 1 ? 'meeting' : 'meetings'}</div>
-                  <div className="cal-query-answer-title">{formatDuration(totalMin)} total · {people.size} {people.size === 1 ? 'person' : 'people'}</div>
-                </div>
-                <div className="cal-query-runners-label">All meetings</div>
-                <div className="cal-query-runners">
-                  {events.slice(0, 8).map(ev => {
-                    const d = new Date(ev.date + 'T00:00:00')
-                    const color = eventColors[ev.colorIndex] || eventColors[0]
-                    return (
-                      <button key={ev.id} className="cal-query-runner" onClick={() => jumpToEvent(ev.date, ev)}>
-                        <div className="cal-query-runner-dot" style={{ background: color.border }} />
-                        <div className="cal-query-runner-info">
-                          <span className="cal-query-runner-title">{ev.title}</span>
-                          <span className="cal-query-runner-meta">
-                            {d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · {formatTimeDisplay(ev.time)}
-                          </span>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* Free-time answer card */}
-          {kind === 'freeTime' && (() => {
-            const { gaps, totalFreeMin, dateStr: dStr } = searchResults
-            const d = new Date(dStr + 'T00:00:00')
-            if (!gaps || gaps.length === 0) {
-              return <div className="cal-search-empty"><p>No free blocks of 45+ min on {d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}.</p></div>
-            }
-            return (
-              <div className="cal-query-result">
-                <div className="cal-query-badge">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                  <span>Free time</span>
-                </div>
-                <div className="cal-query-headline">
-                  <div className="cal-query-answer-label">Open blocks on {d.toLocaleDateString('en-US', { weekday: 'long' })}</div>
-                  <div className="cal-query-answer-time">{formatDuration(totalFreeMin)}</div>
-                  <div className="cal-query-answer-title">{gaps.length} {gaps.length === 1 ? 'block' : 'blocks'} of 45+ min</div>
-                </div>
-                <div className="cal-query-runners-label">Blocks</div>
-                <div className="cal-query-runners">
-                  {gaps.map((g, i) => (
-                    <button key={i} className="cal-query-runner" onClick={() => jumpToDate(dStr)}>
-                      <div className="cal-query-runner-info">
-                        <span className="cal-query-runner-title">
-                          {formatTimeDisplay(`${String(Math.floor(g.start/60)).padStart(2,'0')}:${String(g.start%60).padStart(2,'0')}`)} – {formatTimeDisplay(`${String(Math.floor(g.end/60)).padStart(2,'0')}:${String(g.end%60).padStart(2,'0')}`)}
-                        </span>
-                        <span className="cal-query-runner-meta">{formatDuration(g.end - g.start)}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* Default text-search results */}
-          {kind === 'search' && (() => {
-            const grouped = searchResults.grouped || {}
-            const dates = Object.keys(grouped).sort()
-            if (dates.length === 0) {
-              return (
-                <div className="cal-search-empty">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                  <p>No results found</p>
-                </div>
-              )
-            }
-            return dates.map(date => {
-              const d = new Date(date + 'T00:00:00')
-              return (
-                <div key={date} className="cal-search-date-group">
-                  <div className="cal-search-date-header">
-                    <span className="cal-search-date-day">{d.toLocaleDateString('en-US', { weekday: 'short' })}</span>
-                    <span className="cal-search-date-full">{d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                  </div>
-                  {grouped[date].map(ev => {
-                    const color = eventColors[ev.colorIndex] || eventColors[0]
-                    return (
-                      <div key={ev.id} className="cal-search-event" onClick={() => jumpToEvent(date, ev)}>
-                        <div className="cal-search-event-color" style={{ background: color.border }} />
-                        <div className="cal-search-event-info">
-                          <span className="cal-search-event-title">{ev.title}</span>
-                          <span className="cal-search-event-time">{formatTimeDisplay(ev.time)} – {formatTimeDisplay(ev.endTime)}</span>
-                        </div>
-                        {ev.attendees && (
-                          <div className="cal-search-event-attendees">
-                            {ev.attendees.slice(0, 2).map((a, i) => <span key={i} className="cal-search-attendee">{a}</span>)}
-                            {ev.attendees.length > 2 && <span className="cal-search-attendee-more">+{ev.attendees.length - 2}</span>}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )
-            })
-          })()}
-        </div>
-      </div>
-    )
+  const jumpToDate = (date) => {
+    setCurrentDate(new Date(date + 'T00:00:00'))
+    setSearchResults(null)
+    setSearchQuery('')
   }
+
+  // Derive search results kind for inline rendering
+  const searchKind = searchResults ? (searchResults.kind || 'search') : null
 
   return (
     <div className="calendar-panel" ref={panelRef}>
-      {/* Header */}
+      {/* Header — shows close-search button when search is active, normal nav otherwise */}
+      {searchResults ? (
+        <div className="cal-header">
+          <div className="cal-header-left">
+            <button className="cal-today-btn" onClick={() => { setSearchResults(null); setSearchQuery('') }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              Close Search
+            </button>
+          </div>
+        </div>
+      ) : (
       <div className="cal-header">
         <div className="cal-header-left">
           <button className="cal-today-btn" onClick={goToToday}>Today</button>
@@ -1317,15 +913,6 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
           </button>
         </div>
         <div className="cal-header-right">
-          <button className="cal-ai-schedule-btn" onClick={() => setShowAISchedule(true)} title="AI Schedule">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-              <line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/>
-            </svg>
-          </button>
-          <button className="cal-search-btn" onClick={() => { setSearchResults({ kind: 'empty' }); setTimeout(() => searchRef.current?.focus(), 50) }} title="Search">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          </button>
           <div className="cal-zoom-btns">
             <button className="cal-zoom-btn" onClick={zoomOut} disabled={zoomLevel <= MIN_ZOOM + 0.5} title="Zoom out (or hold Cmd/Ctrl and scroll)">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -1336,17 +923,258 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
           </div>
         </div>
       </div>
+      )}
 
-      {/* AI Schedule Modal */}
-      <AIScheduleModal
-        open={showAISchedule}
-        onClose={() => setShowAISchedule(false)}
-        onScheduleEvent={onScheduleEvent}
-        existingEvents={{ ...calendarTasks, ...userEvents }}
-      />
+      {/* Search results — shown in place of the grid when active */}
+      {searchResults && (() => {
+        const kind = searchKind
+        return (
+          <div className="cal-search-results">
+            {/* Scheduled success card */}
+            {kind === 'scheduled' && (() => {
+              const ev = searchResults.event
+              const d = new Date(searchResults.date + 'T00:00:00')
+              const dateLabel = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+              return (
+                <div className="cal-schedule-success">
+                  <div className="cal-schedule-success-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                  </div>
+                  <div className="cal-schedule-success-label">Meeting scheduled</div>
+                  <div className="cal-schedule-success-title">{ev.title}</div>
+                  <div className="cal-schedule-success-meta">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <span>{dateLabel}</span>
+                    <span className="cal-schedule-success-dot">·</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>{formatTimeDisplay(ev.time)} – {formatTimeDisplay(ev.endTime)}</span>
+                  </div>
+                  {ev.attendees && ev.attendees.length > 0 && (
+                    <div className="cal-schedule-success-attendees">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                      <span>{ev.attendees.join(', ')}</span>
+                    </div>
+                  )}
+                  <div className="cal-schedule-success-actions">
+                    <button className="cal-schedule-success-btn primary" onClick={() => { jumpToEvent(searchResults.date, ev) }}>
+                      <span>Jump to date</span>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    </button>
+                    <button className="cal-schedule-success-btn" onClick={() => { setSearchResults(null); setSearchQuery('') }}>Done</button>
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Productivity answer card */}
+            {kind === 'productivity' && (() => {
+              const top = searchResults.top
+              if (!top || top.length === 0) return <div className="cal-search-empty"><p>Not enough data to rank productivity yet.</p></div>
+              const winner = top[0]
+              const winnerDate = new Date(winner.ev.date + 'T00:00:00')
+              const maxScore = winner.score
+              return (
+                <div className="cal-query-result">
+                  <div className="cal-query-badge">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    <span>Productivity analysis</span>
+                  </div>
+                  <div className="cal-query-headline">
+                    <div className="cal-query-answer-label">Most productive window</div>
+                    <div className="cal-query-answer-time">{formatTimeDisplay(winner.ev.time)} – {formatTimeDisplay(winner.ev.endTime)}</div>
+                    <div className="cal-query-answer-title">{winner.ev.title}</div>
+                    <div className="cal-query-answer-date">{winnerDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</div>
+                  </div>
+                  <div className="cal-query-metrics">
+                    {winner.logCount > 0 && <div className="cal-query-metric"><span className="cal-query-metric-val">{winner.logCount}</span><span className="cal-query-metric-label">activity logs</span></div>}
+                    {winner.sessionCount > 0 && <div className="cal-query-metric"><span className="cal-query-metric-val">{winner.sessionCount}</span><span className="cal-query-metric-label">agent {winner.sessionCount === 1 ? 'session' : 'sessions'}</span></div>}
+                    {winner.doneCount > 0 && <div className="cal-query-metric"><span className="cal-query-metric-val">{winner.doneCount}/{winner.totalAction}</span><span className="cal-query-metric-label">tasks done</span></div>}
+                    <div className="cal-query-metric"><span className="cal-query-metric-val">{formatDuration(winner.duration)}</span><span className="cal-query-metric-label">focus time</span></div>
+                  </div>
+                  <button className="cal-query-jump" onClick={() => jumpToEvent(winner.ev.date, winner.ev)}>
+                    <span>Jump to this window</span>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                  </button>
+                  {top.length > 1 && (
+                    <>
+                      <div className="cal-query-runners-label">Runner-ups</div>
+                      <div className="cal-query-runners">
+                        {top.slice(1, 4).map((r, i) => {
+                          const d = new Date(r.ev.date + 'T00:00:00')
+                          const pct = Math.max(12, Math.round((r.score / maxScore) * 100))
+                          const color = eventColors[r.ev.colorIndex] || eventColors[0]
+                          return (
+                            <button key={r.ev.id + '-' + i} className="cal-query-runner" onClick={() => jumpToEvent(r.ev.date, r.ev)}>
+                              <div className="cal-query-runner-bar" style={{ width: `${pct}%`, background: color.border }} />
+                              <div className="cal-query-runner-info">
+                                <span className="cal-query-runner-title">{r.ev.title}</span>
+                                <span className="cal-query-runner-meta">{d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · {formatTimeDisplay(r.ev.time)}</span>
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )
+            })()}
+
+            {/* Time on project answer card */}
+            {kind === 'timeOn' && (() => {
+              const { project, totalMin, events, byDate } = searchResults
+              if (!events || events.length === 0) return <div className="cal-search-empty"><p>No time logged on <strong>{project}</strong>.</p></div>
+              const maxDayMin = Math.max(...Object.values(byDate))
+              const sortedDates = Object.keys(byDate).sort()
+              return (
+                <div className="cal-query-result">
+                  <div className="cal-query-badge">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>Time investment</span>
+                  </div>
+                  <div className="cal-query-headline">
+                    <div className="cal-query-answer-label">Total time on <strong>#{project}</strong></div>
+                    <div className="cal-query-answer-time">{formatDuration(totalMin)}</div>
+                    <div className="cal-query-answer-title">{events.length} {events.length === 1 ? 'event' : 'events'} across {sortedDates.length} {sortedDates.length === 1 ? 'day' : 'days'}</div>
+                  </div>
+                  <div className="cal-query-runners-label">Daily breakdown</div>
+                  <div className="cal-query-runners">
+                    {sortedDates.map(d => {
+                      const pct = Math.max(12, Math.round((byDate[d] / maxDayMin) * 100))
+                      const label = new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                      return (
+                        <button key={d} className="cal-query-runner" onClick={() => jumpToDate(d)}>
+                          <div className="cal-query-runner-bar" style={{ width: `${pct}%` }} />
+                          <div className="cal-query-runner-info">
+                            <span className="cal-query-runner-title">{label}</span>
+                            <span className="cal-query-runner-meta">{formatDuration(byDate[d])}</span>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Meetings answer card */}
+            {kind === 'meetings' && (() => {
+              const events = searchResults.events
+              if (!events || events.length === 0) return <div className="cal-search-empty"><p>No meetings found.</p></div>
+              const totalMin = events.reduce((n, ev) => n + (timeToMinutes(ev.endTime) - timeToMinutes(ev.time)), 0)
+              const people = new Set(events.flatMap(ev => ev.attendees || []))
+              return (
+                <div className="cal-query-result">
+                  <div className="cal-query-badge">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>Meetings</span>
+                  </div>
+                  <div className="cal-query-headline">
+                    <div className="cal-query-answer-label">Upcoming &amp; past</div>
+                    <div className="cal-query-answer-time">{events.length} {events.length === 1 ? 'meeting' : 'meetings'}</div>
+                    <div className="cal-query-answer-title">{formatDuration(totalMin)} total · {people.size} {people.size === 1 ? 'person' : 'people'}</div>
+                  </div>
+                  <div className="cal-query-runners-label">All meetings</div>
+                  <div className="cal-query-runners">
+                    {events.slice(0, 8).map(ev => {
+                      const d = new Date(ev.date + 'T00:00:00')
+                      const color = eventColors[ev.colorIndex] || eventColors[0]
+                      return (
+                        <button key={ev.id} className="cal-query-runner" onClick={() => jumpToEvent(ev.date, ev)}>
+                          <div className="cal-query-runner-dot" style={{ background: color.border }} />
+                          <div className="cal-query-runner-info">
+                            <span className="cal-query-runner-title">{ev.title}</span>
+                            <span className="cal-query-runner-meta">{d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · {formatTimeDisplay(ev.time)}</span>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Free-time answer card */}
+            {kind === 'freeTime' && (() => {
+              const { gaps, totalFreeMin, dateStr: dStr } = searchResults
+              const d = new Date(dStr + 'T00:00:00')
+              if (!gaps || gaps.length === 0) return <div className="cal-search-empty"><p>No free blocks of 45+ min on {d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}.</p></div>
+              return (
+                <div className="cal-query-result">
+                  <div className="cal-query-badge">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <span>Free time</span>
+                  </div>
+                  <div className="cal-query-headline">
+                    <div className="cal-query-answer-label">Open blocks on {d.toLocaleDateString('en-US', { weekday: 'long' })}</div>
+                    <div className="cal-query-answer-time">{formatDuration(totalFreeMin)}</div>
+                    <div className="cal-query-answer-title">{gaps.length} {gaps.length === 1 ? 'block' : 'blocks'} of 45+ min</div>
+                  </div>
+                  <div className="cal-query-runners-label">Blocks</div>
+                  <div className="cal-query-runners">
+                    {gaps.map((g, i) => (
+                      <button key={i} className="cal-query-runner" onClick={() => jumpToDate(dStr)}>
+                        <div className="cal-query-runner-info">
+                          <span className="cal-query-runner-title">
+                            {formatTimeDisplay(`${String(Math.floor(g.start/60)).padStart(2,'0')}:${String(g.start%60).padStart(2,'0')}`)} – {formatTimeDisplay(`${String(Math.floor(g.end/60)).padStart(2,'0')}:${String(g.end%60).padStart(2,'0')}`)}
+                          </span>
+                          <span className="cal-query-runner-meta">{formatDuration(g.end - g.start)}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Default text-search results */}
+            {kind === 'search' && (() => {
+              const grouped = searchResults.grouped || {}
+              const dates = Object.keys(grouped).sort()
+              if (dates.length === 0) {
+                return (
+                  <div className="cal-search-empty">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <p>No results found</p>
+                  </div>
+                )
+              }
+              return dates.map(date => {
+                const d = new Date(date + 'T00:00:00')
+                return (
+                  <div key={date} className="cal-search-date-group">
+                    <div className="cal-search-date-header">
+                      <span className="cal-search-date-day">{d.toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                      <span className="cal-search-date-full">{d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                    </div>
+                    {grouped[date].map(ev => {
+                      const color = eventColors[ev.colorIndex] || eventColors[0]
+                      return (
+                        <div key={ev.id} className="cal-search-event" onClick={() => jumpToEvent(date, ev)}>
+                          <div className="cal-search-event-color" style={{ background: color.border }} />
+                          <div className="cal-search-event-info">
+                            <span className="cal-search-event-title">{ev.title}</span>
+                            <span className="cal-search-event-time">{formatTimeDisplay(ev.time)} – {formatTimeDisplay(ev.endTime)}</span>
+                          </div>
+                          {ev.attendees && (
+                            <div className="cal-search-event-attendees">
+                              {ev.attendees.slice(0, 2).map((a, i) => <span key={i} className="cal-search-attendee">{a}</span>)}
+                              {ev.attendees.length > 2 && <span className="cal-search-attendee-more">+{ev.attendees.length - 2}</span>}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })
+            })()}
+          </div>
+        )
+      })()}
 
       {/* Mini Calendar Dropdown */}
-      {showMiniCal && (
+      {!searchResults && showMiniCal && (
         <div className="cal-mini-cal">
           <div className="cal-mini-header">
             <button className="cal-mini-nav" onClick={() => handleMiniCalMonthNav(-1)}>
@@ -1381,6 +1209,8 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
         </div>
       )}
 
+      {/* Calendar content — hidden when search results are active */}
+      {!searchResults && (<>
       {/* Pull-to-flip hints */}
       {pullProgress < 0 && !expandedEvent && (
         <div className="cal-pull-hint cal-pull-hint--top" style={{ opacity: Math.min(1, -pullProgress), transform: `translateY(${Math.min(0, pullProgress * 8)}px)` }}>
@@ -1732,6 +1562,19 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
           </div>
         )
       })()}
+      </>)}
+
+      {/* Unified Command Bar */}
+      <CommandBar
+        onScheduleEvent={onScheduleEvent}
+        existingEvents={{ ...calendarTasks, ...userEvents }}
+        userEvents={userEvents}
+        dateStr={dateStr}
+        onJumpToDate={handleJumpToDate}
+        onSearchResults={handleSearchResults}
+        searchQuery={searchQuery}
+        onSearchQueryChange={handleSearchQueryChange}
+      />
     </div>
   )
 }
