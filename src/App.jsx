@@ -199,7 +199,7 @@ function App() {
               : <polyline points="15 18 9 12 15 6" />
             }
           </svg>
-          {sidebarCollapsed && <span>Calendar</span>}
+          {sidebarCollapsed && <span>Plan</span>}
         </button>
         {!sidebarCollapsed && (
           <div className="sidebar-resize-zone" onMouseDown={handleSidebarResizeStart} />
@@ -229,7 +229,7 @@ function App() {
                 : <polyline points="6 9 12 15 18 9" />
               }
             </svg>
-            <span>{bottomCollapsed ? 'Document & Logs' : ''}</span>
+            <span>{bottomCollapsed ? 'Think' : ''}</span>
           </button>
           {!bottomCollapsed && (
             <div className="resize-handle-right" onMouseDown={handleBottomResizeStart} />
