@@ -1557,8 +1557,8 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                   </div>
                 )}
 
-                {/* Tabs / Sites / Files Changed */}
-                {ev.workActivity && (
+                {/* Tabs / Sites */}
+                {ev.workActivity && (ev.workActivity.tabs?.length > 0 || ev.workActivity.sites?.length > 0) && (
                   <div className="cal-detail-section">
                     <div className="cal-detail-work">
                       {ev.workActivity.tabs && ev.workActivity.tabs.length > 0 && (
@@ -1587,29 +1587,35 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                           </div>
                         </div>
                       )}
-                      {ev.workActivity.filesChanged && ev.workActivity.filesChanged.length > 0 && (
-                        <div className="cal-detail-work-section">
-                          <div className="cal-detail-work-heading">
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                            <span>Files changed</span>
-                            <span className="cal-detail-work-stat">
-                              <span className="cal-detail-additions">+{ev.workActivity.filesChanged.reduce((s, f) => s + f.additions, 0)}</span>
-                              <span className="cal-detail-deletions">-{ev.workActivity.filesChanged.reduce((s, f) => s + f.deletions, 0)}</span>
-                            </span>
-                          </div>
-                          <div className="cal-detail-files">
-                            {ev.workActivity.filesChanged.map((f, i) => (
-                              <div key={i} className="cal-detail-file">
-                                <span className="cal-detail-file-name">{f.name}</span>
-                                <span className="cal-detail-file-diff">
-                                  <span className="cal-detail-additions">+{f.additions}</span>
-                                  <span className="cal-detail-deletions">-{f.deletions}</span>
-                                </span>
-                              </div>
-                            ))}
-                          </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Files Changed */}
+                {ev.workActivity?.filesChanged?.length > 0 && (
+                  <div className="cal-detail-section">
+                    <div className="cal-detail-work">
+                      <div className="cal-detail-work-section">
+                        <div className="cal-detail-work-heading">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                          <span>Files changed</span>
+                          <span className="cal-detail-work-stat">
+                            <span className="cal-detail-additions">+{ev.workActivity.filesChanged.reduce((s, f) => s + f.additions, 0)}</span>
+                            <span className="cal-detail-deletions">-{ev.workActivity.filesChanged.reduce((s, f) => s + f.deletions, 0)}</span>
+                          </span>
                         </div>
-                      )}
+                        <div className="cal-detail-files">
+                          {ev.workActivity.filesChanged.map((f, i) => (
+                            <div key={i} className="cal-detail-file">
+                              <span className="cal-detail-file-name">{f.name}</span>
+                              <span className="cal-detail-file-diff">
+                                <span className="cal-detail-additions">+{f.additions}</span>
+                                <span className="cal-detail-deletions">-{f.deletions}</span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1976,8 +1982,8 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                   </div>
                 )}
 
-                {/* Tabs / Sites / Files Changed */}
-                {expandedTask.workActivity && (
+                {/* Tabs / Sites */}
+                {expandedTask.workActivity && (expandedTask.workActivity.tabs?.length > 0 || expandedTask.workActivity.sites?.length > 0) && (
                   <div className="cal-detail-section">
                     <div className="cal-detail-work">
                       {expandedTask.workActivity.tabs && expandedTask.workActivity.tabs.length > 0 && (
@@ -2006,29 +2012,35 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                           </div>
                         </div>
                       )}
-                      {expandedTask.workActivity.filesChanged && expandedTask.workActivity.filesChanged.length > 0 && (
-                        <div className="cal-detail-work-section">
-                          <div className="cal-detail-work-heading">
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                            <span>Files changed</span>
-                            <span className="cal-detail-work-stat">
-                              <span className="cal-detail-additions">+{expandedTask.workActivity.filesChanged.reduce((s, f) => s + f.additions, 0)}</span>
-                              <span className="cal-detail-deletions">-{expandedTask.workActivity.filesChanged.reduce((s, f) => s + f.deletions, 0)}</span>
-                            </span>
-                          </div>
-                          <div className="cal-detail-files">
-                            {expandedTask.workActivity.filesChanged.map((f, i) => (
-                              <div key={i} className="cal-detail-file">
-                                <span className="cal-detail-file-name">{f.name}</span>
-                                <span className="cal-detail-file-diff">
-                                  <span className="cal-detail-additions">+{f.additions}</span>
-                                  <span className="cal-detail-deletions">-{f.deletions}</span>
-                                </span>
-                              </div>
-                            ))}
-                          </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Files Changed */}
+                {expandedTask.workActivity?.filesChanged?.length > 0 && (
+                  <div className="cal-detail-section">
+                    <div className="cal-detail-work">
+                      <div className="cal-detail-work-section">
+                        <div className="cal-detail-work-heading">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                          <span>Files changed</span>
+                          <span className="cal-detail-work-stat">
+                            <span className="cal-detail-additions">+{expandedTask.workActivity.filesChanged.reduce((s, f) => s + f.additions, 0)}</span>
+                            <span className="cal-detail-deletions">-{expandedTask.workActivity.filesChanged.reduce((s, f) => s + f.deletions, 0)}</span>
+                          </span>
                         </div>
-                      )}
+                        <div className="cal-detail-files">
+                          {expandedTask.workActivity.filesChanged.map((f, i) => (
+                            <div key={i} className="cal-detail-file">
+                              <span className="cal-detail-file-name">{f.name}</span>
+                              <span className="cal-detail-file-diff">
+                                <span className="cal-detail-additions">+{f.additions}</span>
+                                <span className="cal-detail-deletions">-{f.deletions}</span>
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
