@@ -20,6 +20,8 @@ function renderMd(text) {
 const EDITS_KEY = 'innernet-journal-edits'        // legacy — read once for migration
 const TREES_KEY = 'innernet-journal-trees'        // per-date editable block trees
 const AI_INSERTS_KEY = 'innernet-journal-inserts'
+const STAMP_VERSION_KEY = 'innernet-stamp-version'
+const STAMP_VERSION = 2  // bump to force re-stamp
 
 function loadLegacyEdits() {
   try { return JSON.parse(localStorage.getItem(EDITS_KEY) || '{}') } catch { return {} }
@@ -346,24 +348,46 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   // Working blocks for current date (saved tree OR materialized from sample)
   const blocks = trees[selectedDate] || materializeTree(selectedDate, legacyEditsRef.current)
 
-  // Auto-stamp time/project on top-level blocks using calendar events for that date
+  // Auto-stamp time/project on top-level blocks by matching to calendar events
   useEffect(() => {
     if (!blocks.length) return
     const events = calendarTasks[selectedDate] || []
+    if (!events.length) return
+
+    const savedVersion = parseInt(localStorage.getItem(STAMP_VERSION_KEY) || '0', 10)
+    const forceRestamp = savedVersion < STAMP_VERSION
     const eventTimes = new Set(events.map(e => e.time))
-    // Re-stamp if any top-level block has no time or a time that doesn't match any calendar event
-    const needsStamp = blocks.some(b => !b.time || (b.time && !eventTimes.has(b.time)))
-    if (!needsStamp || !events.length) return
+    const needsStamp = forceRestamp || blocks.some(b => !b.time || !eventTimes.has(b.time))
+    if (!needsStamp) return
+
+    // Match block text to event title by word overlap
+    function matchScore(blockText, eventTitle) {
+      const bWords = (blockText || '').toLowerCase().split(/\s+/)
+      const eWords = (eventTitle || '').toLowerCase().split(/\s+/)
+      return bWords.filter(w => w.length > 2 && eWords.some(ew => ew.includes(w) || w.includes(ew))).length
+    }
+
     setTrees(prev => {
       const current = prev[selectedDate] || materializeTree(selectedDate, legacyEditsRef.current)
-      const stamped = current.map((b, i) => {
-        if (b.time && eventTimes.has(b.time)) return b
-        const ev = events[i]
-        if (ev) return { ...b, time: ev.time, project: b.project || ev.project }
+      const usedEvents = new Set()
+      const stamped = current.map(b => {
+        if (!forceRestamp && b.time && eventTimes.has(b.time)) return b
+        let bestEv = null, bestScore = 0
+        for (const ev of events) {
+          if (usedEvents.has(ev.id)) continue
+          const score = matchScore(b.text, ev.title)
+          if (score > bestScore) { bestScore = score; bestEv = ev }
+        }
+        if (!bestEv) bestEv = events.find(ev => !usedEvents.has(ev.id))
+        if (bestEv) {
+          usedEvents.add(bestEv.id)
+          return { ...b, time: bestEv.time, project: b.project || bestEv.project }
+        }
         return b
       })
       return { ...prev, [selectedDate]: stamped }
     })
+    localStorage.setItem(STAMP_VERSION_KEY, String(STAMP_VERSION))
   }, [selectedDate])
 
   // Persist trees
