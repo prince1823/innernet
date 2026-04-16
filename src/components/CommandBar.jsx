@@ -417,6 +417,14 @@ export default function CommandBar({ onScheduleEvent, existingEvents = {}, userE
   }
 
   const handleCancel = () => {
+    // Mark the latest event card as cancelled before clearing pendingEvent
+    setMessages(prev => prev.map((m, i) => {
+      if (m.role === 'event-card') {
+        const isLatest = !prev.slice(i + 1).some(x => x.role === 'event-card')
+        if (isLatest) return { ...m, cancelled: true }
+      }
+      return m
+    }))
     setPendingEvent(null)
     setMessages(prev => [...prev, { role: 'system', content: 'Event cancelled. Type something new to schedule.' }])
   }
@@ -550,7 +558,7 @@ export default function CommandBar({ onScheduleEvent, existingEvents = {}, userE
                 const conflicts = isPending && ev.date && ev.time && endTime ? detectConflicts(ev.date, ev.time, endTime) : []
                 const dateObj = ev.date ? new Date(ev.date + 'T00:00:00') : null
                 const dateLabel = dateObj ? dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }) : 'Date not set'
-                const isCreated = !pendingEvent && !isLatestCard || (!pendingEvent && isLatestCard)
+                const isCreated = !pendingEvent && !msg.cancelled
                 return (
                   <div className={`cmdbar-event-card ${msg.isUpdate ? 'cmdbar-event-card--updated' : ''} ${isCreated ? 'cmdbar-event-card--created' : ''}`}>
                     {msg.isUpdate && !isCreated && <div className="cmdbar-event-card-badge">Updated</div>}
