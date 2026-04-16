@@ -718,6 +718,15 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
               title="Click to zoom in"
             />
           </div>
+          {/* Time + Project on top-level headings */}
+          {depth === 0 && block.time && (
+            <span className="ls-block-time">{(() => {
+              const [h, m] = block.time.split(':').map(Number)
+              const ampm = h >= 12 ? 'PM' : 'AM'
+              const h12 = h % 12 || 12
+              return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`
+            })()}</span>
+          )}
           {isAI ? (
             <div className="ls-ai-card">
               <span
@@ -762,6 +771,9 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
               onBlur={e => handleBlockBlur(block.id, e.currentTarget.textContent)}
               dangerouslySetInnerHTML={{ __html: renderMd(displayText) }}
             />
+          )}
+          {depth === 0 && block.project && (
+            <span className="ls-block-project">#{block.project}</span>
           )}
         </div>
 

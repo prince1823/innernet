@@ -566,6 +566,35 @@
   40%           { opacity: 1;   transform: translateY(-2px) scale(1.1);  }
 }
 
+/* ── Time + Project on top-level headings ── */
+
+.ls-block-time {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7785;
+  font-family: 'SF Mono', SFMono-Regular, Menlo, Monaco, 'Courier New', monospace;
+  padding: 5px 0;
+  min-width: 62px;
+  text-align: right;
+  letter-spacing: -0.2px;
+  margin-right: 4px;
+}
+
+.ls-block-project {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--purple-600, #7c3aed);
+  padding: 3px 8px;
+  background: rgba(139, 92, 246, 0.08);
+  border-radius: 4px;
+  margin-left: 8px;
+  white-space: nowrap;
+  align-self: center;
+  letter-spacing: 0.2px;
+}
+
 /* ── Scrollbar ── */
 .doc-body::-webkit-scrollbar { width: 6px; }
 .doc-body::-webkit-scrollbar-track { background: transparent; }

@@ -470,7 +470,7 @@ export const featureDocItems = [
 export const journalPages = {
   '2026-04-07': [
     {
-      id: 'j0407-1', text: 'Kickoff: Innernet v1 planning', children: [
+      id: 'j0407-1', text: 'Kickoff: Innernet v1 planning', time: '9:00', endTime: '10:00', project: 'innernet', children: [
         { id: 'j0407-1a', text: 'Core idea — a personal OS that connects calendar, documents, and AI agents into one workspace', children: [] },
         {
           id: 'j0407-1b', text: 'Design pillars', children: [
@@ -482,7 +482,7 @@ export const journalPages = {
       ]
     },
     {
-      id: 'j0407-2', text: 'Decided on tech stack', children: [
+      id: 'j0407-2', text: 'Decided on tech stack', time: '11:00', endTime: '12:00', project: 'innernet', children: [
         { id: 'j0407-2a', text: 'React + Vite for the frontend', children: [] },
         { id: 'j0407-2b', text: 'Cloudflare Workers for sync layer', children: [] },
         { id: 'j0407-2c', text: 'localStorage for now, migrate to IndexedDB later', children: [] },
@@ -492,7 +492,7 @@ export const journalPages = {
 
   '2026-04-08': [
     {
-      id: 'j0408-1', text: 'Calendar panel prototype', children: [
+      id: 'j0408-1', text: 'Calendar panel prototype', time: '9:00', endTime: '10:30', project: 'innernet', children: [
         { id: 'j0408-1a', text: 'Built time-grid with 30min slots', children: [] },
         {
           id: 'j0408-1b', text: 'Event rendering', children: [
@@ -508,7 +508,7 @@ export const journalPages = {
 
   '2026-04-09': [
     {
-      id: 'j0409-1', text: 'Implement Promises Feature', children: [
+      id: 'j0409-1', text: 'Implement Promises Feature', time: '10:00', endTime: '12:00', project: 'innernet', children: [
         {
           id: 'j0409-1a', text: 'Core requirements', children: [
             { id: 'j0409-1a1', text: 'Window summary view showing daily promise status', children: [] },
@@ -521,7 +521,7 @@ export const journalPages = {
       ]
     },
     {
-      id: 'j0409-2', text: 'Sync to Universe with Cloudflare Worker', children: [
+      id: 'j0409-2', text: 'Sync to Universe with Cloudflare Worker', time: '14:30', endTime: '15:30', project: 'colab91', children: [
         { id: 'j0409-2a', text: 'Setup Cloudflare Worker endpoint', children: [] },
         { id: 'j0409-2b', text: 'Integration with project #colab91', children: [] },
         {
@@ -533,7 +533,7 @@ export const journalPages = {
       ]
     },
     {
-      id: 'j0409-3', text: 'Morning standup notes', children: [
+      id: 'j0409-3', text: 'Morning standup notes', time: '9:00', endTime: '9:30', project: 'innernet', children: [
         { id: 'j0409-3a', text: 'Team agreed on semaphore pattern for agent concurrency (max 3)', children: [] },
         { id: 'j0409-3b', text: 'Tanuj to review calendar search prototype by end of day', children: [] },
       ]
@@ -542,7 +542,7 @@ export const journalPages = {
 
   '2026-04-10': [
     {
-      id: 'j0410-1', text: 'Multi-Agent Execution Engine', children: [
+      id: 'j0410-1', text: 'Multi-Agent Execution Engine', time: '9:00', endTime: '10:30', project: 'innernet', children: [
         { id: 'j0410-1a', text: 'Each feature triggers a separate agent session', children: [] },
         { id: 'j0410-1b', text: 'Agent receives feature doc content as input/context', children: [] },
         {
@@ -555,7 +555,7 @@ export const journalPages = {
       ]
     },
     {
-      id: 'j0410-2', text: 'Calendar Search & Filter', children: [
+      id: 'j0410-2', text: 'Calendar Search & Filter', time: '11:00', endTime: '12:30', project: 'innernet', children: [
         { id: 'j0410-2a', text: 'Search #colab91 to see all Colab91 meetings', children: [] },
         { id: 'j0410-2b', text: 'Search "Tanuj" to see all meetings with Tanuj', children: [] },
         {
@@ -571,7 +571,7 @@ export const journalPages = {
 
   '2026-04-11': [
     {
-      id: 'j0411-1', text: 'Weekly review', children: [
+      id: 'j0411-1', text: 'Weekly review', time: '10:00', endTime: '11:30', project: 'innernet', children: [
         {
           id: 'j0411-1a', text: 'What went well', children: [
             { id: 'j0411-1a1', text: 'Promises feature MVP is functional', children: [] },
@@ -589,7 +589,7 @@ export const journalPages = {
       ]
     },
     {
-      id: 'j0411-2', text: 'Reading: "Tools for Thought" by Howard Rheingold', children: [
+      id: 'j0411-2', text: 'Reading: "Tools for Thought" by Howard Rheingold', time: '13:00', endTime: '14:00', project: 'innernet', children: [
         { id: 'j0411-2a', text: 'The best tools disappear — they become extensions of how you think', children: [] },
         { id: 'j0411-2b', text: 'Innernet should feel like thinking out loud, not operating software', children: [] },
       ]
@@ -598,7 +598,7 @@ export const journalPages = {
 
   '2026-04-12': [
     {
-      id: 'j0412-1', text: 'Thoughts on the spectrum model', children: [
+      id: 'j0412-1', text: 'Thoughts on the spectrum model', time: '10:00', endTime: '10:30', project: 'innernet', children: [
         {
           id: 'j0412-1a', text: 'Most things in life exist on a spectrum, and to double down on one point of view when there are other ways of seeing things is limiting', children: [
             { id: 'j0412-1a1', text: 'Behaviours, normality, harm — all contextual', children: [] },
@@ -617,7 +617,7 @@ export const journalPages = {
 
   '2026-04-13': [
     {
-      id: 'j0413-1', text: 'Sunday — rest day', children: [
+      id: 'j0413-1', text: 'Sunday — rest day', time: '11:00', endTime: '12:30', project: 'innernet', children: [
         { id: 'j0413-1a', text: 'Walked along the river, cleared my head', children: [] },
         {
           id: 'j0413-1b', text: 'Ideas that came up', children: [
@@ -632,14 +632,14 @@ export const journalPages = {
 
   '2026-04-14': [
     {
-      id: 'j0414-1', text: 'Shipping the outliner update today', children: [
+      id: 'j0414-1', text: 'Shipping the outliner update today', time: '9:00', endTime: '10:30', project: 'innernet', children: [
         { id: 'j0414-1a', text: 'Document panel now renders as Logseq-style nested blocks', children: [] },
         { id: 'j0414-1b', text: 'Thread lines connect parent bullets to children', children: [] },
         { id: 'j0414-1c', text: 'Journal pages are date-keyed — selecting a date shows that day\'s blocks', children: [] },
       ]
     },
     {
-      id: 'j0414-2', text: 'Next up', children: [
+      id: 'j0414-2', text: 'Next up', time: '15:00', endTime: '16:00', project: 'innernet', children: [
         { id: 'j0414-2a', text: 'Block collapsing/expanding (click bullet to toggle)', children: [] },
         { id: 'j0414-2b', text: 'Drag-and-drop reordering', children: [] },
         { id: 'j0414-2c', text: 'Block references — link to other blocks by ID', children: [] },
