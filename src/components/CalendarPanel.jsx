@@ -1912,68 +1912,119 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                 </button>
               </div>
 
-              <div className="cal-overlay-split">
-                {/* LEFT: Summary */}
-                <div className="cal-overlay-col cal-overlay-col--left">
-                  <div className="cal-overlay-col-title">Summary</div>
-                  <div className="cal-overlay-col-body">
-                    {expandedTask.aiSummary && (
-                      <div className="cal-overlay-block cal-overlay-block--ai">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                        <p>{expandedTask.aiSummary}</p>
-                      </div>
-                    )}
-                    {expandedSummary.approachSummary && (
-                      <div className="cal-overlay-block">
-                        <div className="cal-overlay-label">Approach</div>
-                        <p className="cal-overlay-ptext"><strong>Planned:</strong> {expandedSummary.approachSummary.plannedText}</p>
-                        <p className="cal-overlay-ptext"><strong>Done:</strong> {expandedSummary.approachSummary.doneText}</p>
-                        <div className="cal-overlay-progress">
-                          <div className="cal-overlay-progress-bar" style={{ width: `${(expandedSummary.approachSummary.doneCount / expandedSummary.approachSummary.totalCount) * 100}%` }} />
-                          <span>{expandedSummary.approachSummary.doneCount}/{expandedSummary.approachSummary.totalCount}</span>
-                        </div>
-                      </div>
-                    )}
-                    {expandedSummary.features.length > 0 && (
-                      <div className="cal-overlay-block">
-                        <div className="cal-overlay-label">Feature Docs</div>
-                        {expandedSummary.features.map(f => (
-                          <div key={f.id} className="cal-overlay-feat">
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                            <span>{f.title}</span>
+              <div className="cal-detail-stacked">
+                <div className="cal-detail-section">
+                  {expandedTask.aiSummary && (
+                    <p className="cal-detail-summary-text">{expandedTask.aiSummary}</p>
+                  )}
+                  {(expandedSummary.approachSummary || expandedSummary.features.length > 0 || expandedSummary.agentSummary) && (
+                    <div className="cal-detail-meta">
+                      {expandedSummary.approachSummary && (
+                        <>
+                          <div className="cal-detail-meta-row">
+                            <span className="cal-detail-meta-label">Planned</span>
+                            <span className="cal-detail-meta-value">{expandedSummary.approachSummary.plannedText}</span>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                    {expandedSummary.agentSummary && (
-                      <div className="cal-overlay-block">
-                        <div className="cal-overlay-label">Agent Session</div>
-                        <p className="cal-overlay-ptext cal-overlay-ptext--italic">{expandedSummary.agentSummary}</p>
-                      </div>
-                    )}
-                  </div>
+                          <div className="cal-detail-meta-row">
+                            <span className="cal-detail-meta-label">Done</span>
+                            <span className="cal-detail-meta-value">{expandedSummary.approachSummary.doneText}</span>
+                          </div>
+                        </>
+                      )}
+                      {expandedSummary.features.length > 0 && (
+                        <div className="cal-detail-meta-row">
+                          <span className="cal-detail-meta-label">Docs</span>
+                          <span className="cal-detail-meta-value">{expandedSummary.features.map(f => f.title).join(', ')}</span>
+                        </div>
+                      )}
+                      {expandedSummary.agentSummary && (
+                        <div className="cal-detail-meta-row">
+                          <span className="cal-detail-meta-label">Agent</span>
+                          <span className="cal-detail-meta-value cal-detail-meta-value--italic">{expandedSummary.agentSummary}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {expandedTask.workActivity && (
+                    <div className="cal-detail-work">
+                      {expandedTask.workActivity.filesChanged && expandedTask.workActivity.filesChanged.length > 0 && (
+                        <div className="cal-detail-work-section">
+                          <div className="cal-detail-work-heading">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            <span>Files changed</span>
+                            <span className="cal-detail-work-stat">
+                              <span className="cal-detail-additions">+{expandedTask.workActivity.filesChanged.reduce((s, f) => s + f.additions, 0)}</span>
+                              <span className="cal-detail-deletions">-{expandedTask.workActivity.filesChanged.reduce((s, f) => s + f.deletions, 0)}</span>
+                            </span>
+                          </div>
+                          <div className="cal-detail-files">
+                            {expandedTask.workActivity.filesChanged.map((f, i) => (
+                              <div key={i} className="cal-detail-file">
+                                <span className="cal-detail-file-name">{f.name}</span>
+                                <span className="cal-detail-file-diff">
+                                  <span className="cal-detail-additions">+{f.additions}</span>
+                                  <span className="cal-detail-deletions">-{f.deletions}</span>
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {expandedTask.workActivity.tabs && expandedTask.workActivity.tabs.length > 0 && (
+                        <div className="cal-detail-work-section">
+                          <div className="cal-detail-work-heading">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
+                            <span>Tabs opened</span>
+                          </div>
+                          <div className="cal-detail-tags-list">
+                            {expandedTask.workActivity.tabs.map((t, i) => (
+                              <span key={i} className="cal-detail-tag">{t}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {expandedTask.workActivity.sites && expandedTask.workActivity.sites.length > 0 && (
+                        <div className="cal-detail-work-section">
+                          <div className="cal-detail-work-heading">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                            <span>Sites visited</span>
+                          </div>
+                          <div className="cal-detail-tags-list">
+                            {expandedTask.workActivity.sites.map((s, i) => (
+                              <span key={i} className="cal-detail-site">{s}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                <div className="cal-overlay-divider" />
-
-                {/* RIGHT: Activity logs */}
-                <div className="cal-overlay-col cal-overlay-col--right">
-                  <div className="cal-overlay-col-title">Activity</div>
-                  <div className="cal-overlay-col-body">
-                    {expandedSummary.logs.length === 0 ? (
-                      <div className="cal-overlay-empty">No activity logged during this event</div>
-                    ) : (
-                      <div className="cal-overlay-logs">
-                        {expandedSummary.logs.map(log => (
-                          <div key={log.id} className={`cal-overlay-log cal-overlay-log--${log.type}`}>
-                            <span className="cal-overlay-log-time">{formatTimeDisplay(log.time)}</span>
-                            <span className={`cal-overlay-log-dot cal-overlay-log-dot--${log.type}`} />
-                            <span className="cal-overlay-log-action">{log.action}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                <div className="cal-detail-section">
+                  <button className="cal-detail-activity-toggle" onClick={() => setActivityExpanded(prev => !prev)}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ transform: activityExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                    <span className="cal-overlay-col-title" style={{ margin: 0 }}>Activity</span>
+                    {expandedSummary.logs.length > 0 && <span className="cal-detail-activity-count">{expandedSummary.logs.length}</span>}
+                  </button>
+                  {activityExpanded && (
+                    <div className="cal-detail-activity-body">
+                      {expandedSummary.logs.length === 0 ? (
+                        <div className="cal-overlay-empty">No activity logged during this event</div>
+                      ) : (
+                        <div className="cal-overlay-logs">
+                          {expandedSummary.logs.map(log => (
+                            <div key={log.id} className={`cal-overlay-log cal-overlay-log--${log.type}`}>
+                              <span className="cal-overlay-log-time">{formatTimeDisplay(log.time)}</span>
+                              <span className={`cal-overlay-log-dot cal-overlay-log-dot--${log.type}`} />
+                              <span className="cal-overlay-log-action">{log.action}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
