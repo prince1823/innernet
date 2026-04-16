@@ -229,7 +229,7 @@ function runTimeQuery(parsed, currentDateStr, userEvents = {}) {
 export default function CommandBar({ onScheduleEvent, existingEvents = {}, userEvents = {}, dateStr, onJumpToDate, onSearchResults, searchQuery: externalSearchQuery, onSearchQueryChange }) {
   const TODAY_STR = '2026-04-09'
   const [query, setQuery] = useState('')
-  const [mode, setMode] = useState('ai') // 'search' | 'ai'
+  const [mode, setMode] = useState('search') // 'search' | 'ai'
   const [messages, setMessages] = useState([])
   const [pendingEvent, setPendingEvent] = useState(null)
   const [loading, setLoading] = useState(false)
