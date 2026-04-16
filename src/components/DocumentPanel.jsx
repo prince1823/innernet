@@ -706,6 +706,15 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     return (
       <div key={block.id} className={`ls-block ${depth === 0 ? 'ls-block-top' : ''} ${isCollapsed ? 'ls-block-collapsed' : ''} ${isAI ? 'ls-block-ai-child' : ''}`} data-block-id={block.id}>
         <div className="ls-block-content">
+          {/* Time on top-level headings — before the bullet */}
+          {depth === 0 && block.time && (
+            <span className="ls-block-time">{(() => {
+              const [h, m] = block.time.split(':').map(Number)
+              const ampm = h >= 12 ? 'PM' : 'AM'
+              const h12 = h % 12 || 12
+              return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`
+            })()}</span>
+          )}
           <div className="ls-bullet-wrap">
             {hasChildren && (
               <button
@@ -728,15 +737,6 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
               title="Click to zoom in"
             />
           </div>
-          {/* Time + Project on top-level headings */}
-          {depth === 0 && block.time && (
-            <span className="ls-block-time">{(() => {
-              const [h, m] = block.time.split(':').map(Number)
-              const ampm = h >= 12 ? 'PM' : 'AM'
-              const h12 = h % 12 || 12
-              return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`
-            })()}</span>
-          )}
           {isAI ? (
             <div className="ls-ai-card">
               <span
