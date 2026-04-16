@@ -2149,7 +2149,10 @@
   padding: 4px 0;
   width: 100%;
   text-align: left;
-  color: inherit;
+  color: #1a1a1a;
+}
+.cal-detail-activity-toggle .cal-overlay-col-title {
+  color: #1a1a1a;
 }
 .cal-detail-activity-toggle:hover {
   opacity: 0.8;
