@@ -1526,7 +1526,9 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                 top: `${topOffset}px`,
                 minHeight: `${Math.max(height, 24)}px`,
                 height: `${Math.max(height, 24)}px`,
-                backgroundColor: color.bg,
+                '--ev-bg': color.bg,
+                '--ev-border': color.border,
+                '--ev-text': color.text,
                 borderLeft: `4px solid ${color.border}`,
               }
               if (layout.totalCols > 1) {

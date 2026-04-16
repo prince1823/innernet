@@ -796,10 +796,50 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+
+  /* Gradient bleed: border color fades into the softer bg color */
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--ev-border) 14%, var(--ev-bg)) 0%,
+      var(--ev-bg) 40%,
+      color-mix(in srgb, var(--ev-bg) 97%, white) 100%
+    );
 }
 
-.cal-event-block:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12); z-index: 3; }
-.cal-event-block.selected { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); z-index: 4; }
+/* Glass inner-glow on hover */
+.cal-event-block::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.45) 0%,
+      rgba(255, 255, 255, 0.08) 40%,
+      transparent 70%
+    );
+  transition: opacity 0.25s ease;
+}
+
+.cal-event-block:hover::after { opacity: 1; }
+
+.cal-event-block:hover {
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  z-index: 3;
+}
+
+.cal-event-block.selected {
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  z-index: 4;
+}
 
 /* ── Temporal Awareness ── */
 /* "Past" events fade and desaturate — they've already happened.
