@@ -15,6 +15,8 @@ function App() {
   // User-created events from the natural-language scheduler — keyed by date
   // string, same shape as calendarTasks. Merged with static data in the panel.
   const [userEvents, setUserEvents] = useState({})
+  // Overrides from drag-to-reschedule / resize — { [eventId]: { time, endTime } }
+  const [eventOverrides, setEventOverrides] = useState({})
 
   // Bottom panel state
   const [bottomCollapsed, setBottomCollapsed] = useState(false)
@@ -46,6 +48,14 @@ function App() {
     setUserEvents(prev => ({
       ...prev,
       [date]: [...(prev[date] || []), event],
+    }))
+  }, [])
+
+  // Called when an event is dragged or resized to update its time/endTime
+  const handleEventUpdate = useCallback((eventId, date, newTime, newEndTime) => {
+    setEventOverrides(prev => ({
+      ...prev,
+      [eventId]: { time: newTime, endTime: newEndTime },
     }))
   }, [])
 
@@ -167,6 +177,8 @@ function App() {
             thoughts={thoughts}
             userEvents={userEvents}
             onScheduleEvent={handleScheduleEvent}
+            onEventUpdate={handleEventUpdate}
+            eventOverrides={eventOverrides}
           />
         </aside>
       )}

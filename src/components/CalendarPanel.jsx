@@ -18,6 +18,12 @@ function timeToMinutes(timeStr) {
   return h * 60 + m
 }
 
+function minutesToTimeStr(totalMin) {
+  const h = Math.max(0, Math.min(23, Math.floor(totalMin / 60)))
+  const m = Math.max(0, Math.min(59, totalMin % 60))
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
 function formatTimeDisplay(timeStr) {
   const [h, m] = timeStr.split(':').map(Number)
   const period = h >= 12 ? 'PM' : 'AM'
@@ -349,7 +355,50 @@ function formatDuration(mins) {
   return m === 0 ? `${h}h` : `${h}h ${m}m`
 }
 
-export default function CalendarPanel({ selectedDate, setSelectedDate, selectedEvent, setSelectedEvent, onSlotClick, onQuickNoteAdd, onQuickSlotClear, quickSlot, thoughts = {}, onDatePanelOpen, userEvents = {}, onScheduleEvent }) {
+// Compute side-by-side column layout for overlapping events.
+// Returns { [eventId]: { col, totalCols } }.
+function computeOverlapLayout(events) {
+  if (!events.length) return {}
+  const sorted = [...events]
+    .map(e => ({ ...e, _startMin: timeToMinutes(e.time), _endMin: timeToMinutes(e.endTime) }))
+    .sort((a, b) => a._startMin - b._startMin || (b._endMin - b._startMin) - (a._endMin - a._startMin))
+
+  const layout = {}
+  const colEnds = [] // latest end-time in each column
+  for (const ev of sorted) {
+    let col = -1
+    for (let c = 0; c < colEnds.length; c++) {
+      if (colEnds[c] <= ev._startMin) { col = c; break }
+    }
+    if (col === -1) { col = colEnds.length; colEnds.push(0) }
+    colEnds[col] = ev._endMin
+    layout[ev.id] = { col, totalCols: 1 }
+  }
+  // Find connected overlap groups and set totalCols per group
+  const visited = new Set()
+  for (const ev of sorted) {
+    if (visited.has(ev.id)) continue
+    const group = []
+    const stack = [ev]
+    while (stack.length) {
+      const curr = stack.pop()
+      if (visited.has(curr.id)) continue
+      visited.add(curr.id)
+      group.push(curr)
+      for (const other of sorted) {
+        if (!visited.has(other.id) && other._startMin < curr._endMin && other._endMin > curr._startMin) {
+          stack.push(other)
+        }
+      }
+    }
+    const maxCol = Math.max(...group.map(e => layout[e.id].col))
+    const totalCols = maxCol + 1
+    for (const e of group) layout[e.id].totalCols = totalCols
+  }
+  return layout
+}
+
+export default function CalendarPanel({ selectedDate, setSelectedDate, selectedEvent, setSelectedEvent, onSlotClick, onQuickNoteAdd, onQuickSlotClear, quickSlot, thoughts = {}, onDatePanelOpen, userEvents = {}, onScheduleEvent, onEventUpdate, eventOverrides = {} }) {
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 9))
   const [showMiniCal, setShowMiniCal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -373,6 +422,15 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const hoverTimerRef = useRef(null)
   const zoomAnimRef = useRef(null) // rAF handle for button-triggered zoom animations
 
+  // ── Drag-to-reschedule & Resize state ──
+  const [dragInfo, setDragInfo] = useState(null)   // { eventId, newTime, newEndTime }
+  const [resizeInfo, setResizeInfo] = useState(null) // { eventId, newEndTime }
+  const dragRef = useRef(null)
+  const resizeRef = useRef(null)
+  const wasDraggingRef = useRef(false)
+  const zoomRef = useRef(56)
+  zoomRef.current = zoomLevel
+
   // ── Zoom Continuity ──
   // Continuous range — 24 px/hr (whole day compressed) to 240 px/hr (fine-grained).
   const MIN_ZOOM = 24
@@ -393,11 +451,19 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const nowPx = (NOW_MIN / 60) * zoomLevel
   const headerLabel = `${currentDate.getDate()} ${MONTHS[currentDate.getMonth()]} ${currentDate.getFullYear()}`
 
-  // Merge static events with any user-scheduled ones for this date
-  const tasks = useMemo(
-    () => [...(calendarTasks[dateStr] || []), ...((userEvents && userEvents[dateStr]) || [])],
-    [dateStr, userEvents]
-  )
+  // Merge static events with any user-scheduled ones for this date,
+  // then apply any drag/resize overrides so moved events render correctly.
+  const tasks = useMemo(() => {
+    const raw = [...(calendarTasks[dateStr] || []), ...((userEvents && userEvents[dateStr]) || [])]
+    return raw.map(ev => {
+      const ov = eventOverrides[ev.id]
+      if (ov) return { ...ev, time: ov.time, endTime: ov.endTime }
+      return ev
+    })
+  }, [dateStr, userEvents, eventOverrides])
+
+  // Overlap layout — assigns columns to events sharing time
+  const overlapLayout = useMemo(() => computeOverlapLayout(tasks), [tasks])
 
   // Classify an event's relationship to "now" for the temporal fade/glow treatment
   const getTemporalState = (task) => {
@@ -618,6 +684,124 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
     setHoveredEventId(null)
   }, [])
 
+  // ── Drag-to-reschedule ──
+  const handleDragStart = useCallback((e, task) => {
+    e.preventDefault()
+    const startMin = timeToMinutes(task.time)
+    const endMin = timeToMinutes(task.endTime)
+    const duration = endMin - startMin
+    const gridRect = gridRef.current?.getBoundingClientRect()
+    if (!gridRect) return
+    const scrollTop = gridRef.current.scrollTop
+    const clickY = e.clientY - gridRect.top + scrollTop
+    const clickMin = (clickY / zoomRef.current) * 60
+    const offsetMin = clickMin - startMin
+    const startX = e.clientX
+    const startY = e.clientY
+    let isDragging = false
+
+    dragRef.current = { eventId: task.id, origStartMin: startMin, duration, offsetMin, lastSnapMin: startMin }
+
+    const onMove = (me) => {
+      const dx = me.clientX - startX
+      const dy = me.clientY - startY
+      if (!isDragging && Math.abs(dx) + Math.abs(dy) < 5) return
+      if (!isDragging) {
+        isDragging = true
+        setHoveredEventId(null)
+        clearTimeout(hoverTimerRef.current)
+        document.body.style.cursor = 'grabbing'
+        document.body.style.userSelect = 'none'
+      }
+      const dr = dragRef.current
+      if (!dr) return
+      const gr = gridRef.current?.getBoundingClientRect()
+      if (!gr) return
+      const mouseY = me.clientY - gr.top + gridRef.current.scrollTop
+      const mouseMin = (mouseY / zoomRef.current) * 60
+      const newStartMin = mouseMin - dr.offsetMin
+      const snappedMin = Math.round(newStartMin / 15) * 15
+      const clampedMin = Math.max(0, Math.min(24 * 60 - dr.duration, snappedMin))
+      if (clampedMin !== dr.lastSnapMin) {
+        dr.lastSnapMin = clampedMin
+        setDragInfo({
+          eventId: dr.eventId,
+          newTime: minutesToTimeStr(clampedMin),
+          newEndTime: minutesToTimeStr(clampedMin + dr.duration),
+        })
+      }
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      if (isDragging) {
+        const dr = dragRef.current
+        if (dr && dr.lastSnapMin !== dr.origStartMin && onEventUpdate) {
+          onEventUpdate(dr.eventId, dateStr, minutesToTimeStr(dr.lastSnapMin), minutesToTimeStr(dr.lastSnapMin + dr.duration))
+        }
+        wasDraggingRef.current = true
+      }
+      dragRef.current = null
+      setDragInfo(null)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [dateStr, onEventUpdate])
+
+  // ── Resize (bottom edge) ──
+  const handleResizeStart = useCallback((e, task) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const origEndMin = timeToMinutes(task.endTime)
+    const startMin = timeToMinutes(task.time)
+    const startY = e.clientY
+    let isResizing = false
+
+    resizeRef.current = { eventId: task.id, startMin, origEndMin, lastSnapEndMin: origEndMin }
+
+    const onMove = (me) => {
+      const dy = me.clientY - startY
+      if (!isResizing && Math.abs(dy) < 3) return
+      if (!isResizing) {
+        isResizing = true
+        setHoveredEventId(null)
+        clearTimeout(hoverTimerRef.current)
+        document.body.style.cursor = 'ns-resize'
+        document.body.style.userSelect = 'none'
+      }
+      const rr = resizeRef.current
+      if (!rr) return
+      const deltaMin = (dy / zoomRef.current) * 60
+      const newEndMin = rr.origEndMin + deltaMin
+      const snappedEndMin = Math.round(newEndMin / 15) * 15
+      const clampedEndMin = Math.max(rr.startMin + 15, Math.min(24 * 60, snappedEndMin))
+      if (clampedEndMin !== rr.lastSnapEndMin) {
+        rr.lastSnapEndMin = clampedEndMin
+        setResizeInfo({ eventId: rr.eventId, newEndTime: minutesToTimeStr(clampedEndMin) })
+      }
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      if (isResizing) {
+        const rr = resizeRef.current
+        if (rr && rr.lastSnapEndMin !== rr.origEndMin && onEventUpdate) {
+          const t = tasks.find(t => t.id === rr.eventId)
+          if (t) onEventUpdate(rr.eventId, dateStr, t.time, minutesToTimeStr(rr.lastSnapEndMin))
+        }
+        wasDraggingRef.current = true
+      }
+      resizeRef.current = null
+      setResizeInfo(null)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [dateStr, tasks, onEventUpdate])
+
   // Resolve hovered task for peek render
   const hoveredTask = hoveredEventId && !expandedEvent
     ? tasks.find(t => t.id === hoveredEventId)
@@ -625,6 +809,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
 
   const handleEventClick = (e, event) => {
     e.stopPropagation()
+    if (wasDraggingRef.current) { wasDraggingRef.current = false; return }
     // Future events have no summary/activity to show yet — clicking is inert
     if (getTemporalState(event) === 'future') return
     setSelectedEvent(event)
@@ -1298,34 +1483,56 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
 
             {/* Event blocks — collapsed: title + time only (progressive disclosure) */}
             {tasks.map((task) => {
-              const startMin = timeToMinutes(task.time)
-              const endMin = timeToMinutes(task.endTime)
+              const isDragged = dragInfo?.eventId === task.id
+              const isResized = resizeInfo?.eventId === task.id
+              const displayTime = isDragged ? dragInfo.newTime : task.time
+              const displayEndTime = isDragged ? dragInfo.newEndTime : (isResized ? resizeInfo.newEndTime : task.endTime)
+
+              const startMin = timeToMinutes(displayTime)
+              const endMin = timeToMinutes(displayEndTime)
               const duration = endMin - startMin
               const topOffset = (startMin / 60) * zoomLevel
               const height = (duration / 60) * zoomLevel
               const color = eventColors[task.colorIndex] || eventColors[0]
               const isExpanded = expandedEvent === task.id
               const temporal = getTemporalState(task)
+              const layout = overlapLayout[task.id] || { col: 0, totalCols: 1 }
+
+              const eventStyle = {
+                top: `${topOffset}px`,
+                minHeight: `${Math.max(height, 24)}px`,
+                height: `${Math.max(height, 24)}px`,
+                backgroundColor: color.bg,
+                borderLeft: `4px solid ${color.border}`,
+              }
+              if (layout.totalCols > 1) {
+                const pct = 100 / layout.totalCols
+                eventStyle.left = `${layout.col * pct}%`
+                eventStyle.width = `calc(${pct}% - ${layout.col === layout.totalCols - 1 ? 8 : 2}px)`
+                eventStyle.right = 'auto'
+              }
 
               return (
                 <div
                   key={task.id}
-                  className={`cal-event-block cal-event-block--${temporal} ${selectedEvent?.id === task.id ? 'selected' : ''} ${isExpanded ? 'is-overlay-source' : ''}`}
-                  style={{
-                    top: `${topOffset}px`,
-                    minHeight: `${Math.max(height, 24)}px`,
-                    height: `${Math.max(height, 24)}px`,
-                    backgroundColor: color.bg,
-                    borderLeft: `4px solid ${color.border}`,
-                  }}
+                  className={`cal-event-block cal-event-block--${temporal} ${selectedEvent?.id === task.id ? 'selected' : ''} ${isExpanded ? 'is-overlay-source' : ''} ${isDragged ? 'is-dragging' : ''} ${isResized ? 'is-resizing' : ''}`}
+                  style={eventStyle}
                   onClick={(e) => handleEventClick(e, task)}
-                  onMouseEnter={() => handleEventEnter(task)}
+                  onMouseDown={(e) => {
+                    if (e.target.closest('.cal-resize-handle')) return
+                    handleDragStart(e, task)
+                  }}
+                  onMouseEnter={() => { if (!dragInfo && !resizeInfo) handleEventEnter(task) }}
                   onMouseLeave={handleEventLeave}
                 >
                   <span className="cal-event-title" style={{ color: color.text }}>{task.title}</span>
                   <span className="cal-event-time" style={{ color: color.text }}>
-                    {formatTimeDisplay(task.time)} – {formatTimeDisplay(task.endTime)}
+                    {formatTimeDisplay(displayTime)} – {formatTimeDisplay(displayEndTime)}
                   </span>
+                  <div
+                    className="cal-resize-handle"
+                    onMouseDown={(e) => handleResizeStart(e, task)}
+                  />
                 </div>
               )
             })}
