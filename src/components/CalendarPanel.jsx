@@ -1319,7 +1319,10 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               <div className="cal-detail-stacked">
                 <div className="cal-detail-section">
                   {ev.aiSummary && (
-                    <p className="cal-detail-summary-text">{ev.aiSummary}</p>
+                    <div className="cal-detail-meta-row cal-detail-summary-row">
+                      <span className="cal-detail-meta-label">Summary</span>
+                      <span className="cal-detail-meta-value">{ev.aiSummary}</span>
+                    </div>
                   )}
                   {(summary.approachSummary || summary.features.length > 0 || summary.agentSummary) && (
                     <div className="cal-detail-meta">
@@ -1508,7 +1511,10 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                 {/* Summary — flowing layout */}
                 <div className="cal-detail-section">
                   {ev.aiSummary && (
-                    <p className="cal-detail-summary-text">{ev.aiSummary}</p>
+                    <div className="cal-detail-meta-row cal-detail-summary-row">
+                      <span className="cal-detail-meta-label">Summary</span>
+                      <span className="cal-detail-meta-value">{ev.aiSummary}</span>
+                    </div>
                   )}
                   {(summary.approachSummary || summary.features.length > 0 || summary.agentSummary) && (
                     <div className="cal-detail-meta">
@@ -1915,7 +1921,10 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               <div className="cal-detail-stacked">
                 <div className="cal-detail-section">
                   {expandedTask.aiSummary && (
-                    <p className="cal-detail-summary-text">{expandedTask.aiSummary}</p>
+                    <div className="cal-detail-meta-row cal-detail-summary-row">
+                      <span className="cal-detail-meta-label">Summary</span>
+                      <span className="cal-detail-meta-value">{expandedTask.aiSummary}</span>
+                    </div>
                   )}
                   {(expandedSummary.approachSummary || expandedSummary.features.length > 0 || expandedSummary.agentSummary) && (
                     <div className="cal-detail-meta">

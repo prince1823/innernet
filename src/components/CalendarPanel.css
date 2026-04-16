@@ -2177,6 +2177,9 @@
   color: #374151;
   margin: 0 0 16px 0;
 }
+.cal-detail-summary-row {
+  margin-bottom: 6px;
+}
 .cal-detail-meta {
   display: flex;
   flex-direction: column;
