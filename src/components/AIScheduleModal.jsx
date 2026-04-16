@@ -131,9 +131,14 @@ export default function AIScheduleModal({ open, onClose, onScheduleEvent, existi
 
     onScheduleEvent(pendingEvent.date, newEvent)
 
+    const dateObj = new Date(pendingEvent.date + 'T00:00:00')
+    const dateLabel = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+
     setMessages(prev => [...prev, {
       role: 'success',
-      content: `"${title}" scheduled for ${formatTimeDisplay(pendingEvent.time)} – ${formatTimeDisplay(endTime)}`,
+      title,
+      timeRange: `${formatTimeDisplay(pendingEvent.time)} – ${formatTimeDisplay(endTime)}`,
+      dateLabel,
       date: pendingEvent.date,
     }])
     setPendingEvent(null)
@@ -208,25 +213,38 @@ export default function AIScheduleModal({ open, onClose, onScheduleEvent, existi
               )}
 
               {msg.role === 'success' && (
-                <div className="ai-msg-success">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12"/>
-                  </svg>
-                  <span>{msg.content}</span>
+                <div className="ai-msg-success-card">
+                  <div className="ai-msg-success-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  </div>
+                  <div className="ai-msg-success-label">Event created</div>
+                  <div className="ai-msg-success-title">{msg.title}</div>
+                  <div className="ai-msg-success-meta">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <span>{msg.dateLabel}</span>
+                    <span style={{ margin: '0 4px', opacity: 0.4 }}>·</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>{msg.timeRange}</span>
+                  </div>
                 </div>
               )}
 
               {msg.role === 'event-card' && (() => {
                 const ev = msg.data
                 const isLatestCard = i === messages.length - 1 || !messages.slice(i + 1).some(m => m.role === 'event-card')
+                const isPending = isLatestCard && !!pendingEvent
                 const endTime = ev.time ? addMinutesToTimeStr(ev.time, ev.duration || 60) : null
-                const conflicts = ev.date && ev.time && endTime ? detectConflicts(ev.date, ev.time, endTime) : []
+                const conflicts = isPending && ev.date && ev.time && endTime ? detectConflicts(ev.date, ev.time, endTime) : []
                 const dateObj = ev.date ? new Date(ev.date + 'T00:00:00') : null
                 const dateLabel = dateObj ? dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }) : 'Date not set'
+                const isCreated = !pendingEvent && !isLatestCard || (!pendingEvent && isLatestCard)
 
                 return (
-                  <div className={`ai-event-card ${msg.isUpdate ? 'ai-event-card--updated' : ''}`}>
-                    {msg.isUpdate && <div className="ai-event-card-badge">Updated</div>}
+                  <div className={`ai-event-card ${msg.isUpdate ? 'ai-event-card--updated' : ''} ${isCreated ? 'ai-event-card--created' : ''}`}>
+                    {msg.isUpdate && !isCreated && <div className="ai-event-card-badge">Updated</div>}
+                    {isCreated && <div className="ai-event-card-badge ai-event-card-badge--created">Created</div>}
                     <div className="ai-event-card-title">{ev.title || 'Untitled Event'}</div>
 
                     <div className="ai-event-card-rows">
