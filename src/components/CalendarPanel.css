@@ -2180,6 +2180,21 @@
 .cal-detail-summary-row {
   margin-bottom: 6px;
 }
+.cal-detail-read-more {
+  background: none;
+  border: none;
+  color: #6366f1;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 4px;
+  transition: color 0.15s;
+}
+.cal-detail-read-more:hover {
+  color: #4f46e5;
+  text-decoration: underline;
+}
 .cal-detail-meta {
   display: flex;
   flex-direction: column;

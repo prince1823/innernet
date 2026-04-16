@@ -409,6 +409,14 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const [searchDetailEvent, setSearchDetailEvent] = useState(null)
   const [savedSearchResults, setSavedSearchResults] = useState(null)
   const [activityExpanded, setActivityExpanded] = useState(true)
+  const [summaryExpanded, setSummaryExpanded] = useState(false)
+
+  const truncateWords = (text, limit = 50) => {
+    if (!text) return { truncated: '', isTruncated: false }
+    const words = text.split(/\s+/)
+    if (words.length <= limit) return { truncated: text, isTruncated: false }
+    return { truncated: words.slice(0, limit).join(' ') + '...', isTruncated: true }
+  }
   const [expandedEvent, setExpandedEvent] = useState(null) // event id for overlay
   const [overlayOrigin, setOverlayOrigin] = useState(null) // { top, left, width, height } for unfold origin
   const [isClosingOverlay, setIsClosingOverlay] = useState(false)
@@ -633,10 +641,10 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
     const handleKeyDown = (e) => {
       if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
         e.preventDefault()
-        setDetailIndex(prev => Math.max(0, prev - 1))
+        setDetailIndex(prev => Math.max(0, prev - 1)); setSummaryExpanded(false)
       } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
         e.preventDefault()
-        setDetailIndex(prev => Math.min(scheduleData.flatEvents.length - 1, prev + 1))
+        setDetailIndex(prev => Math.min(scheduleData.flatEvents.length - 1, prev + 1)); setSummaryExpanded(false)
       } else if (e.key === 'Escape') {
         setViewMode(1) // go back to schedule list
       }
@@ -1322,7 +1330,19 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                   <div className="cal-detail-section">
                     <div className="cal-detail-meta-row cal-detail-summary-row">
                       <span className="cal-detail-meta-label">Summary</span>
-                      <span className="cal-detail-meta-value">{ev.aiSummary}</span>
+                      <span className="cal-detail-meta-value">
+                        {(() => {
+                          const { truncated, isTruncated } = truncateWords(ev.aiSummary)
+                          return <>
+                            {summaryExpanded ? ev.aiSummary : truncated}
+                            {isTruncated && (
+                              <button className="cal-detail-read-more" onClick={() => setSummaryExpanded(prev => !prev)}>
+                                {summaryExpanded ? 'Show less' : 'Read more'}
+                              </button>
+                            )}
+                          </>
+                        })()}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -1520,7 +1540,19 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                   <div className="cal-detail-section">
                     <div className="cal-detail-meta-row cal-detail-summary-row">
                       <span className="cal-detail-meta-label">Summary</span>
-                      <span className="cal-detail-meta-value">{ev.aiSummary}</span>
+                      <span className="cal-detail-meta-value">
+                        {(() => {
+                          const { truncated, isTruncated } = truncateWords(ev.aiSummary)
+                          return <>
+                            {summaryExpanded ? ev.aiSummary : truncated}
+                            {isTruncated && (
+                              <button className="cal-detail-read-more" onClick={() => setSummaryExpanded(prev => !prev)}>
+                                {summaryExpanded ? 'Show less' : 'Read more'}
+                              </button>
+                            )}
+                          </>
+                        })()}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -1945,7 +1977,19 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                   <div className="cal-detail-section">
                     <div className="cal-detail-meta-row cal-detail-summary-row">
                       <span className="cal-detail-meta-label">Summary</span>
-                      <span className="cal-detail-meta-value">{expandedTask.aiSummary}</span>
+                      <span className="cal-detail-meta-value">
+                        {(() => {
+                          const { truncated, isTruncated } = truncateWords(expandedTask.aiSummary)
+                          return <>
+                            {summaryExpanded ? expandedTask.aiSummary : truncated}
+                            {isTruncated && (
+                              <button className="cal-detail-read-more" onClick={() => setSummaryExpanded(prev => !prev)}>
+                                {summaryExpanded ? 'Show less' : 'Read more'}
+                              </button>
+                            )}
+                          </>
+                        })()}
+                      </span>
                     </div>
                   </div>
                 )}
