@@ -1851,3 +1851,467 @@
   background: #047857;
   border-color: #047857;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   SEMANTIC ZOOM VIEWS
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Zoom level label between buttons ── */
+.cal-zoom-level-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--purple-600, #7c3aed);
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  border-right: 1px solid #dadce0;
+  background: var(--purple-50, #f5f3ff);
+  white-space: nowrap;
+}
+
+/* ── View Mode 1: Expanded event cards ── */
+.cal-event-block--expanded {
+  overflow: visible !important;
+  z-index: 4;
+}
+
+.cal-event-block--expanded .cal-event-title {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  font-size: 12.5px;
+}
+
+.cal-event-summary {
+  font-size: 10px;
+  line-height: 1.4;
+  opacity: 0.75;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.cal-event-attendees-inline {
+  font-size: 9px;
+  opacity: 0.6;
+  margin-top: 2px;
+  font-style: italic;
+}
+
+/* ── View Mode 2: Schedule List View ── */
+.cal-schedule-view {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.cal-schedule-day {
+  margin-bottom: 4px;
+}
+
+.cal-schedule-day--current {
+  background: rgba(124, 58, 237, 0.03);
+  border-radius: 8px;
+}
+
+.cal-schedule-day-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px 4px;
+  position: sticky;
+  top: 0;
+  background: var(--bg-white, #fff);
+  z-index: 2;
+}
+
+.cal-schedule-day--current .cal-schedule-day-header {
+  background: rgba(124, 58, 237, 0.03);
+}
+
+.cal-schedule-day-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1a1a2e;
+  letter-spacing: 0.2px;
+}
+
+.cal-schedule-day-count {
+  font-size: 10px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.cal-schedule-day-events {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 6px;
+}
+
+.cal-schedule-event {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+  width: 100%;
+  font-family: inherit;
+}
+
+.cal-schedule-event:hover {
+  background: #f3f4f6;
+}
+
+.cal-schedule-event.selected {
+  background: rgba(124, 58, 237, 0.06);
+}
+
+.cal-schedule-event-color {
+  width: 4px;
+  height: 28px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.cal-schedule-event-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cal-schedule-event-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1a1a2e;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cal-schedule-event-time {
+  font-size: 10px;
+  color: #6b7280;
+}
+
+.cal-schedule-event-attendees {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.cal-schedule-attendee {
+  font-size: 9px;
+  background: #f3f4f6;
+  color: #6b7280;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.cal-schedule-attendee-more {
+  font-size: 9px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.cal-schedule-event-arrow {
+  flex-shrink: 0;
+  color: #d1d5db;
+  transition: color 0.15s;
+}
+
+.cal-schedule-event:hover .cal-schedule-event-arrow {
+  color: #9ca3af;
+}
+
+/* ── View Mode 3: Detail View ── */
+.cal-detail-view {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* The inline detail card reuses cal-overlay-card styles but sits in normal flow */
+.cal-detail-card-inline {
+  position: relative;
+  inset: unset;
+  animation: none;
+  max-height: none;
+  overflow-y: auto;
+}
+
+.cal-detail-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.cal-detail-nav-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  background: var(--bg-white, #fff);
+  color: #374151;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.cal-detail-nav-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.cal-detail-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.cal-detail-nav-counter {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  font-variant-numeric: tabular-nums;
+  min-width: 50px;
+  text-align: center;
+}
+
+.cal-detail-card {
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid;
+  overflow: hidden;
+  background: var(--bg-white, #fff);
+}
+
+.cal-detail-header {
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cal-detail-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a1a2e;
+  line-height: 1.3;
+}
+
+.cal-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #6b7280;
+  flex-wrap: wrap;
+}
+
+.cal-detail-dot {
+  opacity: 0.4;
+}
+
+.cal-detail-project {
+  font-family: var(--font-mono, monospace);
+  font-weight: 600;
+  color: var(--purple-600, #7c3aed);
+  font-size: 10px;
+}
+
+.cal-detail-attendees {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.cal-detail-attendees svg {
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.cal-detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.cal-detail-tag {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--purple-600, #7c3aed);
+  background: var(--purple-50, #f5f3ff);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-family: var(--font-mono, monospace);
+}
+
+.cal-detail-body {
+  padding: 0 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cal-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cal-detail-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cal-detail-section-title svg {
+  color: #f59e0b;
+}
+
+.cal-detail-text {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #374151;
+  margin: 0;
+}
+
+.cal-detail-topic {
+  padding-left: 8px;
+  border-left: 2px solid #e5e7eb;
+}
+
+.cal-detail-topic-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.cal-detail-topic-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.cal-detail-topic-time {
+  font-size: 9px;
+  color: #9ca3af;
+  font-family: var(--font-mono, monospace);
+}
+
+.cal-detail-bullets {
+  margin: 0;
+  padding-left: 14px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #4b5563;
+}
+
+.cal-detail-bullets li {
+  margin-bottom: 2px;
+}
+
+.cal-detail-actions-group {
+  margin-bottom: 6px;
+}
+
+.cal-detail-actions-person {
+  font-size: 10px;
+  font-weight: 700;
+  color: #6b7280;
+  margin-bottom: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.cal-detail-action {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 2px 0;
+  font-size: 11px;
+  color: #374151;
+  line-height: 1.4;
+}
+
+.cal-detail-action.done {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.cal-detail-action-check {
+  flex-shrink: 0;
+  font-size: 11px;
+  width: 14px;
+  text-align: center;
+}
+
+.cal-detail-action-check.checked {
+  color: #059669;
+}
+
+.cal-detail-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cal-detail-progress-bar {
+  flex: 1;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.cal-detail-progress-fill {
+  height: 100%;
+  background: #059669;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.cal-detail-progress-label {
+  font-size: 10px;
+  color: #6b7280;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cal-detail-empty {
+  font-size: 12px;
+  color: #9ca3af;
+  text-align: center;
+  padding: 20px 0;
+  font-style: italic;
+}

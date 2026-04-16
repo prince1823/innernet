@@ -403,6 +403,9 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 9))
   const [showMiniCal, setShowMiniCal] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(56) // pixels per hour; continuous 24..240
+  // Semantic zoom: 0 = normal grid, 1 = expanded cards, 2 = schedule list, 3 = detail view
+  const [viewMode, setViewMode] = useState(0)
+  const [detailIndex, setDetailIndex] = useState(0) // which event is shown in detail view (mode 3)
   const [expandedEvent, setExpandedEvent] = useState(null) // event id for overlay
   const [overlayOrigin, setOverlayOrigin] = useState(null) // { top, left, width, height } for unfold origin
   const [isClosingOverlay, setIsClosingOverlay] = useState(false)
@@ -462,6 +465,27 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
       return ev
     })
   }, [dateStr, userEvents, eventOverrides])
+
+  // Schedule view data — all events across all dates, grouped by date, sorted chronologically.
+  // Used for viewMode 2 (schedule list) and viewMode 3 (detail view).
+  const scheduleData = useMemo(() => {
+    const allDates = new Set([...Object.keys(calendarTasks), ...Object.keys(userEvents || {})])
+    const sorted = [...allDates].sort()
+    const groups = []
+    const flatEvents = []
+    for (const d of sorted) {
+      const raw = [...(calendarTasks[d] || []), ...((userEvents && userEvents[d]) || [])]
+      const events = raw.map(ev => {
+        const ov = eventOverrides[ev.id]
+        return ov ? { ...ev, time: ov.time, endTime: ov.endTime, _date: d } : { ...ev, _date: d }
+      }).sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time))
+      if (events.length > 0) {
+        groups.push({ date: d, events })
+        events.forEach(ev => flatEvents.push(ev))
+      }
+    }
+    return { groups, flatEvents }
+  }, [userEvents, eventOverrides])
 
   // Overlap layout — assigns columns to events sharing time
   const overlapLayout = useMemo(() => computeOverlapLayout(tasks), [tasks])
@@ -538,8 +562,22 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
     zoomAnimRef.current = requestAnimationFrame(step)
   }, [zoomLevel])
 
-  const zoomIn = () => animateZoomTo(Math.min(zoomLevel + 24, MAX_ZOOM))
-  const zoomOut = () => animateZoomTo(Math.max(zoomLevel - 24, MIN_ZOOM))
+  const zoomInPixel = () => animateZoomTo(Math.min(zoomLevel + 24, MAX_ZOOM))
+  const zoomOutPixel = () => animateZoomTo(Math.max(zoomLevel - 24, MIN_ZOOM))
+
+  // Semantic zoom: cycles through view modes 0→1→2→3
+  const zoomIn = () => {
+    if (viewMode < 3) {
+      const next = viewMode + 1
+      setViewMode(next)
+      if (next === 3) setDetailIndex(0) // reset to first event when entering detail view
+    }
+  }
+  const zoomOut = () => {
+    if (viewMode > 0) {
+      setViewMode(viewMode - 1)
+    }
+  }
 
   // Cmd/Ctrl + wheel: continuous zoom anchored on the cursor position.
   // The point in time under the cursor stays under the cursor as zoom changes.
@@ -563,6 +601,24 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
       return next
     })
   }, [])
+
+  // Keyboard navigation for detail view (viewMode 3)
+  useEffect(() => {
+    if (viewMode !== 3) return
+    const handleKeyDown = (e) => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault()
+        setDetailIndex(prev => Math.max(0, prev - 1))
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault()
+        setDetailIndex(prev => Math.min(scheduleData.flatEvents.length - 1, prev + 1))
+      } else if (e.key === 'Escape') {
+        setViewMode(2) // go back to schedule list
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [viewMode, scheduleData.flatEvents.length])
 
   const handleMiniCalClick = (day, inMonth) => {
     if (!inMonth) return
@@ -914,10 +970,11 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
         </div>
         <div className="cal-header-right">
           <div className="cal-zoom-btns">
-            <button className="cal-zoom-btn" onClick={zoomOut} disabled={zoomLevel <= MIN_ZOOM + 0.5} title="Zoom out (or hold Cmd/Ctrl and scroll)">
+            <button className="cal-zoom-btn" onClick={zoomOut} disabled={viewMode <= 0} title="Zoom out — less detail">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
-            <button className="cal-zoom-btn" onClick={zoomIn} disabled={zoomLevel >= MAX_ZOOM - 0.5} title="Zoom in (or hold Cmd/Ctrl and scroll)">
+            {viewMode > 0 && <span className="cal-zoom-level-label">{['Grid', 'Expanded', 'Schedule', 'Detail'][viewMode]}</span>}
+            <button className="cal-zoom-btn" onClick={zoomIn} disabled={viewMode >= 3} title="Zoom in — more detail">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
           </div>
@@ -1211,6 +1268,163 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
 
       {/* Calendar content — hidden when search results are active */}
       {!searchResults && (<>
+
+      {/* ── VIEW MODE 2: Schedule List ── */}
+      {viewMode === 2 && (
+        <div className="cal-schedule-view">
+          {scheduleData.groups.map(group => {
+            const d = new Date(group.date + 'T00:00:00')
+            const dayLabel = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+            const isCurrentDay = group.date === dateStr
+            return (
+              <div key={group.date} className={`cal-schedule-day ${isCurrentDay ? 'cal-schedule-day--current' : ''}`}>
+                <div className="cal-schedule-day-header">
+                  <span className="cal-schedule-day-label">{dayLabel}</span>
+                  <span className="cal-schedule-day-count">{group.events.length} {group.events.length === 1 ? 'meeting' : 'meetings'}</span>
+                </div>
+                <div className="cal-schedule-day-events">
+                  {group.events.map(ev => {
+                    const color = eventColors[ev.colorIndex] || eventColors[0]
+                    return (
+                      <button
+                        key={ev.id}
+                        className={`cal-schedule-event ${selectedEvent?.id === ev.id ? 'selected' : ''}`}
+                        onClick={() => {
+                          setSelectedEvent(ev)
+                          // Jump to detail view for this event
+                          const idx = scheduleData.flatEvents.findIndex(e => e.id === ev.id)
+                          if (idx >= 0) {
+                            setDetailIndex(idx)
+                            setViewMode(3)
+                          }
+                        }}
+                      >
+                        <div className="cal-schedule-event-color" style={{ background: color.border }} />
+                        <div className="cal-schedule-event-info">
+                          <span className="cal-schedule-event-title">{ev.title}</span>
+                          <span className="cal-schedule-event-time">{formatTimeDisplay(ev.time)} – {formatTimeDisplay(ev.endTime)}</span>
+                        </div>
+                        {ev.attendees && ev.attendees.length > 0 && (
+                          <div className="cal-schedule-event-attendees">
+                            {ev.attendees.slice(0, 2).map((a, i) => <span key={i} className="cal-schedule-attendee">{a}</span>)}
+                            {ev.attendees.length > 2 && <span className="cal-schedule-attendee-more">+{ev.attendees.length - 2}</span>}
+                          </div>
+                        )}
+                        <svg className="cal-schedule-event-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── VIEW MODE 3: Detail View with left/right navigation ── */}
+      {viewMode === 3 && (() => {
+        const ev = scheduleData.flatEvents[detailIndex]
+        if (!ev) return null
+        const color = eventColors[ev.colorIndex] || eventColors[0]
+        const summary = getEventSummaryData(ev, ev._date)
+        const hasPrev = detailIndex > 0
+        const hasNext = detailIndex < scheduleData.flatEvents.length - 1
+        return (
+          <div className="cal-detail-view">
+            <div className="cal-detail-nav">
+              <button className="cal-detail-nav-btn" onClick={() => setDetailIndex(Math.max(0, detailIndex - 1))} disabled={!hasPrev}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+              </button>
+              <span className="cal-detail-nav-counter">{detailIndex + 1} / {scheduleData.flatEvents.length}</span>
+              <button className="cal-detail-nav-btn" onClick={() => setDetailIndex(Math.min(scheduleData.flatEvents.length - 1, detailIndex + 1))} disabled={!hasNext}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            </div>
+
+            {/* Reuses the same overlay card layout as the click-to-expand overlay */}
+            <div className="cal-overlay-card cal-detail-card-inline" style={{ borderLeftColor: color.border }}>
+              <div className="cal-overlay-header">
+                <div className="cal-overlay-header-text">
+                  <div className="cal-overlay-title">{ev.title}</div>
+                  <div className="cal-overlay-sub">
+                    <span>{formatTimeDisplay(ev.time)} – {formatTimeDisplay(ev.endTime)}</span>
+                    {ev.project && <span className="cal-overlay-dot">·</span>}
+                    {ev.project && <span className="cal-overlay-project">#{ev.project}</span>}
+                  </div>
+                </div>
+              </div>
+
+              <div className="cal-overlay-split">
+                {/* LEFT: Summary */}
+                <div className="cal-overlay-col cal-overlay-col--left">
+                  <div className="cal-overlay-col-title">Summary</div>
+                  <div className="cal-overlay-col-body">
+                    {ev.aiSummary && (
+                      <div className="cal-overlay-block cal-overlay-block--ai">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        <p>{ev.aiSummary}</p>
+                      </div>
+                    )}
+                    {summary.approachSummary && (
+                      <div className="cal-overlay-block">
+                        <div className="cal-overlay-label">Approach</div>
+                        <p className="cal-overlay-ptext"><strong>Planned:</strong> {summary.approachSummary.plannedText}</p>
+                        <p className="cal-overlay-ptext"><strong>Done:</strong> {summary.approachSummary.doneText}</p>
+                        <div className="cal-overlay-progress">
+                          <div className="cal-overlay-progress-bar" style={{ width: `${(summary.approachSummary.doneCount / summary.approachSummary.totalCount) * 100}%` }} />
+                          <span>{summary.approachSummary.doneCount}/{summary.approachSummary.totalCount}</span>
+                        </div>
+                      </div>
+                    )}
+                    {summary.features.length > 0 && (
+                      <div className="cal-overlay-block">
+                        <div className="cal-overlay-label">Feature Docs</div>
+                        {summary.features.map(f => (
+                          <div key={f.id} className="cal-overlay-feat">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            <span>{f.title}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {summary.agentSummary && (
+                      <div className="cal-overlay-block">
+                        <div className="cal-overlay-label">Agent Session</div>
+                        <p className="cal-overlay-ptext cal-overlay-ptext--italic">{summary.agentSummary}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="cal-overlay-divider" />
+
+                {/* RIGHT: Activity logs */}
+                <div className="cal-overlay-col cal-overlay-col--right">
+                  <div className="cal-overlay-col-title">Activity</div>
+                  <div className="cal-overlay-col-body">
+                    {summary.logs.length === 0 ? (
+                      <div className="cal-overlay-empty">No activity logged during this event</div>
+                    ) : (
+                      <div className="cal-overlay-logs">
+                        {summary.logs.map(log => (
+                          <div key={log.id} className={`cal-overlay-log cal-overlay-log--${log.type}`}>
+                            <span className="cal-overlay-log-time">{formatTimeDisplay(log.time)}</span>
+                            <span className={`cal-overlay-log-dot cal-overlay-log-dot--${log.type}`} />
+                            <span className="cal-overlay-log-action">{log.action}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── VIEW MODE 0 & 1: Time Grid ── */}
+      {viewMode <= 1 && (<>
       {/* Pull-to-flip hints */}
       {pullProgress < 0 && !expandedEvent && (
         <div className="cal-pull-hint cal-pull-hint--top" style={{ opacity: Math.min(1, -pullProgress), transform: `translateY(${Math.min(0, pullProgress * 8)}px)` }}>
@@ -1351,7 +1565,8 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               )
             })()}
 
-            {/* Event blocks — collapsed: title + time only (progressive disclosure) */}
+            {/* Event blocks — collapsed: title + time only (progressive disclosure).
+                viewMode 1 shows expanded cards with full text + summary. */}
             {tasks.map((task) => {
               const isDragged = dragInfo?.eventId === task.id
               const isResized = resizeInfo?.eventId === task.id
@@ -1368,10 +1583,11 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               const temporal = getTemporalState(task)
               const layout = overlapLayout[task.id] || { col: 0, totalCols: 1 }
 
+              const expandedMinHeight = viewMode === 1 ? Math.max(height, 72) : Math.max(height, 24)
               const eventStyle = {
                 top: `${topOffset}px`,
-                minHeight: `${Math.max(height, 24)}px`,
-                height: `${Math.max(height, 24)}px`,
+                minHeight: `${expandedMinHeight}px`,
+                height: viewMode === 1 ? 'auto' : `${Math.max(height, 24)}px`,
                 '--ev-bg': color.bg,
                 '--ev-border': color.border,
                 '--ev-text': color.text,
@@ -1387,7 +1603,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               return (
                 <div
                   key={task.id}
-                  className={`cal-event-block cal-event-block--${temporal} ${selectedEvent?.id === task.id ? 'selected' : ''} ${isExpanded ? 'is-overlay-source' : ''} ${isDragged ? 'is-dragging' : ''} ${isResized ? 'is-resizing' : ''}`}
+                  className={`cal-event-block cal-event-block--${temporal} ${viewMode === 1 ? 'cal-event-block--expanded' : ''} ${selectedEvent?.id === task.id ? 'selected' : ''} ${isExpanded ? 'is-overlay-source' : ''} ${isDragged ? 'is-dragging' : ''} ${isResized ? 'is-resizing' : ''}`}
                   style={eventStyle}
                   onClick={(e) => handleEventClick(e, task)}
                   onMouseDown={(e) => {
@@ -1401,6 +1617,14 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                   <span className="cal-event-time" style={{ color: color.text }}>
                     {formatTimeDisplay(displayTime)} – {formatTimeDisplay(displayEndTime)}
                   </span>
+                  {viewMode === 1 && task.aiSummary && (
+                    <span className="cal-event-summary" style={{ color: color.text }}>{task.aiSummary}</span>
+                  )}
+                  {viewMode === 1 && task.attendees && task.attendees.length > 0 && (
+                    <span className="cal-event-attendees-inline" style={{ color: color.text }}>
+                      {task.attendees.join(', ')}
+                    </span>
+                  )}
                   <div
                     className="cal-resize-handle"
                     onMouseDown={(e) => handleResizeStart(e, task)}
@@ -1562,6 +1786,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
           </div>
         )
       })()}
+      </>)}
       </>)}
 
       {/* Unified Command Bar */}
