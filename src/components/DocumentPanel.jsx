@@ -468,14 +468,33 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
       if (block?.isAI) return                     // don't recursively ask from inside an AI answer
       const blockText = el.textContent || ''
       const cursorOffset = getCursorOffset(el)
+
+      // Check for inline @-query first
       const atIdx = findPendingAtOffset(blockText, cursorOffset)
-      if (atIdx < 0) return
-      const query = blockText.slice(atIdx + 1, cursorOffset).trim()
-      if (!query) return
-      e.preventDefault()
-      const context = blockText.slice(0, atIdx).trim()
-      submitInlineAt(blockId, blockText, query, context, cursorOffset)
-      return
+      if (atIdx >= 0) {
+        const query = blockText.slice(atIdx + 1, cursorOffset).trim()
+        if (query) {
+          e.preventDefault()
+          const context = blockText.slice(0, atIdx).trim()
+          submitInlineAt(blockId, blockText, query, context, cursorOffset)
+          return
+        }
+      }
+
+      // Cmd+Enter with #hashtag — commit as project tag and remove from text
+      const tagMatch = blockText.match(/#(\w+)/)
+      if (tagMatch) {
+        e.preventDefault()
+        const project = tagMatch[1]
+        const cleanText = blockText.replace(/#\w+/, '').trim()
+        applyTreeOp(tree => {
+          const next = setBlockText(tree, blockId, cleanText)
+          const ctx = findContext(next, blockId)
+          if (ctx) ctx.block.project = project
+          return next
+        })
+        return
+      }
     }
 
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -744,7 +763,12 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     // Streaming: if this block is currently being typed out, use the partial
     // text override (even when empty) instead of the source-of-truth block.text
     const isStreaming = Object.prototype.hasOwnProperty.call(streamingText, block.id)
-    const displayText = isStreaming ? streamingText[block.id] : (block.text || '')
+    const rawText = isStreaming ? streamingText[block.id] : (block.text || '')
+    // Extract inline #hashtags to show as project tags on the right (keep in text until Cmd+Enter commits)
+    const inlineTagMatch = rawText.match(/#(\w+)/)
+    const inlineProject = inlineTagMatch ? inlineTagMatch[1] : null
+    const displayText = rawText
+    const effectiveProject = block.project || inlineProject
     const showChildren = (hasChildren && !isCollapsed) || blockInserts.length > 0
 
     return (
@@ -826,8 +850,8 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
               dangerouslySetInnerHTML={{ __html: renderMd(displayText) }}
             />
           )}
-          {depth === 0 && block.project && (
-            <span className="ls-block-project">#{block.project}</span>
+          {depth === 0 && effectiveProject && (
+            <span className="ls-block-project">#{effectiveProject}</span>
           )}
         </div>
 
