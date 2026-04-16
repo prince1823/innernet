@@ -995,7 +995,6 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
             <button className="cal-zoom-btn" onClick={zoomOut} disabled={viewMode === 0 && zoomLevel <= MIN_ZOOM + 0.5} title="Zoom out — less detail">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
-            {viewMode > 0 && <span className="cal-zoom-level-label">{['', 'Schedule', 'Detail'][viewMode]}</span>}
             <button className="cal-zoom-btn" onClick={zoomIn} disabled={viewMode >= 2} title="Zoom in — more detail">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
@@ -1353,16 +1352,6 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
         const hasNext = detailIndex < scheduleData.flatEvents.length - 1
         return (
           <div className="cal-detail-view">
-            <div className="cal-detail-nav">
-              <button className="cal-detail-nav-btn" onClick={() => setDetailIndex(Math.max(0, detailIndex - 1))} disabled={!hasPrev}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-              </button>
-              <span className="cal-detail-nav-counter">{detailIndex + 1} / {scheduleData.flatEvents.length}</span>
-              <button className="cal-detail-nav-btn" onClick={() => setDetailIndex(Math.min(scheduleData.flatEvents.length - 1, detailIndex + 1))} disabled={!hasNext}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-              </button>
-            </div>
-
             {/* Reuses the same overlay card layout as the click-to-expand overlay */}
             <div className="cal-overlay-card cal-detail-card-inline" style={{ borderLeftColor: color.border }}>
               <div className="cal-overlay-header">
@@ -1373,6 +1362,14 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                     {ev.project && <span className="cal-overlay-dot">·</span>}
                     {ev.project && <span className="cal-overlay-project">#{ev.project}</span>}
                   </div>
+                </div>
+                <div className="cal-detail-nav-inline">
+                  <button className="cal-detail-nav-arrow" onClick={() => setDetailIndex(Math.max(0, detailIndex - 1))} disabled={!hasPrev}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="15 18 9 12 15 6"/></svg>
+                  </button>
+                  <button className="cal-detail-nav-arrow" onClick={() => setDetailIndex(Math.min(scheduleData.flatEvents.length - 1, detailIndex + 1))} disabled={!hasNext}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
                 </div>
               </div>
 
