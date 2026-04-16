@@ -228,6 +228,15 @@
   color: #a78bfa;
 }
 
+.ai-msg-success-card--out {
+  animation: ai-success-fade-out 0.5s ease forwards;
+}
+
+@keyframes ai-success-fade-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-8px); }
+}
+
 /* ── Event Card ── */
 .ai-event-card {
   background: #fafafa;

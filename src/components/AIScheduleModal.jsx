@@ -134,8 +134,10 @@ export default function AIScheduleModal({ open, onClose, onScheduleEvent, existi
     const dateObj = new Date(pendingEvent.date + 'T00:00:00')
     const dateLabel = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
 
+    const successId = Date.now()
     setMessages(prev => [...prev, {
       role: 'success',
+      id: successId,
       title,
       timeRange: `${formatTimeDisplay(pendingEvent.time)} – ${formatTimeDisplay(endTime)}`,
       dateLabel,
@@ -143,8 +145,15 @@ export default function AIScheduleModal({ open, onClose, onScheduleEvent, existi
     }])
     setPendingEvent(null)
 
-    // Auto-close modal after 3 seconds
-    setTimeout(() => onClose(), 3000)
+    // Auto-dismiss success card: fade out at 2.5s, remove at 3s
+    setTimeout(() => {
+      setMessages(prev => prev.map(m =>
+        m.id === successId ? { ...m, fading: true } : m
+      ))
+    }, 2500)
+    setTimeout(() => {
+      setMessages(prev => prev.filter(m => m.id !== successId))
+    }, 3000)
   }
 
   const handleCancel = () => {
@@ -216,7 +225,7 @@ export default function AIScheduleModal({ open, onClose, onScheduleEvent, existi
               )}
 
               {msg.role === 'success' && (
-                <div className="ai-msg-success-card">
+                <div className={`ai-msg-success-card ${msg.fading ? 'ai-msg-success-card--out' : ''}`}>
                   <div className="ai-msg-success-icon">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="20 6 9 17 4 12"/>
