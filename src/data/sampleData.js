@@ -14,7 +14,7 @@ export const eventColors = [
 export const calendarTasks = {
   '2026-04-06': [
     { id: 'MF-06', title: 'Colab91 Feature Deep-Dive', time: '10:00', endTime: '11:30', colorIndex: 2, tags: ['colab91', 'feature'], attendees: ['Tanuj', 'Priya'], project: 'colab91',
-      aiSummary: 'Deep-dive into Colab91 feature requirements. Discussed supplier taxonomy, LLM evaluation pipeline, and classification system. Timeline set at 6 weeks.',
+      aiSummary: 'Deep-dive into Colab91 feature requirements with Tanuj and Priya. Defined a 3-level hierarchical supplier taxonomy with AI-suggested categories using embeddings. Mapped out the LLM evaluation pipeline — test prompts against multiple models, score accuracy, and visualize results on a dashboard. Agreed on a 6-week timeline. You took ownership of the taxonomy data model spec; Tanuj will scaffold the LLM eval pipeline.',
       workActivity: {
         filesChanged: [
           { name: 'docs/taxonomy-spec.md', additions: 84, deletions: 0 },
@@ -39,16 +39,16 @@ export const calendarTasks = {
       ]
     },
     { id: 'MF-07', title: 'Supplier Taxonomy Module', time: '14:00', endTime: '15:30', colorIndex: 4, tags: ['colab91', 'taxonomy'], project: 'colab91', attendees: ['Tanuj'],
-      aiSummary: 'Worked on the supplier taxonomy module architecture. Decided on a tree structure with lazy-loaded children and search indexing.',
+      aiSummary: 'Paired with Tanuj on the supplier taxonomy module architecture. Settled on a tree structure with lazy-loaded children for performance, added a search index layer for fast lookups, and wired up the basic CRUD API endpoints. Identified edge cases around circular parent references that need validation guards.',
     },
   ],
   '2026-04-07': [
     { id: 'MF-08', title: 'Architecture Discussion', time: '9:00', endTime: '10:00', colorIndex: 0, tags: ['architecture'], attendees: ['Jason', 'Sarah'], project: 'innernet',
-      aiSummary: 'Discussed overall Innernet architecture — three-panel layout, state management approach, and data flow patterns.',
+      aiSummary: 'Architecture sync with Jason and Sarah. Finalized the three-panel layout approach — Calendar, Notes, and Agent panels in a sliding track using CSS transforms. Decided on a shared context store for cross-panel state (selected event, active note) rather than prop drilling. Data flow will be unidirectional with event-driven updates between panels.',
     },
     { id: 'MF-08b', title: 'Team Standup', time: '11:00', endTime: '11:30', colorIndex: 2, tags: ['standup'], attendees: ['Jason', 'Sarah', 'Mike', 'Tanuj'], project: 'innernet' },
     { id: 'MF-08c', title: 'Colab91 Code Review', time: '14:00', endTime: '15:00', colorIndex: 3, tags: ['colab91', 'review'], attendees: ['Tanuj', 'Raj'], project: 'colab91',
-      aiSummary: 'Reviewed initial Colab91 codebase — API layer and database schema. Found issues with query performance on taxonomy lookups.',
+      aiSummary: 'Code review session with Tanuj and Raj on PR #42. Reviewed the API layer and database schema for Colab91. Found a critical N+1 query issue on taxonomy lookups causing 800ms response times — rewrote with a single JOIN query bringing it down to 45ms. Added 45 new test cases for the taxonomy module. Flagged the missing input validation on the supplier import endpoint.',
       workActivity: {
         filesChanged: [
           { name: 'src/api/taxonomy.ts', additions: 12, deletions: 34 },
@@ -63,7 +63,7 @@ export const calendarTasks = {
   ],
   '2026-04-08': [
     { id: 'MF-09', title: 'Improve App Performance', time: '9:00', endTime: '10:30', colorIndex: 0, summary: 'Profiling and optimization session.', tags: ['perf', 'optimization'], project: 'innernet',
-      aiSummary: 'Profiling and optimization session. Identified render bottlenecks in the calendar grid and reduced re-renders by 60% with useMemo.',
+      aiSummary: 'Solo performance optimization session. Used Chrome DevTools and React Profiler to identify render bottlenecks in the calendar grid — the time slots were re-rendering on every state change. Applied useMemo to the grid computation and useCallback to event handlers, reducing unnecessary re-renders by 60%. Also built a custom useThrottle hook for scroll events that cut CPU usage during rapid calendar scrolling.',
       workActivity: {
         filesChanged: [
           { name: 'src/components/CalendarPanel.jsx', additions: 15, deletions: 42 },
@@ -81,7 +81,7 @@ export const calendarTasks = {
       id: 'MF-12b', title: 'Morning Standup', time: '9:00', endTime: '9:30', colorIndex: 0,
       tags: ['standup', 'team'], project: 'innernet',
       attendees: ['Jason', 'Sarah', 'Mike'],
-      aiSummary: 'The team shared progress updates on the three-panel layout implementation. All sprint items are on track. Two minor blockers were identified around state management, which the engineering lead will resolve by end of day.',
+      aiSummary: 'Morning standup with Jason, Sarah, and Mike. Three-panel layout is at 80% — CSS transform sliding works smoothly across all panels. Calendar panel redesign to Google Calendar style is complete. Notes panel human/AI tab split is functional. Two blockers surfaced: cross-panel state management needs refactoring (you committed to fixing the event selection flow by EOD), and a date/time mismatch between calendar events and note detail cards (already resolved).',
       notesTitle: 'Morning Standup Sync',
       notesSummary: 'Quick team sync covering sprint progress, blockers, and daily priorities for the Innernet app development.',
       topicNotes: [
@@ -127,7 +127,7 @@ export const calendarTasks = {
       id: 'MF-11', title: 'Build Three-Panel Layout', time: '10:00', endTime: '12:00', colorIndex: 4,
       tags: ['dev', 'frontend', 'layout'], project: 'innernet',
       attendees: ['You'],
-      aiSummary: 'Deep work session focused on implementing the core three-panel sliding layout using CSS transforms. Successfully built the phase-based panel switching mechanism where Calendar & Notes and Notes & Agent views toggle smoothly.',
+      aiSummary: '2-hour deep work session building the three-panel sliding layout. Set up a 150% width track container with CSS translateX for phase-based switching. Phase 0 shows Calendar & Notes, Phase 1 shows Notes & Agent — Notes panel stays visible as the persistent anchor. Resolved overflow issues where panels bled outside the viewport during transitions by adding overflow:hidden on the container. Fixed z-index conflicts between overlapping panels. Added 0.3s cubic-bezier easing for smooth slides. Also started responsive breakpoint work for mobile and identified gesture-based swiping as the next priority.',
       workActivity: {
         filesChanged: [
           { name: 'src/components/PanelLayout.jsx', additions: 187, deletions: 23 },
@@ -178,7 +178,7 @@ export const calendarTasks = {
       id: 'MF-12', title: 'AI Integration Brainstorm', time: '14:30', endTime: '15:30', colorIndex: 2,
       tags: ['AI', 'brainstorm', 'agent'], project: 'innernet',
       attendees: ['Priya', 'Raj'],
-      aiSummary: 'Explored how the agent panel could leverage conversation context from notes and calendar events. Discussed real-time AI summaries, auto-linking, and contextual awareness across all three panels.',
+      aiSummary: 'Brainstorm with Priya and Raj on AI integration strategy. Key decisions: the agent will have full context of today\'s calendar and linked notes so it can answer "what did I do today" intelligently. Designed an end-of-day auto-summarization pipeline that combines meeting notes, events, and agent conversations into AI-authored daily summaries. The breakthrough insight was bidirectional smart linking — when a note mentions a meeting topic, the system auto-suggests linking using semantic embeddings. Created the initial context builder utility and drafted the integration plan doc.',
       workActivity: {
         filesChanged: [
           { name: 'docs/ai-integration-plan.md', additions: 67, deletions: 0 },
@@ -224,7 +224,7 @@ export const calendarTasks = {
       id: 'MF-12c', title: 'Sprint Review', time: '16:00', endTime: '17:00', colorIndex: 5,
       tags: ['sprint', 'review'], project: 'innernet',
       attendees: ['Jason', 'Sarah', 'Mike', 'Priya'],
-      aiSummary: 'Reviewed sprint progress with the full team. Calendar MVP and notes scaffolding were delivered on time. The agent panel backend resource gap was flagged as a risk for next sprint.',
+      aiSummary: 'Sprint review with the full team. Calendar MVP shipped — monthly grid view redesigned to Google Calendar style with phase toggle. Notes panel delivered with human/AI tab split and expandable cards. Sprint velocity hit 34 points, up 12% from last sprint. Main risk: agent panel backend has no dedicated resources yet — frontend is fully mocked but API integration hasn\'t started. Team capacity drops to 90% next sprint due to planned PTO. Overall trajectory is positive.',
       notesTitle: 'Sprint Review — Week 2 Wrap',
       notesSummary: 'Full team review of sprint deliverables. Calendar MVP and notes scaffolding shipped on time. Agent panel backend flagged as carry-over risk.',
       topicNotes: [
