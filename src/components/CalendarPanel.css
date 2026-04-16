@@ -2117,3 +2117,43 @@
   color: #ef4444;
 }
 
+/* Stacked detail layout — summary full width, activity below */
+.cal-detail-stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.cal-detail-section {
+  padding: 8px 14px;
+}
+.cal-detail-section + .cal-detail-section {
+  border-top: 1px solid #f0f0f0;
+}
+.cal-detail-activity-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+}
+.cal-detail-activity-toggle:hover {
+  opacity: 0.8;
+}
+.cal-detail-activity-count {
+  font-size: 9px;
+  font-weight: 600;
+  color: #6366f1;
+  background: #eef2ff;
+  border-radius: 8px;
+  padding: 1px 6px;
+  margin-left: 2px;
+}
+.cal-detail-activity-body {
+  padding-top: 6px;
+}
+

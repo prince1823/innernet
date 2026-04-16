@@ -408,6 +408,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const [detailIndex, setDetailIndex] = useState(0) // which event is shown in detail view (mode 2)
   const [searchDetailEvent, setSearchDetailEvent] = useState(null)
   const [savedSearchResults, setSavedSearchResults] = useState(null)
+  const [activityExpanded, setActivityExpanded] = useState(false)
   const [expandedEvent, setExpandedEvent] = useState(null) // event id for overlay
   const [overlayOrigin, setOverlayOrigin] = useState(null) // { top, left, width, height } for unfold origin
   const [isClosingOverlay, setIsClosingOverlay] = useState(false)
@@ -1315,8 +1316,8 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                   </button>
                 </div>
               </div>
-              <div className="cal-overlay-split">
-                <div className="cal-overlay-col cal-overlay-col--left">
+              <div className="cal-detail-stacked">
+                <div className="cal-detail-section">
                   <div className="cal-overlay-col-title">Summary</div>
                   <div className="cal-overlay-col-body">
                     {ev.aiSummary && (
@@ -1355,24 +1356,31 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                     )}
                   </div>
                 </div>
-                <div className="cal-overlay-divider" />
-                <div className="cal-overlay-col cal-overlay-col--right">
-                  <div className="cal-overlay-col-title">Activity</div>
-                  <div className="cal-overlay-col-body">
-                    {summary.logs.length === 0 ? (
-                      <div className="cal-overlay-empty">No activity logged during this event</div>
-                    ) : (
-                      <div className="cal-overlay-logs">
-                        {summary.logs.map(log => (
-                          <div key={log.id} className={`cal-overlay-log cal-overlay-log--${log.type}`}>
-                            <span className="cal-overlay-log-time">{formatTimeDisplay(log.time)}</span>
-                            <span className={`cal-overlay-log-dot cal-overlay-log-dot--${log.type}`} />
-                            <span className="cal-overlay-log-action">{log.action}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                <div className="cal-detail-section">
+                  <button className="cal-detail-activity-toggle" onClick={() => setActivityExpanded(prev => !prev)}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ transform: activityExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                    <span className="cal-overlay-col-title" style={{ margin: 0 }}>Activity</span>
+                    {summary.logs.length > 0 && <span className="cal-detail-activity-count">{summary.logs.length}</span>}
+                  </button>
+                  {activityExpanded && (
+                    <div className="cal-detail-activity-body">
+                      {summary.logs.length === 0 ? (
+                        <div className="cal-overlay-empty">No activity logged during this event</div>
+                      ) : (
+                        <div className="cal-overlay-logs">
+                          {summary.logs.map(log => (
+                            <div key={log.id} className={`cal-overlay-log cal-overlay-log--${log.type}`}>
+                              <span className="cal-overlay-log-time">{formatTimeDisplay(log.time)}</span>
+                              <span className={`cal-overlay-log-dot cal-overlay-log-dot--${log.type}`} />
+                              <span className="cal-overlay-log-action">{log.action}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1502,9 +1510,9 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                 </div>
               </div>
 
-              <div className="cal-overlay-split">
-                {/* LEFT: Summary */}
-                <div className="cal-overlay-col cal-overlay-col--left">
+              <div className="cal-detail-stacked">
+                {/* Summary — full width */}
+                <div className="cal-detail-section">
                   <div className="cal-overlay-col-title">Summary</div>
                   <div className="cal-overlay-col-body">
                     {ev.aiSummary && (
@@ -1544,26 +1552,32 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                   </div>
                 </div>
 
-                <div className="cal-overlay-divider" />
-
-                {/* RIGHT: Activity logs */}
-                <div className="cal-overlay-col cal-overlay-col--right">
-                  <div className="cal-overlay-col-title">Activity</div>
-                  <div className="cal-overlay-col-body">
-                    {summary.logs.length === 0 ? (
-                      <div className="cal-overlay-empty">No activity logged during this event</div>
-                    ) : (
-                      <div className="cal-overlay-logs">
-                        {summary.logs.map(log => (
-                          <div key={log.id} className={`cal-overlay-log cal-overlay-log--${log.type}`}>
-                            <span className="cal-overlay-log-time">{formatTimeDisplay(log.time)}</span>
-                            <span className={`cal-overlay-log-dot cal-overlay-log-dot--${log.type}`} />
-                            <span className="cal-overlay-log-action">{log.action}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                {/* Activity — collapsible */}
+                <div className="cal-detail-section">
+                  <button className="cal-detail-activity-toggle" onClick={() => setActivityExpanded(prev => !prev)}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ transform: activityExpanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                    <span className="cal-overlay-col-title" style={{ margin: 0 }}>Activity</span>
+                    {summary.logs.length > 0 && <span className="cal-detail-activity-count">{summary.logs.length}</span>}
+                  </button>
+                  {activityExpanded && (
+                    <div className="cal-detail-activity-body">
+                      {summary.logs.length === 0 ? (
+                        <div className="cal-overlay-empty">No activity logged during this event</div>
+                      ) : (
+                        <div className="cal-overlay-logs">
+                          {summary.logs.map(log => (
+                            <div key={log.id} className={`cal-overlay-log cal-overlay-log--${log.type}`}>
+                              <span className="cal-overlay-log-time">{formatTimeDisplay(log.time)}</span>
+                              <span className={`cal-overlay-log-dot cal-overlay-log-dot--${log.type}`} />
+                              <span className="cal-overlay-log-action">{log.action}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
