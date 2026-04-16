@@ -237,6 +237,8 @@ export default function CommandBar({ onScheduleEvent, existingEvents = {}, userE
   const inputRef = useRef(null)
   const messagesEndRef = useRef(null)
   const barRef = useRef(null)
+  const panelRef = useRef(null)
+  const resizeRef = useRef(null)
 
   // Scroll AI messages into view
   useEffect(() => {
@@ -255,6 +257,13 @@ export default function CommandBar({ onScheduleEvent, existingEvents = {}, userE
     return () => document.removeEventListener('keydown', onKey)
   }, [expanded, mode, externalSearchQuery])
 
+  // Reset inline resize style when panel collapses
+  useEffect(() => {
+    if (!expanded && barRef.current) {
+      barRef.current.style.flex = ''
+    }
+  }, [expanded])
+
   // Click outside to collapse AI panel
   useEffect(() => {
     if (!expanded || mode !== 'ai') return
@@ -268,6 +277,8 @@ export default function CommandBar({ onScheduleEvent, existingEvents = {}, userE
   // ── Mode Toggle ──
 
   const switchMode = (newMode) => {
+    // Reset any inline resize style from dragging
+    if (barRef.current) barRef.current.style.flex = ''
     setMode(newMode)
     setQuery('')
     if (newMode === 'search') {
@@ -275,9 +286,11 @@ export default function CommandBar({ onScheduleEvent, existingEvents = {}, userE
       onSearchResults(null)
       onSearchQueryChange('')
     } else {
+      // Clear search results first, then expand AI panel after a frame
+      // to avoid simultaneous layout shift
       onSearchResults(null)
       onSearchQueryChange('')
-      setExpanded(true)
+      requestAnimationFrame(() => setExpanded(true))
     }
     setTimeout(() => inputRef.current?.focus(), 50)
   }
@@ -438,15 +451,51 @@ export default function CommandBar({ onScheduleEvent, existingEvents = {}, userE
     }
   }
 
+  // ── Panel Resize ──
+
+  const handleResizeStart = useCallback((e) => {
+    e.preventDefault()
+    const cmdbar = barRef.current
+    if (!cmdbar) return
+    const startY = e.clientY
+    const startHeight = cmdbar.offsetHeight
+    const parentHeight = cmdbar.parentElement?.offsetHeight || window.innerHeight
+    resizeRef.current = { startY, startHeight, parentHeight }
+
+    const onMove = (me) => {
+      const r = resizeRef.current
+      if (!r) return
+      // Dragging UP increases height (panel grows upward)
+      const delta = r.startY - me.clientY
+      const minH = 120
+      const maxH = r.parentHeight - 50 // leave room for header
+      const newHeight = Math.max(minH, Math.min(maxH, r.startHeight + delta))
+      cmdbar.style.flex = `0 0 ${newHeight}px`
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      resizeRef.current = null
+    }
+    document.body.style.cursor = 'ns-resize'
+    document.body.style.userSelect = 'none'
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [])
+
   // ── Render ────────────────────────────────────────────────────────────
 
   const showAIPanel = mode === 'ai' && expanded
 
   return (
     <div className={`cmdbar ${showAIPanel ? 'cmdbar--expanded' : ''}`} ref={barRef}>
-      {/* AI Messages Panel */}
+      {/* AI Messages Panel — floats above the input bar */}
       {showAIPanel && (
-        <div className="cmdbar-panel">
+        <div className="cmdbar-panel-wrapper" ref={panelRef}>
+          <div className="cmdbar-resize-handle" onMouseDown={handleResizeStart} />
+          <div className="cmdbar-panel">
           {messages.length === 0 && (
             <div className="cmdbar-ai-welcome">
               <div className="cmdbar-ai-welcome-icon">
@@ -580,6 +629,7 @@ export default function CommandBar({ onScheduleEvent, existingEvents = {}, userE
             </div>
           )}
           <div ref={messagesEndRef} />
+          </div>
         </div>
       )}
 
