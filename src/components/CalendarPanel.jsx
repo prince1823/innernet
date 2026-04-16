@@ -993,9 +993,24 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               </button>
             </>
           ) : (
-            <h2 className="cal-date-title cal-view-mode-label">
-              {viewMode === 1 ? 'Schedule View' : 'Detail View'}
-            </h2>
+            <div className="cal-view-mode-label">
+              <span className="cal-view-mode-icon">
+                {viewMode === 1 ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+                    <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    <line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+                  </svg>
+                )}
+              </span>
+              <span className="cal-view-mode-text">
+                {viewMode === 1 ? 'Schedule' : 'Detail'}
+              </span>
+            </div>
           )}
         </div>
         <div className="cal-header-right">
