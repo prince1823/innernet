@@ -1325,12 +1325,6 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
                           <span className="cal-schedule-event-title">{ev.title}</span>
                           <span className="cal-schedule-event-time">{formatTimeDisplay(ev.time)} – {formatTimeDisplay(ev.endTime)}</span>
                         </div>
-                        {ev.attendees && ev.attendees.length > 0 && (
-                          <div className="cal-schedule-event-attendees">
-                            {ev.attendees.slice(0, 2).map((a, i) => <span key={i} className="cal-schedule-attendee">{a}</span>)}
-                            {ev.attendees.length > 2 && <span className="cal-schedule-attendee-more">+{ev.attendees.length - 2}</span>}
-                          </div>
-                        )}
                         <svg className="cal-schedule-event-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
                       </button>
                     )
