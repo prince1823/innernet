@@ -1324,7 +1324,6 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               <div key={group.date} className={`cal-schedule-day ${isCurrentDay ? 'cal-schedule-day--current' : ''}`}>
                 <div className="cal-schedule-day-header">
                   <span className="cal-schedule-day-label">{dayLabel}</span>
-                  <span className="cal-schedule-day-count">{group.events.length} {group.events.length === 1 ? 'meeting' : 'meetings'}</span>
                 </div>
                 <div className="cal-schedule-day-events">
                   {group.events.map(ev => {
