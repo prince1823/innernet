@@ -569,6 +569,7 @@ export const journalPages = {
       { id: 'j0414-2a', text: 'Refactored taxonomy queries with Tanuj', children: [] },
     ]},
   ],
+
 };
 
 // Activity logs for the Logs panel

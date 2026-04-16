@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { flushSync } from 'react-dom'
 
-import { journalPages } from '../data/sampleData'
+import { journalPages, calendarTasks } from '../data/sampleData'
 import { askAI } from '../utils/askAI'
 import './DocumentPanel.css'
 
@@ -345,6 +345,26 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
 
   // Working blocks for current date (saved tree OR materialized from sample)
   const blocks = trees[selectedDate] || materializeTree(selectedDate, legacyEditsRef.current)
+
+  // Auto-stamp time/project on top-level blocks using calendar events for that date
+  useEffect(() => {
+    if (!blocks.length) return
+    const events = calendarTasks[selectedDate] || []
+    const eventTimes = new Set(events.map(e => e.time))
+    // Re-stamp if any top-level block has no time or a time that doesn't match any calendar event
+    const needsStamp = blocks.some(b => !b.time || (b.time && !eventTimes.has(b.time)))
+    if (!needsStamp || !events.length) return
+    setTrees(prev => {
+      const current = prev[selectedDate] || materializeTree(selectedDate, legacyEditsRef.current)
+      const stamped = current.map((b, i) => {
+        if (b.time && eventTimes.has(b.time)) return b
+        const ev = events[i]
+        if (ev) return { ...b, time: ev.time, project: b.project || ev.project }
+        return b
+      })
+      return { ...prev, [selectedDate]: stamped }
+    })
+  }, [selectedDate])
 
   // Persist trees
   useEffect(() => {
