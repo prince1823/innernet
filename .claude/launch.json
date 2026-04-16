@@ -2,11 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "dev",
+      "name": "innernet-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "5199"],
-      "port": 5199
+      "runtimeArgs": ["run", "dev"],
+      "port": 5175
     }
-  ],
-  "autoVerify": false
+  ]
 }

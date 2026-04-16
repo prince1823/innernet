@@ -85,6 +85,26 @@
 
 .cal-search-btn:hover { background: #f1f3f4; }
 
+/* ── AI Schedule Button ── */
+.cal-ai-schedule-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #7c3aed;
+  border: none;
+  background: #f5f3ff;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cal-ai-schedule-btn:hover {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
 /* ── Zoom Buttons ── */
 .cal-zoom-btns {
   display: flex;

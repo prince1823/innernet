@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { calendarTasks, eventColors, notes as allNotes, activityLogs, featureDocItems, agentSessions } from '../data/sampleData'
+import AIScheduleModal from './AIScheduleModal'
 import './CalendarPanel.css'
 
 const DAYS_SHORT = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
@@ -412,6 +413,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const [hoveredEventId, setHoveredEventId] = useState(null) // event id for the hover peek card
   // Draft text for the inline quick-note input that pops up when an empty slot is clicked
   const [quickNoteText, setQuickNoteText] = useState('')
+  const [showAISchedule, setShowAISchedule] = useState(false)
   const quickNoteInputRef = useRef(null)
   const gridRef = useRef(null)
   const searchRef = useRef(null)
@@ -1315,6 +1317,12 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
           </button>
         </div>
         <div className="cal-header-right">
+          <button className="cal-ai-schedule-btn" onClick={() => setShowAISchedule(true)} title="AI Schedule">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              <line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/>
+            </svg>
+          </button>
           <button className="cal-search-btn" onClick={() => { setSearchResults({ kind: 'empty' }); setTimeout(() => searchRef.current?.focus(), 50) }} title="Search">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           </button>
@@ -1328,6 +1336,14 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
           </div>
         </div>
       </div>
+
+      {/* AI Schedule Modal */}
+      <AIScheduleModal
+        open={showAISchedule}
+        onClose={() => setShowAISchedule(false)}
+        onScheduleEvent={onScheduleEvent}
+        existingEvents={{ ...calendarTasks, ...userEvents }}
+      />
 
       {/* Mini Calendar Dropdown */}
       {showMiniCal && (
