@@ -622,7 +622,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   // Granola-style notes view toggle: 'me' = human-typed only, 'ai' = AI-enhanced included
   const [notesMode, setNotesMode] = useState('me')
   // When set, highlight the AI callout tied to this top-level block id (cleared after 3s)
-  const [highlightCalloutTopId, setHighlightCalloutTopId] = useState(null)
+  const [highlightCalloutAiId, setHighlightCalloutAiId] = useState(null)
   // When set, flash-highlight a Me-mode block by id (cleared after 2s)
   const [highlightMeBlockId, setHighlightMeBlockId] = useState(null)
   // Track per-callout regeneration state by AI block id
@@ -1305,12 +1305,13 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
             <button
               type="button"
               className="ls-ai-marker"
-              onClick={e => {
-                const topEl = e.currentTarget.closest('.ls-block-top')
-                const topId = topEl ? topEl.getAttribute('data-block-id') : block.id
+              onClick={() => {
+                // Highlight only the specific AI answer tied to this block
+                const aiId = aiChildren[0]?.id
+                if (!aiId) return
                 setNotesMode('ai')
-                setHighlightCalloutTopId(topId)
-                setTimeout(() => setHighlightCalloutTopId(curr => (curr === topId ? null : curr)), 3000)
+                setHighlightCalloutAiId(aiId)
+                setTimeout(() => setHighlightCalloutAiId(curr => (curr === aiId ? null : curr)), 3000)
               }}
               onMouseDown={e => e.preventDefault()}
               title="AI added an insight — view in AI mode"
@@ -1566,7 +1567,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                           const isOpen = openSourceLens && openSourceLens.block === bi && openSourceLens.item === ii
                           const sources = (item.sources || []).map(id => meBlockById[id]).filter(Boolean)
                           if (item.kind === 'callout') {
-                            const isHighlighted = highlightCalloutTopId && item.sourceTopId === highlightCalloutTopId
+                            const isHighlighted = highlightCalloutAiId && item.aiBlockId === highlightCalloutAiId
                             return (
                               <li
                                 key={ii}
