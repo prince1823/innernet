@@ -339,6 +339,18 @@
   margin-right: 2px;
 }
 
+.ai-doc-callout-on {
+  color: #8b93a3;
+  font-style: normal;
+}
+
+.ai-doc-callout-on::before {
+  content: ' · ';
+  color: #c4b5fd;
+  font-style: normal;
+  margin: 0 3px;
+}
+
 /* Border flash when user clicks the AI marker arrow in Me mode */
 .ai-doc-callout-highlight {
   position: relative;

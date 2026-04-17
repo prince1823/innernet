@@ -166,7 +166,7 @@ function parseMarkdownToDoc(md, meBlocks) {
 // highlighted callouts into the AI enhanced view under the matching section.
 function collectQAPairs(tree) {
   const pairs = []
-  function walk(nodes, topBlock) {
+  function walk(nodes, topBlock, parentBlock) {
     for (const b of nodes) {
       const nextTop = topBlock || b
       if (b.isAI && b.sourceQuery) {
@@ -177,12 +177,13 @@ function collectQAPairs(tree) {
           answer: (b.text || '').trim(),
           topText: nextTop.text || '',
           topTime: nextTop.time,
+          askedOn: (parentBlock?.text || '').trim(),
         })
       }
-      if (b.children && b.children.length) walk(b.children, topBlock || b)
+      if (b.children && b.children.length) walk(b.children, topBlock || b, b)
     }
   }
-  walk(tree, null)
+  walk(tree, null, null)
   return pairs
 }
 
@@ -215,6 +216,7 @@ function injectCalloutsIntoDoc(doc, pairs) {
       text: pair.answer,
       kind: 'callout',
       question: pair.question,
+      askedOn: pair.askedOn,
       sources: [],
       sourceTopId: pair.topId,
     })
@@ -712,12 +714,9 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     aiStreamTimersRef.current = []
   }, [])
 
-  useEffect(() => {
-    if (notesMode !== 'ai') return
-    generateAiView(false)
-    // intentionally only fire on mode flip / date change — not every keystroke
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notesMode, selectedDate])
+  // AI view is derived purely from user Q&A pairs — no full-content regeneration.
+  // Each question/answer the user asked in Me mode becomes a callout in AI mode,
+  // grouped under its top-level ancestor heading. No API call on mode flip.
 
   useEffect(() => { setOpenSourceLens(null) }, [notesMode, selectedDate])
 
@@ -1315,15 +1314,32 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     })
   }
 
-  // Resolve what to show: live stream > cached doc (migrate legacy content → doc on the fly)
+  // Build the AI view directly from user Q&A pairs — no content regeneration.
+  // Each new question appended in Me mode shows up here as an additional callout
+  // under the same top-level heading, without touching any existing responses.
   let displayDoc = null
-  if (aiViewStream !== null) {
-    displayDoc = parseMarkdownToDoc(aiViewStream, meBlockList)
-  } else if (cachedAiView?.doc) {
-    displayDoc = cachedAiView.doc
-  } else if (cachedAiView?.content) {
-    // Legacy entry — parse once, keep in-memory; next save overwrites cache with doc form
-    displayDoc = parseMarkdownToDoc(cachedAiView.content, meBlockList)
+  {
+    const pairs = collectQAPairs(blocks || [])
+    if (pairs.length > 0) {
+      const byTop = new Map()
+      for (const p of pairs) {
+        if (!byTop.has(p.topId)) byTop.set(p.topId, { topText: p.topText, items: [] })
+        byTop.get(p.topId).items.push({
+          kind: 'callout',
+          text: p.answer,
+          question: p.question,
+          askedOn: p.askedOn,
+          sourceTopId: p.topId,
+          sources: [],
+        })
+      }
+      const doc = []
+      for (const { topText, items } of byTop.values()) {
+        doc.push({ type: 'h', level: 3, text: topText })
+        doc.push({ type: 'ul', items })
+      }
+      displayDoc = doc
+    }
   }
 
   return (
@@ -1419,8 +1435,31 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                 <span className="ai-doc-shimmer" style={{ width: '60%' }} />
               </div>
             ) : displayDoc && displayDoc.length > 0 ? (
+              (() => {
+                // Filter doc to only show callouts (Q&A insights) under their section headings.
+                // Drop AI-rewritten bullets/paragraphs so the user sees only what they asked.
+                const filteredDoc = []
+                for (let i = 0; i < displayDoc.length; i++) {
+                  const b = displayDoc[i]
+                  if (b.type === 'h') {
+                    let hasCalloutInSection = false
+                    for (let j = i + 1; j < displayDoc.length; j++) {
+                      if (displayDoc[j].type === 'h') break
+                      if (displayDoc[j].type === 'ul' && displayDoc[j].items.some(it => it.kind === 'callout')) {
+                        hasCalloutInSection = true
+                        break
+                      }
+                    }
+                    if (hasCalloutInSection) filteredDoc.push(b)
+                  } else if (b.type === 'ul') {
+                    const calloutItems = b.items.filter(it => it.kind === 'callout')
+                    if (calloutItems.length > 0) filteredDoc.push({ ...b, items: calloutItems, __origIdx: i })
+                  }
+                }
+                const sourceDoc = filteredDoc.length > 0 ? filteredDoc : displayDoc
+                return (
               <div className={`ai-doc-body ${aiViewStream !== null ? 'ai-doc-body-streaming' : ''}`}>
-                {displayDoc.map((block, bi) => {
+                {sourceDoc.map((block, bi) => {
                   const editable = aiViewStream === null && !aiViewLoading
                   if (block.type === 'h') {
                     const Tag = block.level === 2 ? 'h2' : 'h3'
@@ -1480,7 +1519,12 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                     }}
                                   >{item.text}</span>
                                   {item.question && (
-                                    <span className="ai-doc-callout-from">from: {item.question}</span>
+                                    <span className="ai-doc-callout-from">
+                                      from: {item.question}
+                                      {item.askedOn && (
+                                        <span className="ai-doc-callout-on"> on “{item.askedOn}”</span>
+                                      )}
+                                    </span>
                                   )}
                                 </span>
                               </li>
@@ -1534,6 +1578,8 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                   return null
                 })}
               </div>
+                )
+              })()
             ) : !aiViewError && (
               <div className="ls-empty"><span className="ls-empty-text">Switch to Me mode to add notes, then come back.</span></div>
             )}
