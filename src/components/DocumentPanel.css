@@ -499,26 +499,31 @@
 .ls-ai-marker {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  margin-left: 8px;
-  padding: 2px 7px 2px 6px;
-  background: #f5f3ff;
-  border: 1px solid #e4dcfa;
-  border-radius: 999px;
-  color: #7c3aed;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  justify-content: center;
+  margin-left: 4px;
+  padding: 2px;
+  align-self: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: #a78bfa;
   font-family: inherit;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  opacity: 0.9;
+  transition: color 0.15s, transform 0.15s, opacity 0.15s;
+  animation: ls-ai-marker-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes ls-ai-marker-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to   { opacity: 0.9; transform: translateX(0); }
 }
 
 .ls-ai-marker:hover {
-  background: #ede9fe;
-  border-color: #c4b5fd;
-  color: #6d28d9;
+  color: #7c3aed;
+  opacity: 1;
+  transform: translateX(3px);
 }
 
 .ls-ai-marker svg {
@@ -528,6 +533,11 @@
 .ls-block-content {
   display: flex;
   align-items: flex-start;
+}
+
+/* When a block has an AI insight marker, let the text shrink so the arrow sits right after it */
+.ls-block-content-has-ai .ls-block-text {
+  flex: 0 1 auto;
 }
 
 .ls-bullet-wrap {
