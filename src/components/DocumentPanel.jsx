@@ -554,6 +554,8 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   const [notesMode, setNotesMode] = useState('me')
   // When set, highlight the AI callout tied to this top-level block id (cleared after 3s)
   const [highlightCalloutTopId, setHighlightCalloutTopId] = useState(null)
+  // Track per-callout regeneration state by AI block id
+  const [regeneratingCalloutIds, setRegeneratingCalloutIds] = useState(new Set())
   // Generated AI-enhanced view per date: { [date]: { sourceHash, content, generatedAt } }
   const [aiViews, setAiViews] = useState(loadAiViews)
   const [aiViewLoading, setAiViewLoading] = useState(false)
@@ -1048,6 +1050,31 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     })
   }
 
+  // Regenerate a single AI callout by re-running its original query with its stored context.
+  // Only touches that one AI block's text — no global rewrite, no other callouts change.
+  const regenerateCallout = useCallback(async (aiBlockId) => {
+    const currentTree = trees[selectedDate] || materializeTree(selectedDate, legacyEditsRef.current)
+    const ctx = findContext(currentTree, aiBlockId)
+    if (!ctx) return
+    const block = ctx.block
+    const query = (block.sourceQuery || '').trim()
+    if (!query) return
+    const context = block.sourceContext || ''
+
+    setRegeneratingCalloutIds(prev => { const next = new Set(prev); next.add(aiBlockId); return next })
+    try {
+      const prompt = `Answer this question: ${query}\n\nContext:\n${context}\n\nRespond as a single flowing paragraph, 2-3 sentences maximum. Be concise and focused. Do NOT use bullet points, numbered lists, or headings — write it as continuous prose.`
+      const response = await askAI(prompt, context)
+      const paraText = formatAIParagraph(response) || (response || '')
+      applyTreeOp(tree => setBlockText(tree, aiBlockId, paraText))
+      await streamBlockText(aiBlockId, paraText)
+    } catch (e) {
+      // swallow — leaves existing text intact
+    } finally {
+      setRegeneratingCalloutIds(prev => { const next = new Set(prev); next.delete(aiBlockId); return next })
+    }
+  }, [trees, selectedDate, askAI])
+
   // ── Implement CTA handlers ─────────────────────────────────────────────
   // The CTA lives inside each @-query AI card. "Yes" spawns a ChatWindows
   // feature session seeded with the original question + AI answer + the text
@@ -1330,6 +1357,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
           question: p.question,
           askedOn: p.askedOn,
           sourceTopId: p.topId,
+          aiBlockId: p.id,
           sources: [],
         })
       }
@@ -1395,38 +1423,6 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
         {/* AI-enhanced view (read-only) when in AI mode */}
         {notesMode === 'ai' ? (
           <div className="ai-doc">
-            <div className="ai-doc-toolbar">
-              <span className="ai-doc-meta">
-                {aiViewLoading
-                  ? 'Generating enhanced view…'
-                  : cachedAiView
-                    ? `Enhanced ${new Date(cachedAiView.generatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
-                    : 'No enhanced view yet'}
-              </span>
-              <div className="ai-doc-toolbar-right">
-                {isStale && (
-                  <button
-                    type="button"
-                    className="ai-doc-stale-pill"
-                    onClick={() => generateAiView(true)}
-                    title="Notes have changed — click to regenerate"
-                  >
-                    <span className="ai-doc-stale-dot" />
-                    Notes changed
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="ai-doc-regen"
-                  onClick={() => generateAiView(true)}
-                  disabled={aiViewLoading}
-                  title="Regenerate enhanced view"
-                >
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-                  Regenerate
-                </button>
-              </div>
-            </div>
             {aiViewError && <div className="ai-doc-error">{aiViewError}</div>}
             {aiViewLoading && !displayDoc ? (
               <div className="ai-doc-loading">
@@ -1527,6 +1523,22 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                     </span>
                                   )}
                                 </span>
+                                {item.aiBlockId && (
+                                  <button
+                                    type="button"
+                                    className={`ai-doc-callout-regen ${regeneratingCalloutIds.has(item.aiBlockId) ? 'is-regenerating' : ''}`}
+                                    onClick={() => regenerateCallout(item.aiBlockId)}
+                                    onMouseDown={e => e.preventDefault()}
+                                    disabled={regeneratingCalloutIds.has(item.aiBlockId)}
+                                    title="Regenerate this response"
+                                    aria-label="Regenerate response"
+                                  >
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                                      <polyline points="23 4 23 10 17 10"/>
+                                      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                                    </svg>
+                                  </button>
+                                )}
                               </li>
                             )
                           }

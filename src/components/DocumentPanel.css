@@ -277,7 +277,9 @@
 /* ── AI mode callout (Q&A insight) ── */
 .ai-doc-callout {
   list-style: none;
-  display: block;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   position: relative;
   margin: 6px 0 8px 0;
   padding: 0;
@@ -286,6 +288,11 @@
   font-size: 12.5px;
   color: #4a4a60;
   line-height: 1.55;
+}
+
+.ai-doc-callout .ai-doc-callout-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .ai-doc-callout-glyph {
@@ -299,25 +306,15 @@
 
 .ai-doc-callout-answer {
   display: inline;
-  background: linear-gradient(120deg, rgba(196, 181, 253, 0.22) 0%, rgba(196, 181, 253, 0.35) 100%);
-  background-size: 100% 58%;
-  background-repeat: no-repeat;
-  background-position: 0 88%;
+  background: transparent;
   color: #2a2a40;
   font-weight: 400;
-  padding: 0 3px;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
+  padding: 0;
   outline: none;
-  transition: background-size 0.2s ease;
-}
-
-.ai-doc-callout-answer:hover {
-  background-size: 100% 100%;
 }
 
 .ai-doc-callout-answer:focus {
-  background: rgba(139, 92, 246, 0.12);
+  background: rgba(0, 0, 0, 0.04);
   border-radius: 3px;
 }
 
@@ -349,6 +346,50 @@
   color: #c4b5fd;
   font-style: normal;
   margin: 0 3px;
+}
+
+/* Per-callout regenerate button — small circle icon */
+.ai-doc-callout-regen {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  color: #9aa3b2;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.ai-doc-callout:hover .ai-doc-callout-regen,
+.ai-doc-callout-regen.is-regenerating {
+  opacity: 1;
+}
+
+.ai-doc-callout-regen:hover:not(:disabled) {
+  background: #f5f3ff;
+  border-color: #d8ccfb;
+  color: #7c3aed;
+}
+
+.ai-doc-callout-regen:disabled {
+  cursor: default;
+}
+
+.ai-doc-callout-regen.is-regenerating svg {
+  animation: ai-doc-callout-regen-spin 0.9s linear infinite;
+  color: #8b5cf6;
+}
+
+@keyframes ai-doc-callout-regen-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
 /* Border flash when user clicks the AI marker arrow in Me mode */
