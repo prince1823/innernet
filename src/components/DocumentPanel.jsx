@@ -8,8 +8,18 @@ import './DocumentPanel.css'
 
 function renderMd(text) {
   if (!text) return ''
-  return text
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  // Preserve inline formatting tags persisted by the selection toolbar
+  // (b/i/u/s and their semantic equivalents) — everything else gets HTML-escaped
+  // before markdown conversion so raw `<` / `>` in user text can't inject markup.
+  const ALLOWED_TAG = /<\/?(?:b|i|u|s|strong|em|code|span|br)\b[^>]*>/gi
+  const saved = []
+  let s = text.replace(ALLOWED_TAG, (m) => {
+    saved.push(m)
+    return `\x00${saved.length - 1}\x00`
+  })
+  s = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  s = s.replace(/\x00(\d+)\x00/g, (_, i) => saved[parseInt(i, 10)])
+  return s
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
@@ -580,7 +590,11 @@ function SelectionToolbar({ containerRef }) {
   }, [containerRef])
 
   const applyFormat = (cmd) => {
-    try { document.execCommand(cmd) } catch {}
+    try {
+      // Prefer semantic tags (<b>/<i>/<u>/<s>) over <span style> so saved HTML stays simple
+      document.execCommand('styleWithCSS', false, false)
+      document.execCommand(cmd)
+    } catch {}
   }
 
   if (!pos) return null
@@ -1249,7 +1263,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                 contentEditable={!isStreaming}
                 suppressContentEditableWarning
                 onKeyDown={e => handleBlockKeyDown(e, block.id, block)}
-                onBlur={e => handleBlockBlur(block.id, e.currentTarget.textContent)}
+                onBlur={e => handleBlockBlur(block.id, e.currentTarget.innerHTML)}
                 dangerouslySetInnerHTML={{ __html: renderMd(displayText) }}
               />
               {block.canImplement && !block.implementStatus && !isStreaming && (
@@ -1283,7 +1297,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
               contentEditable={!isStreaming}
               suppressContentEditableWarning
               onKeyDown={e => handleBlockKeyDown(e, block.id, block)}
-              onBlur={e => handleBlockBlur(block.id, e.currentTarget.textContent)}
+              onBlur={e => handleBlockBlur(block.id, e.currentTarget.innerHTML)}
               dangerouslySetInnerHTML={{ __html: renderMd(displayText) }}
             />
           )}
