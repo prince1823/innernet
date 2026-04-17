@@ -22,6 +22,215 @@ const TREES_KEY = 'innernet-journal-trees'        // per-date editable block tre
 const AI_INSERTS_KEY = 'innernet-journal-inserts'
 const STAMP_VERSION_KEY = 'innernet-stamp-version'
 const STAMP_VERSION = 2  // bump to force re-stamp
+const AI_VIEWS_KEY = 'innernet-journal-ai-views'  // per-date generated AI-enhanced view
+
+function loadAiViews() {
+  try { return JSON.parse(localStorage.getItem(AI_VIEWS_KEY) || '{}') } catch { return {} }
+}
+
+// djb2 hash — used to invalidate the cached AI view when the source Me tree changes
+function hashString(s) {
+  let h = 5381
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0
+  return (h >>> 0).toString(36)
+}
+
+// Strip isAI blocks recursively — Me content is the source of truth for AI generation
+function stripAI(tree) {
+  return tree
+    .filter(b => !b.isAI)
+    .map(b => ({ ...b, children: b.children ? stripAI(b.children) : [] }))
+}
+
+// Convert a Me tree into a plain-text outline the model can read
+function treeToOutline(tree, depth = 0) {
+  const indent = '  '.repeat(depth)
+  return tree.map(b => {
+    const meta = []
+    if (b.time) meta.push(b.time)
+    if (b.project) meta.push(`#${b.project}`)
+    const metaStr = meta.length ? ` [${meta.join(' ')}]` : ''
+    const head = `${indent}- ${b.text || ''}${metaStr}`
+    const kids = b.children && b.children.length
+      ? '\n' + treeToOutline(b.children, depth + 1)
+      : ''
+    return head + kids
+  }).join('\n')
+}
+
+// Render markdown for the AI enhanced view — supports ## headings + bullets + inline marks
+function renderEnhancedMd(text) {
+  if (!text) return ''
+  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const lines = escaped.split('\n')
+  const out = []
+  let inList = false
+  for (const raw of lines) {
+    const line = raw.trimEnd()
+    if (!line.trim()) {
+      if (inList) { out.push('</ul>'); inList = false }
+      continue
+    }
+    const h2 = line.match(/^##\s+(.+)$/)
+    const h1 = line.match(/^#\s+(.+)$/)
+    const li = line.match(/^\s*[-*]\s+(.+)$/)
+    if (h2) {
+      if (inList) { out.push('</ul>'); inList = false }
+      out.push(`<h3 class="ai-doc-h">${inline(h2[1])}</h3>`)
+    } else if (h1) {
+      if (inList) { out.push('</ul>'); inList = false }
+      out.push(`<h2 class="ai-doc-h">${inline(h1[1])}</h2>`)
+    } else if (li) {
+      if (!inList) { out.push('<ul class="ai-doc-ul">'); inList = true }
+      out.push(`<li>${inline(li[1])}</li>`)
+    } else {
+      if (inList) { out.push('</ul>'); inList = false }
+      out.push(`<p class="ai-doc-p">${inline(line)}</p>`)
+    }
+  }
+  if (inList) out.push('</ul>')
+  return out.join('')
+
+  function inline(s) {
+    return s
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+  }
+}
+
+// Flatten all user (non-AI) blocks to a list of { id, text, time, project }
+// for source-lens lookups from the AI enhanced view
+function flattenMeBlocks(tree, acc = []) {
+  for (const b of tree) {
+    if (!b.isAI) acc.push({ id: b.id, text: b.text, time: b.time, project: b.project })
+    if (b.children && b.children.length) flattenMeBlocks(b.children, acc)
+  }
+  return acc
+}
+
+const STOPWORDS = new Set(['the','a','an','of','to','and','or','but','in','on','at','for','with','is','was','are','were','be','been','being','by','this','that','these','those','it','its','as','from','we','our','i','me','my','you','your','he','she','they','them','their','has','have','had','do','does','did','will','would','can','could','may','might','must','should','not'])
+
+function tokenize(s) {
+  return (s || '').toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2 && !STOPWORDS.has(w))
+}
+
+// Word-overlap similarity: returns up to topN Me-block IDs whose tokens share
+// the most with the bullet text. Dead-simple — the model won't tell us the
+// provenance, so we reconstruct it heuristically.
+function findSources(bulletText, meBlocks, topN = 3) {
+  const bTokens = tokenize(bulletText)
+  if (!bTokens.length) return []
+  const bSet = new Set(bTokens)
+  const scored = []
+  for (const b of meBlocks) {
+    const tokens = tokenize(b.text)
+    if (!tokens.length) continue
+    let shared = 0
+    for (const t of tokens) if (bSet.has(t)) shared++
+    if (shared > 0) scored.push({ id: b.id, score: shared })
+  }
+  scored.sort((a, b) => b.score - a.score)
+  return scored.slice(0, topN).map(x => x.id)
+}
+
+// Parse the model's markdown output into a structured Doc: an array of blocks
+// where headings/paragraphs are plain text and bullet lists carry per-item
+// `sources` arrays. Doc is what we actually persist and render from.
+function parseMarkdownToDoc(md, meBlocks) {
+  const lines = (md || '').split('\n')
+  const doc = []
+  let currentUl = null
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (!line) { currentUl = null; continue }
+    const h2 = line.match(/^##\s+(.+)$/)
+    const h1 = line.match(/^#\s+(.+)$/)
+    const li = line.match(/^[-*]\s+(.+)$/)
+    if (h2 || h1) {
+      currentUl = null
+      doc.push({ type: 'h', level: h2 ? 3 : 2, text: (h2 || h1)[1] })
+    } else if (li) {
+      if (!currentUl) { currentUl = { type: 'ul', items: [] }; doc.push(currentUl) }
+      currentUl.items.push({ text: li[1], sources: findSources(li[1], meBlocks) })
+    } else {
+      currentUl = null
+      doc.push({ type: 'p', text: line })
+    }
+  }
+  return doc
+}
+
+// Walk the tree and collect Q&A pairs: each AI block with a sourceQuery yields
+// one pair (question, answer, top-level ancestor text/time). Used to inject
+// highlighted callouts into the AI enhanced view under the matching section.
+function collectQAPairs(tree) {
+  const pairs = []
+  function walk(nodes, topBlock) {
+    for (const b of nodes) {
+      const nextTop = topBlock || b
+      if (b.isAI && b.sourceQuery) {
+        pairs.push({
+          id: b.id,
+          question: b.sourceQuery,
+          answer: (b.text || '').trim(),
+          topText: nextTop.text || '',
+          topTime: nextTop.time,
+        })
+      }
+      if (b.children && b.children.length) walk(b.children, topBlock || b)
+    }
+  }
+  walk(tree, null)
+  return pairs
+}
+
+// Match each Q&A pair to the most relevant heading section in the Doc by word
+// overlap between the pair's top-level ancestor text and the heading text,
+// then append a callout item to that section's UL.
+function injectCalloutsIntoDoc(doc, pairs) {
+  if (!pairs.length) return doc
+  const next = doc.map(b => b.type === 'ul' ? { ...b, items: [...b.items] } : b)
+  const sections = []
+  for (let i = 0; i < next.length; i++) {
+    if (next[i].type === 'h') {
+      for (let j = i + 1; j < next.length; j++) {
+        if (next[j].type === 'h') break
+        if (next[j].type === 'ul') { sections.push({ ulIdx: j, headingText: next[i].text }); break }
+      }
+    }
+  }
+  for (const pair of pairs) {
+    const topTokens = new Set(tokenize(pair.topText))
+    let best = null, bestScore = 0
+    for (const sec of sections) {
+      let score = 0
+      for (const t of tokenize(sec.headingText)) if (topTokens.has(t)) score++
+      if (score > bestScore) { bestScore = score; best = sec }
+    }
+    const target = best || sections[0]
+    if (!target) continue
+    next[target.ulIdx].items.push({
+      text: pair.answer,
+      kind: 'callout',
+      question: pair.question,
+      sources: [],
+    })
+  }
+  return next
+}
+
+// Render Doc back to markdown (used for hash/diagnostics; not for display)
+function docToMarkdown(doc) {
+  if (!doc) return ''
+  const out = []
+  for (const b of doc) {
+    if (b.type === 'h') out.push(`${'#'.repeat(b.level)} ${b.text}`)
+    else if (b.type === 'p') out.push(b.text)
+    else if (b.type === 'ul') for (const it of b.items) out.push(`- ${it.text}`)
+  }
+  return out.join('\n')
+}
 
 function loadLegacyEdits() {
   try { return JSON.parse(localStorage.getItem(EDITS_KEY) || '{}') } catch { return {} }
@@ -337,6 +546,19 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   const [focusRequest, setFocusRequest] = useState(null)
   // When set, only render this block (and its subtree) as the page root
   const [zoomedBlockId, setZoomedBlockId] = useState(null)
+  // Granola-style notes view toggle: 'me' = human-typed only, 'ai' = AI-enhanced included
+  const [notesMode, setNotesMode] = useState('me')
+  // Generated AI-enhanced view per date: { [date]: { sourceHash, content, generatedAt } }
+  const [aiViews, setAiViews] = useState(loadAiViews)
+  const [aiViewLoading, setAiViewLoading] = useState(false)
+  const [aiViewError, setAiViewError] = useState(null)
+  // Streaming overlay for the enhanced view: partial markdown shown in place of cached doc while typing in
+  const [aiViewStream, setAiViewStream] = useState(null)
+  // Which bullet's source popover is open: { sectionIdx, itemIdx } or null
+  const [openSourceLens, setOpenSourceLens] = useState(null)
+  // Token of the in-flight generation; used so an old fetch doesn't overwrite a newer one
+  const aiGenTokenRef = useRef(0)
+  const aiStreamTimersRef = useRef([])
   const legacyEditsRef = useRef(loadLegacyEdits())
   const docBodyRef = useRef(null)
 
@@ -398,6 +620,113 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   useEffect(() => {
     try { localStorage.setItem(AI_INSERTS_KEY, JSON.stringify(atInserts)) } catch {}
   }, [atInserts])
+
+  useEffect(() => {
+    try { localStorage.setItem(AI_VIEWS_KEY, JSON.stringify(aiViews)) } catch {}
+  }, [aiViews])
+
+  // Generate (or reuse cached) enhanced view when entering AI mode for a date.
+  // Cache key is the hash of the stripped Me tree — edits invalidate automatically.
+  const generateAiView = useCallback(async (force = false) => {
+    const stripped = stripAI(blocks || [])
+    if (!stripped.length) {
+      setAiViewError('No notes to enhance yet — write something in Me mode first.')
+      return
+    }
+    const outline = treeToOutline(stripped)
+    const sourceHash = hashString(outline)
+
+    if (!force) {
+      const cached = aiViews[selectedDate]
+      if (cached && cached.sourceHash === sourceHash) return
+    }
+
+    const myToken = ++aiGenTokenRef.current
+    setAiViewLoading(true)
+    setAiViewError(null)
+
+    const prompt = `Rewrite these raw journal notes into a polished, well-structured daily summary in markdown. ` +
+      `Use ## headings to group related entries by topic or project. Use bullets and short paragraphs. ` +
+      `Improve grammar, expand cryptic shorthand into full sentences, and dedupe overlap. ` +
+      `Do NOT include question/answer artifacts — write as continuous prose. Do NOT invent facts. ` +
+      `Output markdown only, no preamble.\n\nRaw notes:\n${outline}`
+
+    try {
+      const response = await askAI(prompt, '')
+      if (myToken !== aiGenTokenRef.current) return // superseded
+      const fullText = response || ''
+
+      // Stream the enhanced doc in character-by-character
+      aiStreamTimersRef.current.forEach(t => clearTimeout(t))
+      aiStreamTimersRef.current = []
+      const CHARS_PER_TICK = 12
+      const TICK_MS = 16
+      let i = 0
+      setAiViewStream('')
+      await new Promise(resolve => {
+        const tick = () => {
+          if (myToken !== aiGenTokenRef.current) return resolve()
+          i = Math.min(i + CHARS_PER_TICK, fullText.length)
+          setAiViewStream(fullText.slice(0, i))
+          if (i < fullText.length) {
+            const t = setTimeout(tick, TICK_MS)
+            aiStreamTimersRef.current.push(t)
+          } else {
+            resolve()
+          }
+        }
+        const t0 = setTimeout(tick, 10)
+        aiStreamTimersRef.current.push(t0)
+      })
+      if (myToken !== aiGenTokenRef.current) return
+
+      // Parse markdown into structured Doc + attach per-bullet source-lens mapping,
+      // then inject Q&A pairs as highlighted callouts under their matching sections.
+      const meBlocks = flattenMeBlocks(stripped)
+      const qaPairs = collectQAPairs(blocks || [])
+      const doc = injectCalloutsIntoDoc(parseMarkdownToDoc(fullText, meBlocks), qaPairs)
+
+      setAiViews(prev => ({
+        ...prev,
+        [selectedDate]: {
+          sourceHash,
+          doc,
+          generatedAt: Date.now(),
+        },
+      }))
+      setAiViewStream(null)
+    } catch (e) {
+      if (myToken !== aiGenTokenRef.current) return
+      setAiViewError('Failed to generate AI view.')
+    } finally {
+      if (myToken === aiGenTokenRef.current) setAiViewLoading(false)
+    }
+  }, [aiViews, blocks, selectedDate])
+
+  useEffect(() => () => {
+    aiStreamTimersRef.current.forEach(t => clearTimeout(t))
+    aiStreamTimersRef.current = []
+  }, [])
+
+  useEffect(() => {
+    if (notesMode !== 'ai') return
+    generateAiView(false)
+    // intentionally only fire on mode flip / date change — not every keystroke
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notesMode, selectedDate])
+
+  useEffect(() => { setOpenSourceLens(null) }, [notesMode, selectedDate])
+
+  // Close the source lens popover on outside-click
+  useEffect(() => {
+    if (!openSourceLens) return
+    const onDocClick = (e) => {
+      if (e.target.closest('.ai-doc-sources') || e.target.closest('.ai-doc-lens')) return
+      setOpenSourceLens(null)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [openSourceLens])
 
   // Apply a transformation to the current date's tree (materializes on first op)
   const applyTreeOp = useCallback((fn) => {
@@ -695,14 +1024,23 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     applyTreeOp(tree => setBlockText(tree, aiBlockId, paraText))
     await streamBlockText(aiBlockId, paraText)
 
-    // 6. Flip on the Implement CTA now that the card is a complete Q→A. The footer
-    //    renders conditionally on block.canImplement && !implementStatus — declining
-    //    or accepting writes implementStatus to make the footer go away.
+    // 6. Strip the `@query` from the parent block text — the question is preserved on
+    //    the AI child as sourceQuery for the AI-mode callout, so Me mode reads cleanly.
+    //    Also flip on the Implement CTA now that the card is a complete Q→A.
     applyTreeOp(tree => {
       const next = cloneTree(tree)
-      const ctx = findContext(next, aiBlockId)
-      if (!ctx) return next
-      ctx.block.canImplement = true
+      const parentCtx = findContext(next, blockId)
+      if (parentCtx) {
+        const current = parentCtx.block.text || ''
+        const target = '@' + query
+        const idx = current.lastIndexOf(target)
+        if (idx >= 0) {
+          const stripped = (current.slice(0, idx) + current.slice(idx + target.length)).replace(/\s+/g, ' ').trim()
+          parentCtx.block.text = stripped
+        }
+      }
+      const aiCtx = findContext(next, aiBlockId)
+      if (aiCtx) aiCtx.block.canImplement = true
       return next
     })
   }
@@ -755,7 +1093,15 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
 
   // Recursive block renderer
   const renderBlock = (block, depth = 0) => {
-    const hasChildren = block.children && block.children.length > 0
+    const rawChildren = block.children || []
+    // In Me mode we hide AI children entirely — the answer belongs in AI mode.
+    // Instead we flag the line with a small "AI answered" marker so the user
+    // knows something was generated from this block.
+    const hideAI = notesMode === 'me'
+    const aiChildren = hideAI ? rawChildren.filter(c => c.isAI) : []
+    const hasAIMarker = hideAI && aiChildren.length > 0
+    const mainChildren = hideAI ? rawChildren.filter(c => !c.isAI) : rawChildren
+    const hasChildren = mainChildren.length > 0
     const blockInserts = atInserts.filter(ins => ins.blockId === block.id)
 
     const isCollapsed = !!block.collapsed
@@ -767,7 +1113,11 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     // Extract inline #hashtags to show as project tags on the right (keep in text until Cmd+Enter commits)
     const inlineTagMatch = rawText.match(/#(\w+)/)
     const inlineProject = inlineTagMatch ? inlineTagMatch[1] : null
-    const displayText = rawText
+    // In Me mode, hide any `@query` from display — it's preserved on the AI child
+    // as sourceQuery, so the AI-mode callout still shows it as provenance.
+    const displayText = (hideAI && hasAIMarker)
+      ? rawText.replace(/@[^\n]*/g, '').replace(/\s+/g, ' ').trim()
+      : rawText
     const effectiveProject = block.project || inlineProject
     const showChildren = (hasChildren && !isCollapsed) || blockInserts.length > 0
 
@@ -853,6 +1203,18 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
           {depth === 0 && effectiveProject && (
             <span className="ls-block-project">#{effectiveProject}</span>
           )}
+          {hasAIMarker && (
+            <button
+              type="button"
+              className="ls-ai-marker"
+              onClick={() => setNotesMode('ai')}
+              onMouseDown={e => e.preventDefault()}
+              title="AI added an insight — view in AI mode"
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              <span>AI</span>
+            </button>
+          )}
         </div>
 
         {showChildren && (
@@ -886,21 +1248,97 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
             ))}
 
             {/* Child blocks */}
-            {hasChildren && !isCollapsed && block.children.map(child => renderBlock(child, depth + 1))}
+            {hasChildren && !isCollapsed && mainChildren.map(child => renderBlock(child, depth + 1))}
           </div>
         )}
+
       </div>
     )
   }
 
   // Determine what to render as page root: either the full date's blocks or a zoomed subtree
   const zoomedBlock = zoomedBlockId ? findContext(blocks, zoomedBlockId)?.block : null
-  const rootBlocks = zoomedBlock ? [zoomedBlock] : blocks
+  const baseRoot = zoomedBlock ? [zoomedBlock] : blocks
   const ancestorTrail = zoomedBlockId ? findAncestors(blocks, zoomedBlockId) : []
+
+  // Me mode keeps the full tree — renderBlock decides per-block whether AI children
+  // are surfaced as marginalia (depth 0) or still rendered inline (deeper). AI mode
+  // never reaches renderBlock; it goes through the enhanced-view render path instead.
+  const rootBlocks = baseRoot
+
+  // Stale detection: compare current Me-tree hash against cached AI view's source hash
+  const cachedAiView = aiViews[selectedDate]
+  const liveSourceHash = notesMode === 'ai'
+    ? hashString(treeToOutline(stripAI(blocks || [])))
+    : null
+  const isStale = !!cachedAiView && liveSourceHash && cachedAiView.sourceHash !== liveSourceHash && !aiViewLoading
+
+  // Me-block lookup map — used by the source-lens popover to show raw notes by id
+  const meBlockList = notesMode === 'ai' ? flattenMeBlocks(stripAI(blocks || [])) : []
+  const meBlockById = notesMode === 'ai'
+    ? meBlockList.reduce((acc, b) => (acc[b.id] = b, acc), {})
+    : {}
+
+  // Persist a text edit to a specific doc node (bullet or heading/para).
+  // coord is { block: idx } for headings/paras, { block: idx, item: j } for bullets.
+  const updateDocNodeText = (coord, newText) => {
+    setAiViews(prev => {
+      const cur = prev[selectedDate]
+      if (!cur) return prev
+      // Always work off the current displayDoc's shape (so we handle the legacy-migration case)
+      const baseDoc = cur.doc
+        || (cur.content ? parseMarkdownToDoc(cur.content, meBlockList) : [])
+      const next = baseDoc.map((b, i) => {
+        if (i !== coord.block) return b
+        if (b.type === 'ul' && typeof coord.item === 'number') {
+          const items = b.items.map((it, j) => j === coord.item ? { ...it, text: newText } : it)
+          return { ...b, items }
+        }
+        return { ...b, text: newText }
+      })
+      return {
+        ...prev,
+        [selectedDate]: { ...cur, doc: next, content: undefined, edited: true, generatedAt: Date.now() },
+      }
+    })
+  }
+
+  // Resolve what to show: live stream > cached doc (migrate legacy content → doc on the fly)
+  let displayDoc = null
+  if (aiViewStream !== null) {
+    displayDoc = parseMarkdownToDoc(aiViewStream, meBlockList)
+  } else if (cachedAiView?.doc) {
+    displayDoc = cachedAiView.doc
+  } else if (cachedAiView?.content) {
+    // Legacy entry — parse once, keep in-memory; next save overwrites cache with doc form
+    displayDoc = parseMarkdownToDoc(cachedAiView.content, meBlockList)
+  }
 
   return (
     <div className="doc-panel">
       <div className="doc-body" ref={docBodyRef} style={{ position: 'relative' }}>
+
+        {/* Granola-style Me / AI notes toggle */}
+        <div className="doc-mode-toggle">
+          <button
+            type="button"
+            className={`doc-mode-btn ${notesMode === 'me' ? 'active' : ''}`}
+            onClick={() => setNotesMode('me')}
+            title="Show only your notes"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+            Me
+          </button>
+          <button
+            type="button"
+            className={`doc-mode-btn ${notesMode === 'ai' ? 'active' : ''}`}
+            onClick={() => setNotesMode('ai')}
+            title="Show AI-enhanced notes"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            AI
+          </button>
+        </div>
 
         {/* Page heading — date in normal mode, breadcrumb when zoomed into a block */}
         {zoomedBlockId ? (
@@ -926,8 +1364,163 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
           <h1 className="ls-page-title">{formatDateHeading(selectedDate || '2026-04-09')}</h1>
         )}
 
-        {/* Journal blocks (or zoomed subtree) */}
-        {rootBlocks.length > 0 ? (
+        {/* AI-enhanced view (read-only) when in AI mode */}
+        {notesMode === 'ai' ? (
+          <div className="ai-doc">
+            <div className="ai-doc-toolbar">
+              <span className="ai-doc-meta">
+                {aiViewLoading
+                  ? 'Generating enhanced view…'
+                  : cachedAiView
+                    ? `Enhanced ${new Date(cachedAiView.generatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+                    : 'No enhanced view yet'}
+              </span>
+              <div className="ai-doc-toolbar-right">
+                {isStale && (
+                  <button
+                    type="button"
+                    className="ai-doc-stale-pill"
+                    onClick={() => generateAiView(true)}
+                    title="Notes have changed — click to regenerate"
+                  >
+                    <span className="ai-doc-stale-dot" />
+                    Notes changed
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="ai-doc-regen"
+                  onClick={() => generateAiView(true)}
+                  disabled={aiViewLoading}
+                  title="Regenerate enhanced view"
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                  Regenerate
+                </button>
+              </div>
+            </div>
+            {aiViewError && <div className="ai-doc-error">{aiViewError}</div>}
+            {aiViewLoading && !displayDoc ? (
+              <div className="ai-doc-loading">
+                <span className="ai-doc-shimmer" />
+                <span className="ai-doc-shimmer" style={{ width: '80%' }} />
+                <span className="ai-doc-shimmer" style={{ width: '60%' }} />
+              </div>
+            ) : displayDoc && displayDoc.length > 0 ? (
+              <div className={`ai-doc-body ${aiViewStream !== null ? 'ai-doc-body-streaming' : ''}`}>
+                {displayDoc.map((block, bi) => {
+                  const editable = aiViewStream === null && !aiViewLoading
+                  if (block.type === 'h') {
+                    const Tag = block.level === 2 ? 'h2' : 'h3'
+                    return (
+                      <Tag
+                        key={bi}
+                        className="ai-doc-h"
+                        contentEditable={editable}
+                        suppressContentEditableWarning
+                        onBlur={e => {
+                          const t = e.currentTarget.textContent || ''
+                          if (t !== block.text) updateDocNodeText({ block: bi }, t)
+                        }}
+                      >{block.text}</Tag>
+                    )
+                  }
+                  if (block.type === 'p') {
+                    return (
+                      <p
+                        key={bi}
+                        className="ai-doc-p"
+                        contentEditable={editable}
+                        suppressContentEditableWarning
+                        onBlur={e => {
+                          const t = e.currentTarget.textContent || ''
+                          if (t !== block.text) updateDocNodeText({ block: bi }, t)
+                        }}
+                      >{block.text}</p>
+                    )
+                  }
+                  if (block.type === 'ul') {
+                    return (
+                      <ul key={bi} className="ai-doc-ul">
+                        {block.items.map((item, ii) => {
+                          const isOpen = openSourceLens && openSourceLens.block === bi && openSourceLens.item === ii
+                          const sources = (item.sources || []).map(id => meBlockById[id]).filter(Boolean)
+                          if (item.kind === 'callout') {
+                            return (
+                              <li key={ii} className="ai-doc-callout" contentEditable={false}>
+                                <span className="ai-doc-callout-glyph" aria-hidden>
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2z"/></svg>
+                                </span>
+                                <span className="ai-doc-callout-body">
+                                  <span
+                                    className="ai-doc-callout-answer"
+                                    contentEditable={editable}
+                                    suppressContentEditableWarning
+                                    onBlur={e => {
+                                      const t = e.currentTarget.textContent || ''
+                                      if (t !== item.text) updateDocNodeText({ block: bi, item: ii }, t)
+                                    }}
+                                  >{item.text}</span>
+                                  {item.question && (
+                                    <span className="ai-doc-callout-from">from: {item.question}</span>
+                                  )}
+                                </span>
+                              </li>
+                            )
+                          }
+                          return (
+                            <li key={ii} className="ai-doc-li">
+                              <span className="ai-doc-li-row">
+                                <span
+                                  className="ai-doc-li-text"
+                                  contentEditable={editable}
+                                  suppressContentEditableWarning
+                                  onBlur={e => {
+                                    const t = e.currentTarget.textContent || ''
+                                    if (t !== item.text) updateDocNodeText({ block: bi, item: ii }, t)
+                                  }}
+                                >{item.text}</span>
+                                {sources.length > 0 && (
+                                  <button
+                                    type="button"
+                                    contentEditable={false}
+                                    className={`ai-doc-lens ${isOpen ? 'active' : ''}`}
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={() => setOpenSourceLens(isOpen ? null : { block: bi, item: ii })}
+                                    title="Show source notes"
+                                  >
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                      <circle cx="11" cy="11" r="7"/>
+                                      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                    </svg>
+                                  </button>
+                                )}
+                              </span>
+                              {isOpen && sources.length > 0 && (
+                                <div className="ai-doc-sources" contentEditable={false}>
+                                  <div className="ai-doc-source-text">
+                                    {sources
+                                      .map(s => (s.text || '').trim())
+                                      .filter(Boolean)
+                                      .map(t => /[.!?]$/.test(t) ? t : t + '.')
+                                      .join(' ')}
+                                  </div>
+                                </div>
+                              )}
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    )
+                  }
+                  return null
+                })}
+              </div>
+            ) : !aiViewError && (
+              <div className="ls-empty"><span className="ls-empty-text">Switch to Me mode to add notes, then come back.</span></div>
+            )}
+          </div>
+        ) : rootBlocks.length > 0 ? (
           rootBlocks.map(block => renderBlock(block, 0))
         ) : (
           <div className="ls-empty">
