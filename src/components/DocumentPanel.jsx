@@ -544,6 +544,60 @@ function setCursorAtOffset(el, offset) {
 
 // ──────────────────────────────────────────────────────────────────────────
 
+// Floating formatting toolbar that follows the user's text selection inside `containerRef`.
+// Kept as a separate component with its own state so selection-tracking re-renders
+// don't cascade into the parent editor (re-rendering contentEditable blocks can
+// wipe the active selection).
+function SelectionToolbar({ containerRef }) {
+  const [pos, setPos] = useState(null)
+  useEffect(() => {
+    const update = () => {
+      const sel = window.getSelection()
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) { setPos(null); return }
+      const range = sel.getRangeAt(0)
+      const anchor = range.commonAncestorContainer
+      const anchorEl = anchor.nodeType === 1 ? anchor : anchor.parentElement
+      const container = containerRef.current
+      if (!container || !anchorEl || !container.contains(anchorEl)) { setPos(null); return }
+      const rect = range.getBoundingClientRect()
+      if (!rect || (rect.width === 0 && rect.height === 0)) { setPos(null); return }
+      setPos({ top: rect.top - 8, left: rect.left + rect.width / 2 })
+    }
+    const onMouseDown = (e) => {
+      if (e.target.closest && e.target.closest('.doc-sel-toolbar')) return
+      setPos(null)
+    }
+    const onMouseUp = () => { setTimeout(update, 0) }
+    const onKeyUp = () => { update() }
+    document.addEventListener('mousedown', onMouseDown)
+    document.addEventListener('mouseup', onMouseUp)
+    document.addEventListener('keyup', onKeyUp)
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('mouseup', onMouseUp)
+      document.removeEventListener('keyup', onKeyUp)
+    }
+  }, [containerRef])
+
+  const applyFormat = (cmd) => {
+    try { document.execCommand(cmd) } catch {}
+  }
+
+  if (!pos) return null
+  return (
+    <div
+      className="doc-sel-toolbar"
+      style={{ top: pos.top, left: pos.left }}
+      onMouseDown={e => e.preventDefault()}
+    >
+      <button type="button" className="doc-sel-btn" onClick={() => applyFormat('bold')} title="Bold"><b>B</b></button>
+      <button type="button" className="doc-sel-btn" onClick={() => applyFormat('italic')} title="Italic"><i>I</i></button>
+      <button type="button" className="doc-sel-btn" onClick={() => applyFormat('underline')} title="Underline"><u>U</u></button>
+      <button type="button" className="doc-sel-btn" onClick={() => applyFormat('strikeThrough')} title="Strikethrough"><s>S</s></button>
+    </div>
+  )
+}
+
 export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatures = [] }) {
   const [trees, setTrees] = useState(loadTrees)
   const [atInserts, setAtInserts] = useState(loadAtInserts)
@@ -572,49 +626,6 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   const aiStreamTimersRef = useRef([])
   const legacyEditsRef = useRef(loadLegacyEdits())
   const docBodyRef = useRef(null)
-  // Floating format toolbar position ({ top, left } in viewport coords) when text is selected inside the doc
-  const [selectionToolbar, setSelectionToolbar] = useState(null)
-
-  // Track text selection inside doc-body and position the floating toolbar above it
-  useEffect(() => {
-    const onSelChange = () => {
-      const sel = window.getSelection()
-      if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
-        setSelectionToolbar(null)
-        return
-      }
-      const range = sel.getRangeAt(0)
-      const anchor = range.commonAncestorContainer
-      const anchorEl = anchor.nodeType === 1 ? anchor : anchor.parentElement
-      if (!docBodyRef.current || !anchorEl || !docBodyRef.current.contains(anchorEl)) {
-        setSelectionToolbar(null)
-        return
-      }
-      const rect = range.getBoundingClientRect()
-      if (!rect || (rect.width === 0 && rect.height === 0)) {
-        setSelectionToolbar(null)
-        return
-      }
-      setSelectionToolbar({
-        top: rect.top - 8,
-        left: rect.left + rect.width / 2,
-      })
-    }
-    document.addEventListener('selectionchange', onSelChange)
-    return () => document.removeEventListener('selectionchange', onSelChange)
-  }, [])
-
-  const applyFormat = useCallback((cmd) => {
-    // Keep the current selection active while the button is clicked
-    try {
-      if (cmd === 'cut') {
-        document.execCommand('copy')
-        document.execCommand('delete')
-      } else {
-        document.execCommand(cmd)
-      }
-    } catch {}
-  }, [])
 
   // Streaming state for AI responses
   // streamingText: blockId → partial text override (takes priority over block.text while streaming)
@@ -1419,18 +1430,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
 
   return (
     <div className="doc-panel">
-      {selectionToolbar && (
-        <div
-          className="doc-sel-toolbar"
-          style={{ top: selectionToolbar.top, left: selectionToolbar.left }}
-          onMouseDown={e => e.preventDefault()}
-        >
-          <button type="button" className="doc-sel-btn" onClick={() => applyFormat('bold')} title="Bold"><b>B</b></button>
-          <button type="button" className="doc-sel-btn" onClick={() => applyFormat('italic')} title="Italic"><i>I</i></button>
-          <button type="button" className="doc-sel-btn" onClick={() => applyFormat('underline')} title="Underline"><u>U</u></button>
-          <button type="button" className="doc-sel-btn" onClick={() => applyFormat('strikeThrough')} title="Strikethrough"><s>S</s></button>
-        </div>
-      )}
+      <SelectionToolbar containerRef={docBodyRef} />
       <div className="doc-body" ref={docBodyRef} style={{ position: 'relative' }}>
 
         {/* Granola-style Me / AI notes toggle */}
