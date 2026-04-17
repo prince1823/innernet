@@ -178,6 +178,7 @@ function collectQAPairs(tree) {
           topText: nextTop.text || '',
           topTime: nextTop.time,
           askedOn: (parentBlock?.text || '').trim(),
+          askedOnId: parentBlock?.id || null,
         })
       }
       if (b.children && b.children.length) walk(b.children, topBlock || b, b)
@@ -554,6 +555,8 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   const [notesMode, setNotesMode] = useState('me')
   // When set, highlight the AI callout tied to this top-level block id (cleared after 3s)
   const [highlightCalloutTopId, setHighlightCalloutTopId] = useState(null)
+  // When set, flash-highlight a Me-mode block by id (cleared after 2s)
+  const [highlightMeBlockId, setHighlightMeBlockId] = useState(null)
   // Track per-callout regeneration state by AI block id
   const [regeneratingCalloutIds, setRegeneratingCalloutIds] = useState(new Set())
   // Generated AI-enhanced view per date: { [date]: { sourceHash, content, generatedAt } }
@@ -569,6 +572,49 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   const aiStreamTimersRef = useRef([])
   const legacyEditsRef = useRef(loadLegacyEdits())
   const docBodyRef = useRef(null)
+  // Floating format toolbar position ({ top, left } in viewport coords) when text is selected inside the doc
+  const [selectionToolbar, setSelectionToolbar] = useState(null)
+
+  // Track text selection inside doc-body and position the floating toolbar above it
+  useEffect(() => {
+    const onSelChange = () => {
+      const sel = window.getSelection()
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) {
+        setSelectionToolbar(null)
+        return
+      }
+      const range = sel.getRangeAt(0)
+      const anchor = range.commonAncestorContainer
+      const anchorEl = anchor.nodeType === 1 ? anchor : anchor.parentElement
+      if (!docBodyRef.current || !anchorEl || !docBodyRef.current.contains(anchorEl)) {
+        setSelectionToolbar(null)
+        return
+      }
+      const rect = range.getBoundingClientRect()
+      if (!rect || (rect.width === 0 && rect.height === 0)) {
+        setSelectionToolbar(null)
+        return
+      }
+      setSelectionToolbar({
+        top: rect.top - 8,
+        left: rect.left + rect.width / 2,
+      })
+    }
+    document.addEventListener('selectionchange', onSelChange)
+    return () => document.removeEventListener('selectionchange', onSelChange)
+  }, [])
+
+  const applyFormat = useCallback((cmd) => {
+    // Keep the current selection active while the button is clicked
+    try {
+      if (cmd === 'cut') {
+        document.execCommand('copy')
+        document.execCommand('delete')
+      } else {
+        document.execCommand(cmd)
+      }
+    } catch {}
+  }, [])
 
   // Streaming state for AI responses
   // streamingText: blockId → partial text override (takes priority over block.text while streaming)
@@ -1152,7 +1198,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     const showChildren = (hasChildren && !isCollapsed) || blockInserts.length > 0
 
     return (
-      <div key={block.id} className={`ls-block ${depth === 0 ? 'ls-block-top' : ''} ${isCollapsed ? 'ls-block-collapsed' : ''} ${isAI ? 'ls-block-ai-child' : ''}`} data-block-id={block.id}>
+      <div key={block.id} className={`ls-block ${depth === 0 ? 'ls-block-top' : ''} ${isCollapsed ? 'ls-block-collapsed' : ''} ${isAI ? 'ls-block-ai-child' : ''} ${highlightMeBlockId === block.id ? 'ls-block-highlight' : ''}`} data-block-id={block.id}>
         <div className={`ls-block-content ${hasAIMarker ? 'ls-block-content-has-ai' : ''}`}>
           {/* Time on top-level headings — before the bullet */}
           {depth === 0 && block.time && (
@@ -1356,6 +1402,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
           text: p.answer,
           question: p.question,
           askedOn: p.askedOn,
+          askedOnId: p.askedOnId,
           sourceTopId: p.topId,
           aiBlockId: p.id,
           sources: [],
@@ -1372,6 +1419,18 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
 
   return (
     <div className="doc-panel">
+      {selectionToolbar && (
+        <div
+          className="doc-sel-toolbar"
+          style={{ top: selectionToolbar.top, left: selectionToolbar.left }}
+          onMouseDown={e => e.preventDefault()}
+        >
+          <button type="button" className="doc-sel-btn" onClick={() => applyFormat('bold')} title="Bold"><b>B</b></button>
+          <button type="button" className="doc-sel-btn" onClick={() => applyFormat('italic')} title="Italic"><i>I</i></button>
+          <button type="button" className="doc-sel-btn" onClick={() => applyFormat('underline')} title="Underline"><u>U</u></button>
+          <button type="button" className="doc-sel-btn" onClick={() => applyFormat('strikeThrough')} title="Strikethrough"><s>S</s></button>
+        </div>
+      )}
       <div className="doc-body" ref={docBodyRef} style={{ position: 'relative' }}>
 
         {/* Granola-style Me / AI notes toggle */}
@@ -1518,7 +1577,26 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                     <span className="ai-doc-callout-from">
                                       from: {item.question}
                                       {item.askedOn && (
-                                        <span className="ai-doc-callout-on"> on “{item.askedOn}”</span>
+                                        item.askedOnId ? (
+                                          <button
+                                            type="button"
+                                            className="ai-doc-callout-on ai-doc-callout-on-clickable"
+                                            onClick={() => {
+                                              const id = item.askedOnId
+                                              setNotesMode('me')
+                                              setHighlightMeBlockId(id)
+                                              setTimeout(() => {
+                                                const el = document.querySelector(`[data-block-id="${id}"]`)
+                                                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                              }, 40)
+                                              setTimeout(() => setHighlightMeBlockId(curr => (curr === id ? null : curr)), 2000)
+                                            }}
+                                            onMouseDown={e => e.preventDefault()}
+                                            title="Jump to this note in Me mode"
+                                          > on “{item.askedOn}”</button>
+                                        ) : (
+                                          <span className="ai-doc-callout-on"> on “{item.askedOn}”</span>
+                                        )
                                       )}
                                     </span>
                                   )}

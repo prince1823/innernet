@@ -341,6 +341,44 @@
   font-style: normal;
 }
 
+.ai-doc-callout-on-clickable {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-style: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.ai-doc-callout-on-clickable:hover {
+  text-decoration: underline;
+  text-decoration-color: rgba(139, 147, 163, 0.5);
+  text-underline-offset: 2px;
+}
+
+/* Flash-highlight a Me-mode block when the user clicks its "on ..." link */
+.ls-block-highlight > .ls-block-content .ls-block-text {
+  animation: ls-block-flash 2s ease-out forwards;
+  border-radius: 4px;
+}
+
+@keyframes ls-block-flash {
+  0% {
+    background: rgba(250, 204, 21, 0.55);
+    box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.45);
+  }
+  60% {
+    background: rgba(250, 204, 21, 0.35);
+    box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.25);
+  }
+  100% {
+    background: transparent;
+    box-shadow: 0 0 0 0 rgba(250, 204, 21, 0);
+  }
+}
+
 .ai-doc-callout-on::before {
   content: ' · ';
   color: #c4b5fd;
@@ -1171,3 +1209,45 @@
 .doc-body::-webkit-scrollbar-track { background: transparent; }
 .doc-body::-webkit-scrollbar-thumb { background: #dadce0; border-radius: 3px; }
 .doc-body::-webkit-scrollbar-thumb:hover { background: #bbb; }
+
+/* ── Floating selection formatting toolbar ── */
+.doc-sel-toolbar {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: #2a2a2a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 1000;
+  user-select: none;
+}
+.doc-sel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  color: #e8e8e8;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.doc-sel-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.doc-sel-btn b, .doc-sel-btn i, .doc-sel-btn u, .doc-sel-btn s {
+  font-style: inherit;
+  font-weight: inherit;
+}
+.doc-sel-btn b { font-weight: 700; }
+.doc-sel-btn i { font-style: italic; }
+.doc-sel-btn u { text-decoration: underline; }
+.doc-sel-btn s { text-decoration: line-through; }
