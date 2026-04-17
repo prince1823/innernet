@@ -1207,7 +1207,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     // Instead we flag the line with a small "AI answered" marker so the user
     // knows something was generated from this block.
     const hideAI = notesMode === 'me'
-    const aiChildren = hideAI ? rawChildren.filter(c => c.isAI) : []
+    const aiChildren = hideAI ? rawChildren.filter(c => c.isAI && (c.text || '').trim()) : []
     const hasAIMarker = hideAI && aiChildren.length > 0
     const mainChildren = hideAI ? rawChildren.filter(c => !c.isAI) : rawChildren
     const hasChildren = mainChildren.length > 0
@@ -1242,28 +1242,30 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
               return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`
             })()}</span>
           )}
-          <div className="ls-bullet-wrap">
-            {hasChildren && (
-              <button
-                type="button"
-                className={`ls-collapse-btn ${isCollapsed ? 'ls-collapse-btn-collapsed' : ''}`}
-                onClick={e => handleToggleCollapse(block.id, e)}
+          {(rawText || '').trim() && (
+            <div className="ls-bullet-wrap">
+              {hasChildren && (
+                <button
+                  type="button"
+                  className={`ls-collapse-btn ${isCollapsed ? 'ls-collapse-btn-collapsed' : ''}`}
+                  onClick={e => handleToggleCollapse(block.id, e)}
+                  onMouseDown={e => e.preventDefault()}
+                  aria-label={isCollapsed ? 'Expand' : 'Collapse'}
+                  title={isCollapsed ? 'Expand' : 'Collapse'}
+                >
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </button>
+              )}
+              <span
+                className={`ls-bullet ${hasChildren ? 'ls-bullet-parent' : ''} ${isAI ? 'ls-bullet-ai' : ''}`}
+                onClick={e => handleBulletClick(block.id, e)}
                 onMouseDown={e => e.preventDefault()}
-                aria-label={isCollapsed ? 'Expand' : 'Collapse'}
-                title={isCollapsed ? 'Expand' : 'Collapse'}
-              >
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </button>
-            )}
-            <span
-              className={`ls-bullet ${hasChildren ? 'ls-bullet-parent' : ''} ${isAI ? 'ls-bullet-ai' : ''}`}
-              onClick={e => handleBulletClick(block.id, e)}
-              onMouseDown={e => e.preventDefault()}
-              title="Click to zoom in"
-            />
-          </div>
+                title="Click to zoom in"
+              />
+            </div>
+          )}
           {isAI ? (
             <div className="ls-ai-card">
               <span
