@@ -506,7 +506,7 @@ export const journalPages = {
   '2026-04-09': [
     { id: 'j0409-1', text: 'Morning standup', time: '9:00', project: 'innernet', children: [
       { id: 'j0409-1a', text: 'Three-panel layout at 80% — CSS sliding works', children: [] },
-      { id: 'j0409-1b', text: 'Blocker: cross-panel state management', children: [] },
+      { id: 'j0409-1b', text: 'Blocker: cross-panel state management — calendar selection, notes focus, and doc scroll all live in separate panels but drift out of sync on panel switch. Lifting to a shared store feels right, but re-renders the full layout on every keystroke; a scoped event bus avoids that but makes undo/redo painful. Parking this until we pick between Zustand slice + selectors vs. a ref-based pub/sub with explicit commit points.', children: [] },
     ]},
     { id: 'j0409-2', text: 'Build three-panel layout', time: '10:00', project: 'innernet', children: [
       { id: 'j0409-2a', text: '150% width track with translateX switching', children: [] },

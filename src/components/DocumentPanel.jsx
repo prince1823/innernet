@@ -189,6 +189,7 @@ function collectQAPairs(tree) {
           topTime: nextTop.time,
           askedOn: (parentBlock?.text || '').trim(),
           askedOnId: parentBlock?.id || null,
+          askedAt: b.askedAt || null,
         })
       }
       if (b.children && b.children.length) walk(b.children, topBlock || b, b)
@@ -1084,6 +1085,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
       isAI: true,
       sourceQuery: query,
       sourceContext: context,
+      askedAt: Date.now(),
     }
     setStreamingText(prev => ({ ...prev, [aiBlockId]: '' }))
     applyTreeOp(tree => prependChildren(tree, blockId, [aiBlock]))
@@ -1138,6 +1140,12 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
       const response = await askAI(prompt, context)
       const paraText = formatAIParagraph(response) || (response || '')
       applyTreeOp(tree => setBlockText(tree, aiBlockId, paraText))
+      applyTreeOp(tree => {
+        const next = cloneTree(tree)
+        const c = findContext(next, aiBlockId)
+        if (c) c.block.askedAt = Date.now()
+        return next
+      })
       await streamBlockText(aiBlockId, paraText)
     } catch (e) {
       // swallow — leaves existing text intact
@@ -1429,6 +1437,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
           question: p.question,
           askedOn: p.askedOn,
           askedOnId: p.askedOnId,
+          askedAt: p.askedAt,
           sourceTopId: p.topId,
           aiBlockId: p.id,
           sources: [],
@@ -1612,6 +1621,13 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                         ) : (
                                           <span className="ai-doc-callout-on"> on “{item.askedOn}”</span>
                                         )
+                                      )}
+                                      {item.askedAt && (
+                                        <span className="ai-doc-callout-stamp" title={new Date(item.askedAt).toLocaleString()}>
+                                          {new Date(item.askedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                          <span className="ai-doc-callout-stamp-dot">·</span>
+                                          {new Date(item.askedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                                        </span>
                                       )}
                                     </span>
                                   )}
