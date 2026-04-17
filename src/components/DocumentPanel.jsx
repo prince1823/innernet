@@ -1430,6 +1430,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     if (pairs.length > 0) {
       const byTop = new Map()
       for (const p of pairs) {
+        if (!(p.answer || '').trim()) continue
         if (!byTop.has(p.topId)) byTop.set(p.topId, { topText: p.topText, items: [] })
         byTop.get(p.topId).items.push({
           kind: 'callout',
@@ -1445,6 +1446,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
       }
       const doc = []
       for (const { topText, items } of byTop.values()) {
+        if (!items.length) continue
         doc.push({ type: 'h', level: 3, text: topText })
         doc.push({ type: 'ul', items })
       }
@@ -1592,12 +1594,36 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                     className="ai-doc-callout-answer"
                                     contentEditable={editable}
                                     suppressContentEditableWarning
+                                    onKeyDown={e => {
+                                      if ((e.key === 'Backspace' || e.key === 'Delete') && item.aiBlockId) {
+                                        const t = e.currentTarget.textContent || ''
+                                        if (!t.trim()) {
+                                          e.preventDefault()
+                                          applyTreeOp(tree => deleteBlock(tree, item.aiBlockId))
+                                        }
+                                      }
+                                    }}
+                                    onInput={e => {
+                                      const t = e.currentTarget.textContent || ''
+                                      if (!t.trim() && item.aiBlockId) {
+                                        applyTreeOp(tree => deleteBlock(tree, item.aiBlockId))
+                                      }
+                                    }}
                                     onBlur={e => {
                                       const t = e.currentTarget.textContent || ''
-                                      if (t !== item.text) updateDocNodeText({ block: bi, item: ii }, t)
+                                      if (t !== item.text) {
+                                        if (!t.trim() && item.aiBlockId) {
+                                          applyTreeOp(tree => deleteBlock(tree, item.aiBlockId))
+                                          return
+                                        }
+                                        updateDocNodeText({ block: bi, item: ii }, t)
+                                        if (item.aiBlockId) {
+                                          applyTreeOp(tree => setBlockText(tree, item.aiBlockId, t))
+                                        }
+                                      }
                                     }}
                                   >{item.text}</span>
-                                  {item.question && (
+                                  {item.question && (item.text || '').trim() && (
                                     <span className="ai-doc-callout-from">
                                       from: {item.question}
                                       {item.askedOn && (
