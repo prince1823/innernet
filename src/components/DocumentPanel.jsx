@@ -172,6 +172,7 @@ function collectQAPairs(tree) {
       if (b.isAI && b.sourceQuery) {
         pairs.push({
           id: b.id,
+          topId: nextTop.id,
           question: b.sourceQuery,
           answer: (b.text || '').trim(),
           topText: nextTop.text || '',
@@ -215,6 +216,7 @@ function injectCalloutsIntoDoc(doc, pairs) {
       kind: 'callout',
       question: pair.question,
       sources: [],
+      sourceTopId: pair.topId,
     })
   }
   return next
@@ -548,6 +550,8 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   const [zoomedBlockId, setZoomedBlockId] = useState(null)
   // Granola-style notes view toggle: 'me' = human-typed only, 'ai' = AI-enhanced included
   const [notesMode, setNotesMode] = useState('me')
+  // When set, highlight the AI callout tied to this top-level block id (cleared after 3s)
+  const [highlightCalloutTopId, setHighlightCalloutTopId] = useState(null)
   // Generated AI-enhanced view per date: { [date]: { sourceHash, content, generatedAt } }
   const [aiViews, setAiViews] = useState(loadAiViews)
   const [aiViewLoading, setAiViewLoading] = useState(false)
@@ -1204,7 +1208,13 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
             <button
               type="button"
               className="ls-ai-marker"
-              onClick={() => setNotesMode('ai')}
+              onClick={e => {
+                const topEl = e.currentTarget.closest('.ls-block-top')
+                const topId = topEl ? topEl.getAttribute('data-block-id') : block.id
+                setNotesMode('ai')
+                setHighlightCalloutTopId(topId)
+                setTimeout(() => setHighlightCalloutTopId(curr => (curr === topId ? null : curr)), 3000)
+              }}
               onMouseDown={e => e.preventDefault()}
               title="AI added an insight — view in AI mode"
               aria-label="View AI insight"
@@ -1448,8 +1458,14 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                           const isOpen = openSourceLens && openSourceLens.block === bi && openSourceLens.item === ii
                           const sources = (item.sources || []).map(id => meBlockById[id]).filter(Boolean)
                           if (item.kind === 'callout') {
+                            const isHighlighted = highlightCalloutTopId && item.sourceTopId === highlightCalloutTopId
                             return (
-                              <li key={ii} className="ai-doc-callout" contentEditable={false}>
+                              <li
+                                key={ii}
+                                className={`ai-doc-callout ${isHighlighted ? 'ai-doc-callout-highlight' : ''}`}
+                                contentEditable={false}
+                                ref={isHighlighted ? (el => el && el.scrollIntoView({ behavior: 'smooth', block: 'center' })) : undefined}
+                              >
                                 <span className="ai-doc-callout-glyph" aria-hidden>
                                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2z"/></svg>
                                 </span>

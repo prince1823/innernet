@@ -339,6 +339,30 @@
   margin-right: 2px;
 }
 
+/* Yellow highlight flash when user clicks the AI marker arrow in Me mode */
+.ai-doc-callout-highlight .ai-doc-callout-answer {
+  animation: ai-doc-callout-flash 3s ease-out forwards;
+  border-radius: 3px;
+}
+
+@keyframes ai-doc-callout-flash {
+  0% {
+    background: rgba(253, 224, 71, 0.85);
+    box-shadow: 0 0 0 4px rgba(253, 224, 71, 0.45);
+  }
+  70% {
+    background: rgba(253, 224, 71, 0.6);
+    box-shadow: 0 0 0 2px rgba(253, 224, 71, 0.2);
+  }
+  100% {
+    background: linear-gradient(120deg, rgba(196, 181, 253, 0.22) 0%, rgba(196, 181, 253, 0.35) 100%);
+    background-size: 100% 58%;
+    background-repeat: no-repeat;
+    background-position: 0 88%;
+    box-shadow: none;
+  }
+}
+
 .ai-doc-sources {
   position: absolute;
   top: calc(100% + 6px);
