@@ -175,7 +175,150 @@
   font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
   background: #f5f5f6;
   color: #1a1a2e;
+  display: flex;
+  flex-direction: row;
 }
+.do-claude-main {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Claude sidebar (recent history) ── */
+.do-claude-sidebar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(26, 26, 46, 0.06);
+  background: rgba(253, 251, 247, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: width 0.22s ease;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.do-claude-sidebar.open { width: 232px; }
+.do-claude-sidebar.closed { width: 0; border-right: none; }
+.do-claude-sidebar.closed .do-claude-sidebar-head { display: none; }
+.do-claude-sidebar-open-btn {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(26, 26, 46, 0.08);
+  border-radius: 8px;
+  color: #4b5562;
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: background 0.12s, color 0.12s;
+}
+.do-claude-sidebar-open-btn:hover { background: #fff; color: #7c5cff; }
+.do-claude-sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px;
+  border-bottom: 1px solid rgba(26, 26, 46, 0.05);
+}
+.do-claude-sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  color: #4b5562;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.do-claude-sidebar-toggle:hover { background: rgba(124, 92, 255, 0.1); color: #7c5cff; }
+.do-claude-newchat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  padding: 6px 10px;
+  background: rgba(124, 92, 255, 0.1);
+  border: 1px solid rgba(124, 92, 255, 0.2);
+  border-radius: 8px;
+  color: #6b46ff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.do-claude-newchat:hover { background: rgba(124, 92, 255, 0.18); border-color: rgba(124, 92, 255, 0.38); }
+.do-claude-sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.do-claude-sidebar-list::-webkit-scrollbar { width: 6px; }
+.do-claude-sidebar-list::-webkit-scrollbar-thumb { background: rgba(26, 26, 46, 0.12); border-radius: 3px; }
+.do-claude-sidebar-empty {
+  padding: 18px 10px;
+  font-size: 12px;
+  color: #8a909a;
+  text-align: center;
+}
+.do-claude-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #1a1a2e;
+  transition: background 0.12s;
+}
+.do-claude-sidebar-item:hover { background: rgba(26, 26, 46, 0.05); }
+.do-claude-sidebar-item.active { background: rgba(124, 92, 255, 0.12); }
+.do-claude-sidebar-item-body { flex: 1; min-width: 0; }
+.do-claude-sidebar-item-title {
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.do-claude-sidebar-item-meta {
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: #8a909a;
+}
+.do-claude-sidebar-item-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  border-radius: 5px;
+  color: #8a909a;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s, background 0.12s, color 0.12s;
+}
+.do-claude-sidebar-item:hover .do-claude-sidebar-item-del { opacity: 1; }
+.do-claude-sidebar-item-del:hover { background: rgba(220, 38, 38, 0.12); color: #dc2626; }
 .do-claude-bg {
   position: absolute; inset: 0;
   pointer-events: none;

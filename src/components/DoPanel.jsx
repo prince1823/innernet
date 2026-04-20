@@ -140,6 +140,39 @@ async function streamAI(messages, onChunk, { signal } = {}) {
 }
 
 // ─────────────────────────── Claude pane ───────────────────────────
+const CLAUDE_HISTORY_KEY = 'innernet:claude-history:v1'
+const CLAUDE_SIDEBAR_KEY = 'innernet:claude-sidebar:v1'
+
+function loadClaudeHistory() {
+  try {
+    const raw = localStorage.getItem(CLAUDE_HISTORY_KEY)
+    const parsed = raw ? JSON.parse(raw) : null
+    return Array.isArray(parsed) ? parsed : []
+  } catch { return [] }
+}
+
+function saveClaudeHistory(list) {
+  try { localStorage.setItem(CLAUDE_HISTORY_KEY, JSON.stringify(list)) } catch {}
+}
+
+function deriveConversationTitle(messages) {
+  const firstUser = messages.find(m => m.role === 'user')
+  const text = (firstUser?.content || 'New conversation').trim().replace(/\s+/g, ' ')
+  return text.length > 48 ? text.slice(0, 48) + '…' : text
+}
+
+function formatRelativeTime(ts) {
+  const diff = Date.now() - ts
+  const mins = Math.round(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.round(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.round(hrs / 24)
+  if (days < 7) return `${days}d ago`
+  return new Date(ts).toLocaleDateString()
+}
+
 const GREETINGS = [
   { pre: 'Hello', name: 'Tanuj' },
   { pre: 'Welcome back', name: 'Tanuj' },
@@ -163,7 +196,66 @@ function ClaudePane({ tab, updateTab }) {
   const textareaRef = useRef(null)
   const abortRef = useRef(null)
   const [greetingIdx, setGreetingIdx] = useState(() => Math.floor(Math.random() * GREETINGS.length))
+  const [history, setHistory] = useState(loadClaudeHistory)
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(CLAUDE_SIDEBAR_KEY) ?? 'true') } catch { return true }
+  })
   const isEmpty = state.messages.length === 0
+
+  // Backfill conversationId on legacy tabs
+  useEffect(() => {
+    if (!state.conversationId) {
+      updateTab({ data: { ...state, conversationId: `conv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` } })
+    }
+  }, [state.conversationId])
+
+  useEffect(() => {
+    try { localStorage.setItem(CLAUDE_SIDEBAR_KEY, JSON.stringify(sidebarOpen)) } catch {}
+  }, [sidebarOpen])
+
+  // Auto-save current conversation to history whenever messages settle
+  useEffect(() => {
+    const convId = state.conversationId
+    if (!convId || loading) return
+    const hasUser = state.messages.some(m => m.role === 'user')
+    if (!hasUser) return
+    setHistory(prev => {
+      const entry = {
+        id: convId,
+        title: deriveConversationTitle(state.messages),
+        messages: state.messages,
+        updatedAt: Date.now(),
+      }
+      const next = [entry, ...prev.filter(h => h.id !== convId)]
+      saveClaudeHistory(next)
+      return next
+    })
+  }, [state.messages, loading, state.conversationId])
+
+  const newChat = () => {
+    if (loading) abortRef.current?.abort()
+    updateTab({ data: { ...state, messages: [], conversationId: `conv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` } })
+    setInput('')
+  }
+
+  const loadConversation = (id) => {
+    const entry = history.find(h => h.id === id)
+    if (!entry) return
+    if (loading) abortRef.current?.abort()
+    updateTab({ data: { ...state, messages: entry.messages, conversationId: entry.id } })
+  }
+
+  const deleteConversation = (id, e) => {
+    e?.stopPropagation()
+    setHistory(prev => {
+      const next = prev.filter(h => h.id !== id)
+      saveClaudeHistory(next)
+      return next
+    })
+    if (id === state.conversationId) {
+      updateTab({ data: { ...state, messages: [], conversationId: `conv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` } })
+    }
+  }
   // Rotate through greetings every 4s while the pane is idle (empty + no
   // loading). Stops rotating once the user sends a message.
   useEffect(() => {
@@ -290,6 +382,63 @@ function ClaudePane({ tab, updateTab }) {
         />
         <div className="do-claude-bg-veil" />
       </div>
+      <aside className={`do-claude-sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
+        <div className="do-claude-sidebar-head">
+          <button
+            className="do-claude-sidebar-toggle"
+            onClick={() => setSidebarOpen(v => !v)}
+            title={sidebarOpen ? 'Hide history' : 'Show history'}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <line x1="9" y1="4" x2="9" y2="20" />
+            </svg>
+          </button>
+          {sidebarOpen && (
+            <button className="do-claude-newchat" onClick={newChat} title="Start a new chat">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <span>New chat</span>
+            </button>
+          )}
+        </div>
+        {sidebarOpen && (
+          <div className="do-claude-sidebar-list">
+            {history.length === 0 && (
+              <div className="do-claude-sidebar-empty">No conversations yet</div>
+            )}
+            {history.map(h => (
+              <div
+                key={h.id}
+                className={`do-claude-sidebar-item ${h.id === state.conversationId ? 'active' : ''}`}
+                onClick={() => loadConversation(h.id)}
+                title={h.title}
+              >
+                <div className="do-claude-sidebar-item-body">
+                  <div className="do-claude-sidebar-item-title">{h.title}</div>
+                  <div className="do-claude-sidebar-item-meta">{formatRelativeTime(h.updatedAt)}</div>
+                </div>
+                <button
+                  className="do-claude-sidebar-item-del"
+                  onClick={(e) => deleteConversation(h.id, e)}
+                  title="Delete conversation"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </aside>
+      <div className="do-claude-main">
+      {!sidebarOpen && (
+        <button
+          className="do-claude-sidebar-open-btn"
+          onClick={() => setSidebarOpen(true)}
+          title="Show history"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9" y1="4" x2="9" y2="20"/></svg>
+        </button>
+      )}
       <div
         className="do-claude-messages"
         ref={scrollRef}
@@ -393,6 +542,7 @@ function ClaudePane({ tab, updateTab }) {
             </button>
           )}
         </div>
+      </div>
       </div>
     </div>
   )
@@ -742,7 +892,7 @@ function TerminalPane({ tab, updateTab }) {
 // — the Chrome-style flow.
 function makeTab(type, opts = {}) {
   const id = nextId()
-  if (type === 'claude') return { id, type, title: 'Claude', data: { messages: [] } }
+  if (type === 'claude') return { id, type, title: 'Claude', data: { messages: [], conversationId: `conv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` } }
   if (type === 'browser') {
     const url = opts.newTab
       ? NEW_TAB_URL
