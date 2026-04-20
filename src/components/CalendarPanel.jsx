@@ -576,22 +576,11 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const zoomInPixel = () => animateZoomTo(Math.min(zoomLevel + 24, MAX_ZOOM))
   const zoomOutPixel = () => animateZoomTo(Math.max(zoomLevel - 24, MIN_ZOOM))
 
-  // Semantic zoom: first 2 clicks zoom the calendar grid (instant snap),
-  // 3rd click opens schedule list, 4th click opens detail view.
-  const zoomClicksRef = useRef(0)
-  const baseZoom = 56 // default zoom level
-  const zoomStep = 24
-
+  // Semantic zoom: grid → schedule list → detail view, one click per step.
+  // Pixel-level zoom of the grid is still available via Cmd/Ctrl + wheel.
   const zoomIn = () => {
     if (viewMode === 0) {
-      if (zoomClicksRef.current < 2) {
-        zoomClicksRef.current += 1
-        const target = Math.min(baseZoom + zoomClicksRef.current * zoomStep, MAX_ZOOM)
-        if (zoomAnimRef.current) cancelAnimationFrame(zoomAnimRef.current)
-        setZoomLevel(target)
-      } else {
-        setViewMode(1)
-      }
+      setViewMode(1)
     } else if (viewMode === 1) {
       setViewMode(2)
       setDetailIndex(0)
@@ -602,13 +591,6 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
       setViewMode(1)
     } else if (viewMode === 1) {
       setViewMode(0)
-    } else if (viewMode === 0) {
-      if (zoomClicksRef.current > 0) {
-        zoomClicksRef.current -= 1
-        const target = Math.max(baseZoom + zoomClicksRef.current * zoomStep, MIN_ZOOM)
-        if (zoomAnimRef.current) cancelAnimationFrame(zoomAnimRef.current)
-        setZoomLevel(target)
-      }
     }
   }
 
@@ -1027,7 +1009,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
         </div>
         <div className="cal-header-right">
           <div className="cal-zoom-btns">
-            <button className="cal-zoom-btn" onClick={zoomOut} disabled={viewMode === 0 && zoomLevel <= MIN_ZOOM + 0.5} title="Zoom out — less detail">
+            <button className="cal-zoom-btn" onClick={zoomOut} disabled={viewMode === 0} title="Zoom out — less detail">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
             <button className="cal-zoom-btn" onClick={zoomIn} disabled={viewMode >= 2} title="Zoom in — more detail">
