@@ -599,26 +599,34 @@ function setCursorAtOffset(el, offset) {
 // Kept as a separate component with its own state so selection-tracking re-renders
 // don't cascade into the parent editor (re-rendering contentEditable blocks can
 // wipe the active selection).
-function SelectionToolbar({ containerRef }) {
+function SelectionToolbar({ containerRef, onImprove, showImprove }) {
   const [pos, setPos] = useState(null)
+  const [improveOpen, setImproveOpen] = useState(false)
+  const [toneOpen, setToneOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const captureRef = useRef(null)
+
   useEffect(() => {
     const update = () => {
       const sel = window.getSelection()
-      if (!sel || sel.isCollapsed || sel.rangeCount === 0) { setPos(null); return }
+      if (!sel || sel.isCollapsed || sel.rangeCount === 0) { setPos(null); setImproveOpen(false); setToneOpen(false); return }
       const range = sel.getRangeAt(0)
       const anchor = range.commonAncestorContainer
       const anchorEl = anchor.nodeType === 1 ? anchor : anchor.parentElement
       const container = containerRef.current
-      if (!container || !anchorEl || !container.contains(anchorEl)) { setPos(null); return }
+      if (!container || !anchorEl || !container.contains(anchorEl)) { setPos(null); setImproveOpen(false); setToneOpen(false); return }
       const rect = range.getBoundingClientRect()
-      if (!rect || (rect.width === 0 && rect.height === 0)) { setPos(null); return }
+      if (!rect || (rect.width === 0 && rect.height === 0)) { setPos(null); setImproveOpen(false); setToneOpen(false); return }
       setPos({ top: rect.top - 8, left: rect.left + rect.width / 2 })
     }
     const onMouseDown = (e) => {
       if (e.target.closest && e.target.closest('.doc-sel-toolbar')) return
-      setPos(null)
+      setPos(null); setImproveOpen(false); setToneOpen(false)
     }
-    const onMouseUp = () => { setTimeout(update, 0) }
+    const onMouseUp = (e) => {
+      if (e.target?.closest && e.target.closest('.doc-sel-toolbar')) return
+      setTimeout(update, 0)
+    }
     const onKeyUp = () => { update() }
     document.addEventListener('mousedown', onMouseDown)
     document.addEventListener('mouseup', onMouseUp)
@@ -632,10 +640,44 @@ function SelectionToolbar({ containerRef }) {
 
   const applyFormat = (cmd) => {
     try {
-      // Prefer semantic tags (<b>/<i>/<u>/<s>) over <span style> so saved HTML stays simple
       document.execCommand('styleWithCSS', false, false)
       document.execCommand(cmd)
     } catch {}
+  }
+
+  const captureSelection = () => {
+    const sel = window.getSelection()
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null
+    const text = sel.toString()
+    if (!text.trim()) return null
+    const range = sel.getRangeAt(0).cloneRange()
+    const anchorEl = range.commonAncestorContainer.nodeType === 1
+      ? range.commonAncestorContainer
+      : range.commonAncestorContainer.parentElement
+    const editableEl = anchorEl?.closest?.('[contenteditable="true"]')
+    if (!editableEl) return null
+    return { text, range, editableEl }
+  }
+
+  const runImprove = async (action, tone) => {
+    const cap = captureRef.current || captureSelection()
+    if (!cap) { setImproveOpen(false); setToneOpen(false); return }
+    setBusy(true)
+    try {
+      await onImprove(cap, action, tone)
+    } finally {
+      setBusy(false)
+      setImproveOpen(false)
+      setToneOpen(false)
+      setPos(null)
+      captureRef.current = null
+    }
+  }
+
+  const openImprove = () => {
+    captureRef.current = captureSelection()
+    setImproveOpen(v => !v)
+    setToneOpen(false)
   }
 
   if (!pos) return null
@@ -645,6 +687,44 @@ function SelectionToolbar({ containerRef }) {
       style={{ top: pos.top, left: pos.left }}
       onMouseDown={e => e.preventDefault()}
     >
+      {showImprove && (
+        <div className="doc-sel-improve-wrap">
+          <button
+            type="button"
+            className={`doc-sel-btn doc-sel-improve-btn ${busy ? 'busy' : ''}`}
+            onClick={openImprove}
+            title="Improve with AI"
+            disabled={busy}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 4 }}>
+              <path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z"/>
+            </svg>
+            {busy ? 'Improving…' : 'Improve'}
+          </button>
+          {improveOpen && !busy && (
+            <div className="doc-sel-menu" onMouseDown={e => e.preventDefault()}>
+              <button type="button" className="doc-sel-menu-item" onClick={() => runImprove('simplify')}>Simplify text</button>
+              <button type="button" className="doc-sel-menu-item" onClick={() => runImprove('reduce')}>Reduce text</button>
+              <button type="button" className="doc-sel-menu-item" onClick={() => runImprove('detailed')}>Make it detailed</button>
+              <button type="button" className="doc-sel-menu-item" onClick={() => runImprove('summarize')}>Summarize</button>
+              <div className="doc-sel-menu-sub">
+                <button type="button" className="doc-sel-menu-item" onClick={() => setToneOpen(v => !v)}>
+                  Adjust tone <span style={{ marginLeft: 'auto', opacity: 0.5 }}>›</span>
+                </button>
+                {toneOpen && (
+                  <div className="doc-sel-submenu">
+                    <button type="button" className="doc-sel-menu-item" onClick={() => runImprove('tone', 'professional')}>Professional</button>
+                    <button type="button" className="doc-sel-menu-item" onClick={() => runImprove('tone', 'casual')}>Casual</button>
+                    <button type="button" className="doc-sel-menu-item" onClick={() => runImprove('tone', 'friendly')}>Friendly</button>
+                    <button type="button" className="doc-sel-menu-item" onClick={() => runImprove('tone', 'confident')}>Confident</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          <span className="doc-sel-sep" />
+        </div>
+      )}
       <button type="button" className="doc-sel-btn" onClick={() => applyFormat('bold')} title="Bold"><b>B</b></button>
       <button type="button" className="doc-sel-btn" onClick={() => applyFormat('italic')} title="Italic"><i>I</i></button>
       <button type="button" className="doc-sel-btn" onClick={() => applyFormat('underline')} title="Underline"><u>U</u></button>
@@ -1231,6 +1311,70 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     }
   }, [trees, selectedDate, askAI])
 
+  // Selection-driven "Improve" rewrite: take the user's highlighted substring,
+  // ask the AI to transform it per the chosen action, and splice the rewrite
+  // back into the contentEditable element. Works across Me mode (tree-backed)
+  // and AI mode (doc-node-backed) because we edit the DOM and then fire blur
+  // so each mode's existing onBlur persists the change through its own path.
+  const handleImproveSelection = useCallback(async ({ text: selectedText, range, editableEl }, action, tone) => {
+    if (!editableEl || !selectedText) return
+
+    const formatRule = 'Respond in plain prose only. Do NOT use any markdown: no **bold**, no *italics*, no headings, no bullet points, no numbered lists, no code fences. Return continuous sentences.'
+    const instruction = {
+      simplify: `Rewrite this text in simpler language. Keep the original meaning. ${formatRule} Return only the rewritten text — no preamble, no quotes.`,
+      reduce: `Shorten this text while preserving key information. ${formatRule} Return only the shortened text — no preamble, no quotes.`,
+      detailed: `Expand this text with more detail, examples, and nuance. Keep the original intent. ${formatRule} Return only the expanded text — no preamble, no quotes.`,
+      summarize: `Summarize this text into one or two concise sentences. ${formatRule} Return only the summary — no preamble, no quotes.`,
+      tone: `Rewrite this text in a ${tone || 'professional'} tone. Keep the meaning. ${formatRule} Return only the rewritten text — no preamble, no quotes.`,
+    }[action] || `Improve this text. ${formatRule} Return only the rewritten text.`
+    const prompt = `${instruction}\n\nText:\n${selectedText}`
+
+    const stripMarkdown = (s) => (s || '')
+      .replace(/```[\s\S]*?```/g, '')         // fenced code
+      .replace(/`([^`]+)`/g, '$1')            // inline code
+      .replace(/\*\*([^*]+)\*\*/g, '$1')      // bold
+      .replace(/__([^_]+)__/g, '$1')          // bold alt
+      .replace(/(^|\s)\*([^*\n]+)\*/g, '$1$2')// italic
+      .replace(/(^|\s)_([^_\n]+)_/g, '$1$2')  // italic alt
+      .replace(/^\s{0,3}#{1,6}\s+/gm, '')     // headings
+      .replace(/^\s*[-*+]\s+/gm, '')          // bullets
+      .replace(/^\s*\d+\.\s+/gm, '')          // numbered
+      .replace(/\n{2,}/g, ' ')                // collapse blank lines
+      .replace(/\s+/g, ' ')                   // normalize whitespace
+      .trim()
+
+    try {
+      const response = await askAI(prompt, '')
+      const rewritten = stripMarkdown(response).replace(/^["'`]+|["'`]+$/g, '')
+      if (!rewritten) return
+      // Splice via the saved Range (the live selection may have collapsed when
+      // the user clicked a menu button). Falls back to text-replace when the
+      // Range's nodes aren't in the DOM anymore (e.g. React re-rendered).
+      try {
+        if (editableEl.contains(range.startContainer) && editableEl.contains(range.endContainer)) {
+          range.deleteContents()
+          range.insertNode(document.createTextNode(rewritten))
+          editableEl.normalize()
+        } else {
+          const curr = editableEl.textContent || ''
+          const idx = curr.indexOf(selectedText)
+          if (idx < 0) return
+          editableEl.textContent = curr.slice(0, idx) + rewritten + curr.slice(idx + selectedText.length)
+        }
+      } catch {
+        const curr = editableEl.textContent || ''
+        const idx = curr.indexOf(selectedText)
+        if (idx < 0) return
+        editableEl.textContent = curr.slice(0, idx) + rewritten + curr.slice(idx + selectedText.length)
+      }
+      // Fire input + blur so each mode's existing handlers persist the change.
+      editableEl.dispatchEvent(new Event('input', { bubbles: true }))
+      editableEl.dispatchEvent(new FocusEvent('blur', { bubbles: true }))
+    } catch {
+      // swallow — leave content unchanged on failure
+    }
+  }, [])
+
   // ── Implement CTA handlers ─────────────────────────────────────────────
   // The CTA lives inside each @-query AI card. "Yes" spawns a ChatWindows
   // feature session seeded with the original question + AI answer + the text
@@ -1545,7 +1689,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
 
   return (
     <div className="doc-panel">
-      <SelectionToolbar containerRef={docBodyRef} />
+      <SelectionToolbar containerRef={docBodyRef} showImprove={notesMode === 'ai'} onImprove={handleImproveSelection} />
       <div className="doc-body" ref={docBodyRef} style={{ position: 'relative' }}>
 
         {/* Granola-style Me / AI notes toggle */}
