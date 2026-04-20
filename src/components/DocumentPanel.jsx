@@ -1324,7 +1324,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
               return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`
             })()}</span>
           )}
-          {hasVisibleText && (
+          {(isAI ? hasVisibleText : true) && (
             <div className="ls-bullet-wrap">
               {hasChildren && (
                 <button
