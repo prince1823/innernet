@@ -105,12 +105,20 @@ function ClaudePane({ tab, updateTab }) {
 
   return (
     <div className="do-pane do-claude">
+      <div className="do-claude-bg" aria-hidden="true">
+        <div className="do-claude-aurora do-claude-aurora-a" />
+        <div className="do-claude-aurora do-claude-aurora-b" />
+        <div className="do-claude-aurora do-claude-aurora-c" />
+        <div className="do-claude-grain" />
+      </div>
       <div className="do-claude-messages" ref={scrollRef}>
         {state.messages.length === 0 && (
           <div className="do-claude-empty">
-            <TabIcon kind="claude" />
-            <p>Chat with Claude</p>
-            <span>Ask anything — coding, writing, thinking.</span>
+            <div className="do-claude-empty-star">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            </div>
+            <h2 className="do-claude-empty-title">Hello, <em>there.</em></h2>
+            <p className="do-claude-empty-sub">Ask anything — code, writing, or a quiet thought.</p>
           </div>
         )}
         {state.messages.map((m, i) => (
