@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
+import hljs from 'highlight.js/lib/common'
+import 'highlight.js/styles/atom-one-light.css'
 import './DoPanel.css'
 
 const API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY
@@ -52,8 +54,20 @@ function renderMarkdown(text) {
   // via delegated click on the messages container (see ClaudePane)
   s = s.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
     const clean = code.replace(/\n$/, '')
-    const label = lang || 'code'
-    return `<div class="do-md-pre-wrap"><div class="do-md-pre-head"><span class="do-md-pre-lang">${label}</span><button type="button" class="do-md-copy" data-copy-code title="Copy code" aria-label="Copy code"><svg class="do-md-copy-default" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><svg class="do-md-copy-check" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button></div><pre class="do-md-pre"><code>${clean}</code></pre></div>`
+    let highlighted, detectedLang = lang
+    try {
+      if (lang && hljs.getLanguage(lang)) {
+        highlighted = hljs.highlight(clean, { language: lang, ignoreIllegals: true }).value
+      } else {
+        const auto = hljs.highlightAuto(clean)
+        highlighted = auto.value
+        if (!detectedLang && auto.language) detectedLang = auto.language
+      }
+    } catch {
+      highlighted = clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    }
+    const label = detectedLang || 'code'
+    return `<div class="do-md-pre-wrap"><div class="do-md-pre-head"><span class="do-md-pre-lang">${label}</span><button type="button" class="do-md-copy" data-copy-code title="Copy code" aria-label="Copy code"><svg class="do-md-copy-default" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><svg class="do-md-copy-check" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button></div><pre class="do-md-pre"><code class="hljs">${highlighted}</code></pre></div>`
   })
   // headings
   s = s.replace(/^###### (.+)$/gm, '<h6>$1</h6>')
@@ -89,7 +103,7 @@ function renderMarkdown(text) {
   return s
 }
 
-async function streamAI(messages, onChunk) {
+async function streamAI(messages, onChunk, { signal } = {}) {
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -99,6 +113,7 @@ async function streamAI(messages, onChunk) {
       'X-Title': 'Innernet',
     },
     body: JSON.stringify({ model: MODEL, messages, max_tokens: 800, stream: true }),
+    signal,
   })
   if (!res.ok) throw new Error(`${res.status}`)
   const reader = res.body.getReader()
@@ -131,10 +146,49 @@ function ClaudePane({ tab, updateTab }) {
   const [loading, setLoading] = useState(false)
   const [streaming, setStreaming] = useState('')
   const scrollRef = useRef(null)
+  const textareaRef = useRef(null)
+  const abortRef = useRef(null)
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [state.messages, loading, streaming])
+
+  // auto-grow the textarea to fit content, capped so it doesn't swallow the pane
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 180) + 'px'
+  }, [input])
+
+  const runTurn = async (messagesForTurn, finalMessages) => {
+    setLoading(true)
+    setStreaming('')
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
+    let accum = ''
+    try {
+      await streamAI(
+        [
+          { role: 'system', content: 'You are Claude, an assistant inside the Innernet productivity app. Be concise, helpful, and technical when appropriate. Use markdown formatting — headings, bullet lists, code blocks — for anything more than a one-liner.' },
+          ...messagesForTurn,
+        ],
+        (chunk) => { accum += chunk; setStreaming(accum) },
+        { signal: ctrl.signal }
+      )
+      updateTab({ data: { ...state, messages: [...finalMessages, { role: 'assistant', content: accum || 'No response.' }] } })
+    } catch (err) {
+      const aborted = err.name === 'AbortError' || ctrl.signal.aborted
+      const content = aborted
+        ? (accum ? accum + '\n\n_[stopped]_' : '_[stopped]_')
+        : `**Error:** ${err.message}`
+      updateTab({ data: { ...state, messages: [...finalMessages, { role: 'assistant', content }] } })
+    } finally {
+      abortRef.current = null
+      setStreaming('')
+      setLoading(false)
+    }
+  }
 
   const send = async () => {
     const text = input.trim()
@@ -143,25 +197,10 @@ function ClaudePane({ tab, updateTab }) {
     const nextMessages = [...state.messages, userMsg]
     updateTab({ data: { ...state, messages: nextMessages } })
     setInput('')
-    setLoading(true)
-    setStreaming('')
-    let accum = ''
-    try {
-      await streamAI(
-        [
-          { role: 'system', content: 'You are Claude, an assistant inside the Innernet productivity app. Be concise, helpful, and technical when appropriate. Use markdown formatting — headings, bullet lists, code blocks — for anything more than a one-liner.' },
-          ...nextMessages,
-        ],
-        (chunk) => { accum += chunk; setStreaming(accum) }
-      )
-      updateTab({ data: { ...state, messages: [...nextMessages, { role: 'assistant', content: accum || 'No response.' }] } })
-    } catch (err) {
-      updateTab({ data: { ...state, messages: [...nextMessages, { role: 'assistant', content: `**Error:** ${err.message}` }] } })
-    } finally {
-      setStreaming('')
-      setLoading(false)
-    }
+    await runTurn(nextMessages, nextMessages)
   }
+
+  const stop = () => { abortRef.current?.abort() }
 
   return (
     <div className="do-pane do-claude">
@@ -230,17 +269,28 @@ function ClaudePane({ tab, updateTab }) {
       </div>
       <div className="do-claude-input-wrap">
         <div className="do-claude-input">
-          <input
-            type="text"
+          <textarea
+            ref={textareaRef}
+            rows={1}
             placeholder={loading ? 'Claude is thinking…' : 'Ask something..'}
             value={input}
-            disabled={loading}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') send() }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                send()
+              }
+            }}
           />
-          <button className="do-claude-send" onClick={send} disabled={loading || !input.trim()}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
-          </button>
+          {loading ? (
+            <button className="do-claude-send do-claude-stop" onClick={stop} title="Stop generating">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+            </button>
+          ) : (
+            <button className="do-claude-send" onClick={send} disabled={!input.trim()} title="Send">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+            </button>
+          )}
         </div>
       </div>
     </div>

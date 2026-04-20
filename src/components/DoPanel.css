@@ -640,14 +640,14 @@
 }
 .do-claude-input {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
   max-width: 720px;
   margin: 0 auto;
   padding: 6px 6px 6px 22px;
   background: rgba(238, 236, 241, 0.9);
   border: 1px solid rgba(26, 26, 46, 0.05);
-  border-radius: 999px;
+  border-radius: 22px;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   transition: background 0.18s, box-shadow 0.18s;
@@ -656,23 +656,28 @@
   background: #fff;
   box-shadow: 0 6px 20px rgba(26, 26, 46, 0.06);
 }
-.do-claude-input input {
+.do-claude-input textarea {
   flex: 1;
   padding: 10px 0;
   background: transparent;
   border: none;
   font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   font-size: 14px;
+  line-height: 1.45;
   outline: none;
   color: #1a1a2e;
+  resize: none;
+  max-height: 180px;
+  overflow-y: auto;
 }
-.do-claude-input input::placeholder { color: rgba(26, 26, 46, 0.38); }
+.do-claude-input textarea::placeholder { color: rgba(26, 26, 46, 0.38); }
 .do-claude-send {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 36px; height: 36px;
   flex-shrink: 0;
+  margin-bottom: 2px;
   background: #1a1a2e;
   color: #fff;
   border: none;
@@ -682,6 +687,28 @@
 }
 .do-claude-send:hover:not(:disabled) { transform: translateY(-1px); background: #000; }
 .do-claude-send:disabled { opacity: 0.35; cursor: default; }
+.do-claude-stop { background: #b91c1c; }
+.do-claude-stop:hover:not(:disabled) { background: #991515; }
+
+.do-claude-actions {
+  display: flex;
+  justify-content: center;
+  margin: 4px 0 2px;
+}
+.do-claude-regen {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #fff;
+  color: #1a1a2e;
+  border: 1px solid rgba(26, 26, 46, 0.12);
+  border-radius: 999px;
+  font: 500 12px 'Plus Jakarta Sans', 'Inter', sans-serif;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+.do-claude-regen:hover { background: #f7f7fa; border-color: rgba(26, 26, 46, 0.22); transform: translateY(-1px); }
 
 @media (max-width: 640px) {
   .do-claude-suggestions { grid-template-columns: 1fr; }
