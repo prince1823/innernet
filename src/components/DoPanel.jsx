@@ -113,12 +113,9 @@ function ClaudePane({ tab, updateTab }) {
       </div>
       <div className="do-claude-messages" ref={scrollRef}>
         {state.messages.length === 0 && (
-          <div className="do-claude-empty">
-            <div className="do-claude-empty-star">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-            </div>
-            <h2 className="do-claude-empty-title">Hello, <em>there.</em></h2>
-            <p className="do-claude-empty-sub">Ask anything — code, writing, or a quiet thought.</p>
+          <div className="do-claude-hero">
+            <h1 className="do-claude-greeting">Hello <em>Tanuj</em></h1>
+            <p className="do-claude-tagline">How can I help you today?</p>
           </div>
         )}
         {state.messages.map((m, i) => (
@@ -138,18 +135,20 @@ function ClaudePane({ tab, updateTab }) {
           </div>
         )}
       </div>
-      <div className="do-claude-input">
-        <input
-          type="text"
-          placeholder={loading ? 'Claude is thinking…' : 'Message Claude…'}
-          value={input}
-          disabled={loading}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') send() }}
-        />
-        <button className="do-claude-send" onClick={send} disabled={loading || !input.trim()}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        </button>
+      <div className="do-claude-input-wrap">
+        <div className="do-claude-input">
+          <input
+            type="text"
+            placeholder={loading ? 'Claude is thinking…' : 'Ask something..'}
+            value={input}
+            disabled={loading}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') send() }}
+          />
+          <button className="do-claude-send" onClick={send} disabled={loading || !input.trim()}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          </button>
+        </div>
       </div>
     </div>
   )
