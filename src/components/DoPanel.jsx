@@ -255,8 +255,32 @@ function ClaudePane({ tab, updateTab }) {
   return (
     <div className="do-pane do-claude">
       <div className="do-claude-bg" aria-hidden="true">
+        {/* SVG edge-detection filter used by the overlay video to draw dark
+            outlines around bright shapes (the figure). Laplacian kernel
+            extracts edges, then the feColorMatrix turns bright edges into
+            opaque black and flat areas into transparent. */}
+        <svg className="do-claude-bg-svg" width="0" height="0" aria-hidden="true">
+          <defs>
+            <filter id="do-claude-edges" colorInterpolationFilters="sRGB">
+              <feConvolveMatrix order="3" preserveAlpha="true" edgeMode="duplicate" kernelMatrix="-1 -1 -1  -1  8 -1  -1 -1 -1" />
+              <feColorMatrix type="matrix" values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0   1.6 1.6 1.6 0 0" />
+              <feComponentTransfer>
+                <feFuncA type="linear" slope="1.2" intercept="-0.05" />
+              </feComponentTransfer>
+            </filter>
+          </defs>
+        </svg>
         <video
           className="do-claude-bg-video"
+          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260405_074625_a81f018a-956b-43fb-9aee-4d1508e30e6a.mp4"
+          muted
+          autoPlay
+          loop
+          playsInline
+          preload="auto"
+        />
+        <video
+          className="do-claude-bg-outline"
           src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260405_074625_a81f018a-956b-43fb-9aee-4d1508e30e6a.mp4"
           muted
           autoPlay

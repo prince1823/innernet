@@ -195,6 +195,21 @@
      pastel feel that matches the rest of the light UI. */
   filter: invert(1) hue-rotate(180deg) saturate(0.65) brightness(1.08) contrast(0.92);
 }
+/* Outline pass — same video with a Laplacian edge filter, drawn on top with
+   multiply so only the extracted dark lines darken the base video below. */
+.do-claude-bg-outline {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  filter: url(#do-claude-edges);
+  mix-blend-mode: multiply;
+  opacity: 0.9;
+  pointer-events: none;
+}
+.do-claude-bg-svg { position: absolute; width: 0; height: 0; }
 /* Gentle wash on top — tints whites toward cream and adds a subtle vignette
    so the edges fade into the pane background. */
 .do-claude-bg-veil {
