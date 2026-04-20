@@ -1285,6 +1285,10 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     // knows something was generated from this block.
     const hideAI = notesMode === 'me'
     const aiChildren = hideAI ? rawChildren.filter(c => c.isAI && !isVisuallyEmpty(c.text)) : []
+    const aiGeneratingChild = hideAI
+      ? rawChildren.find(c => c.isAI && Object.prototype.hasOwnProperty.call(streamingText, c.id))
+      : null
+    const isAIGenerating = !!aiGeneratingChild
     const hasAIMarker = hideAI && aiChildren.length > 0
     const mainChildren = hideAI ? rawChildren.filter(c => !c.isAI) : rawChildren
     const hasChildren = mainChildren.length > 0
@@ -1302,7 +1306,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     const inlineProject = inlineTagMatch ? inlineTagMatch[1] : null
     // In Me mode, hide any `@query` from display — it's preserved on the AI child
     // as sourceQuery, so the AI-mode callout still shows it as provenance.
-    const displayText = (hideAI && hasAIMarker)
+    const displayText = (hideAI && (hasAIMarker || isAIGenerating))
       ? rawText.replace(/@[^\n]*/g, '').replace(/\s+/g, ' ').trim()
       : rawText
     const effectiveProject = block.project || inlineProject
@@ -1310,7 +1314,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
 
     return (
       <div key={block.id} className={`ls-block ${depth === 0 ? 'ls-block-top' : ''} ${isCollapsed ? 'ls-block-collapsed' : ''} ${isAI ? 'ls-block-ai-child' : ''} ${highlightMeBlockId === block.id ? 'ls-block-highlight' : ''}`} data-block-id={block.id}>
-        <div className={`ls-block-content ${hasAIMarker ? 'ls-block-content-has-ai' : ''}`}>
+        <div className={`ls-block-content ${(hasAIMarker || isAIGenerating) ? 'ls-block-content-has-ai' : ''}`}>
           {/* Time on top-level headings — before the bullet */}
           {depth === 0 && block.time && hasVisibleText && (
             <span className="ls-block-time">{(() => {
@@ -1389,7 +1393,15 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
               dangerouslySetInnerHTML={{ __html: renderMd(displayText) }}
             />
           )}
-          {hasAIMarker && hasVisibleText && (
+          {isAIGenerating && hasVisibleText && (
+            <span className="ls-ai-generating" aria-live="polite">
+              <span className="ls-ai-generating-dots" aria-hidden="true">
+                <span /><span /><span />
+              </span>
+              <span className="ls-ai-generating-text">generating in AI mode</span>
+            </span>
+          )}
+          {hasAIMarker && !isAIGenerating && hasVisibleText && (
             <button
               type="button"
               className="ls-ai-marker"
