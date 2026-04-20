@@ -1872,8 +1872,10 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                   {item.question && (item.text || '').trim() && (
                                     <span className="ai-doc-callout-from">
                                       from: {item.question}
-                                      {item.askedOn && (
-                                        item.askedOnId ? (
+                                      {item.askedOn && (() => {
+                                        const full = item.askedOn
+                                        const shown = full.length > 60 ? full.slice(0, 60).trimEnd() + '…' : full
+                                        return item.askedOnId ? (
                                           <button
                                             type="button"
                                             className="ai-doc-callout-on ai-doc-callout-on-clickable"
@@ -1888,12 +1890,12 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                               setTimeout(() => setHighlightMeBlockId(curr => (curr === id ? null : curr)), 2000)
                                             }}
                                             onMouseDown={e => e.preventDefault()}
-                                            title="Jump to this note in Me mode"
-                                          > on “{item.askedOn}”</button>
+                                            title={full.length > 60 ? full : 'Jump to this note in Me mode'}
+                                          > on “{shown}”</button>
                                         ) : (
-                                          <span className="ai-doc-callout-on"> on “{item.askedOn}”</span>
+                                          <span className="ai-doc-callout-on" title={full.length > 60 ? full : undefined}> on “{shown}”</span>
                                         )
-                                      )}
+                                      })()}
                                       {item.askedAt && (
                                         <span className="ai-doc-callout-stamp" title={new Date(item.askedAt).toLocaleString()}>
                                           {new Date(item.askedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
