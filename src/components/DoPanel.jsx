@@ -173,6 +173,19 @@ function formatRelativeTime(ts) {
   return new Date(ts).toLocaleDateString()
 }
 
+const PLACEHOLDER_PROMPTS = [
+  'Ask something..',
+  'Draft a quick standup update…',
+  'Summarize my day from the calendar…',
+  'What should I tackle next?',
+  'Rewrite this paragraph to sound sharper…',
+  'Explain this bug to me like I\u2019m five…',
+  'Brainstorm names for a side project…',
+  'Plan a 30-min focus block for me…',
+  'Turn these notes into a changelog…',
+  'What\u2019s a good unit test for this?',
+]
+
 const GREETINGS = [
   { pre: 'Hello', name: 'Tanuj' },
   { pre: 'Welcome back', name: 'Tanuj' },
@@ -196,6 +209,7 @@ function ClaudePane({ tab, updateTab }) {
   const textareaRef = useRef(null)
   const abortRef = useRef(null)
   const [greetingIdx, setGreetingIdx] = useState(() => Math.floor(Math.random() * GREETINGS.length))
+  const [placeholderIdx, setPlaceholderIdx] = useState(() => Math.floor(Math.random() * PLACEHOLDER_PROMPTS.length))
   const [history, setHistory] = useState(loadClaudeHistory)
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     try { return JSON.parse(localStorage.getItem(CLAUDE_SIDEBAR_KEY) ?? 'true') } catch { return true }
@@ -265,6 +279,15 @@ function ClaudePane({ tab, updateTab }) {
     }, 3500)
     return () => clearInterval(id)
   }, [isEmpty, loading])
+
+  // Rotate placeholder prompts while the input is empty and not loading.
+  useEffect(() => {
+    if (loading || input) return
+    const id = setInterval(() => {
+      setPlaceholderIdx(i => (i + 1) % PLACEHOLDER_PROMPTS.length)
+    }, 2800)
+    return () => clearInterval(id)
+  }, [loading, input])
 
   const scrollToBottom = (behavior = 'smooth') => {
     const el = scrollRef.current
@@ -522,7 +545,7 @@ function ClaudePane({ tab, updateTab }) {
           <textarea
             ref={textareaRef}
             rows={1}
-            placeholder={loading ? 'Claude is thinking…' : 'Ask something..'}
+            placeholder={loading ? 'Claude is thinking…' : PLACEHOLDER_PROMPTS[placeholderIdx]}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => {
