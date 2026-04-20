@@ -83,6 +83,27 @@ function App() {
     }))
   }, [selectedDate])
 
+  const handleThoughtDelete = useCallback((time, id) => {
+    const key = `slot-${selectedDate}-${time}`
+    setThoughts(prev => {
+      const items = (prev[key] || []).filter(it => it.id !== id)
+      const next = { ...prev }
+      if (items.length === 0) delete next[key]
+      else next[key] = items
+      return next
+    })
+  }, [selectedDate])
+
+  const handleThoughtUpdate = useCallback((time, id, newText) => {
+    const clean = (newText || '').trim()
+    if (!clean) return
+    const key = `slot-${selectedDate}-${time}`
+    setThoughts(prev => ({
+      ...prev,
+      [key]: (prev[key] || []).map(it => it.id === id ? { ...it, text: clean } : it),
+    }))
+  }, [selectedDate])
+
   // Ask AI on a feature
   const handleAskAI = useCallback((featId, title, context) => {
     const newWindow = { id: featId, title, context }
@@ -172,6 +193,8 @@ function App() {
             setSelectedEvent={(ev) => { setSelectedEvent(ev); setQuickSlot(null) }}
             onSlotClick={handleSlotClick}
             onQuickNoteAdd={handleQuickNoteAdd}
+            onThoughtDelete={handleThoughtDelete}
+            onThoughtUpdate={handleThoughtUpdate}
             onQuickSlotClear={clearQuickSlot}
             quickSlot={quickSlot}
             thoughts={thoughts}

@@ -399,7 +399,7 @@ function computeOverlapLayout(events) {
   return layout
 }
 
-export default function CalendarPanel({ selectedDate, setSelectedDate, selectedEvent, setSelectedEvent, onSlotClick, onQuickNoteAdd, onQuickSlotClear, quickSlot, thoughts = {}, onDatePanelOpen, userEvents = {}, onScheduleEvent, onEventUpdate, eventOverrides = {} }) {
+export default function CalendarPanel({ selectedDate, setSelectedDate, selectedEvent, setSelectedEvent, onSlotClick, onQuickNoteAdd, onThoughtDelete, onThoughtUpdate, onQuickSlotClear, quickSlot, thoughts = {}, onDatePanelOpen, userEvents = {}, onScheduleEvent, onEventUpdate, eventOverrides = {} }) {
   const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 9))
   const [showMiniCal, setShowMiniCal] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(56) // pixels per hour; continuous 24..240
@@ -429,6 +429,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   // Draft text for the inline quick-note input that pops up when an empty slot is clicked
   const [quickNoteText, setQuickNoteText] = useState('')
   const quickNoteInputRef = useRef(null)
+  const [editingNote, setEditingNote] = useState(null) // { id, text }
   const gridRef = useRef(null)
   const panelRef = useRef(null)
   const pullAccum = useRef(0)
@@ -1745,68 +1746,106 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               />,
             ])}
 
-            {/* Thought blocks */}
+            {/* Thought blocks — click to inline-edit, hover reveals delete */}
             {thoughtSlots.map(slot => {
               const [h, m] = slot.time.split(':').map(Number)
               const minutes = h * 60 + m
               const topOffset = (minutes / 60) * zoomLevel
-              const isActive = quickSlot?.time === slot.time
+              const lastItem = slot.items[slot.items.length - 1]
+              const isEditing = editingNote?.id === lastItem.id
+              const commitEdit = () => {
+                const t = (editingNote?.text || '').trim()
+                if (t && t !== lastItem.text && onThoughtUpdate) onThoughtUpdate(slot.time, lastItem.id, t)
+                setEditingNote(null)
+              }
               return (
-                <div key={slot.time} className={`cal-thought-block ${isActive ? 'active' : ''}`} style={{ top: `${topOffset}px` }}
-                  onClick={(e) => { e.stopPropagation(); onSlotClick(slot.time, slot.label) }}>
+                <div
+                  key={slot.time}
+                  className={`cal-thought-block ${isEditing ? 'editing' : ''}`}
+                  style={{ top: `${topOffset}px` }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (!isEditing) setEditingNote({ id: lastItem.id, text: lastItem.text })
+                  }}
+                >
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/></svg>
-                  <span className="cal-thought-preview">{slot.items[slot.items.length - 1].text}</span>
-                  {slot.items.length > 1 && <span className="cal-thought-count">+{slot.items.length - 1}</span>}
+                  {isEditing ? (
+                    <input
+                      className="cal-thought-edit-input"
+                      value={editingNote.text}
+                      autoFocus
+                      onChange={(e) => setEditingNote({ id: lastItem.id, text: e.target.value })}
+                      onBlur={commitEdit}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => {
+                        e.stopPropagation()
+                        if (e.key === 'Enter') { e.preventDefault(); commitEdit() }
+                        else if (e.key === 'Escape') { e.preventDefault(); setEditingNote(null) }
+                      }}
+                    />
+                  ) : (
+                    <span className="cal-thought-preview">{lastItem.text}</span>
+                  )}
+                  {slot.items.length > 1 && !isEditing && <span className="cal-thought-count">+{slot.items.length - 1}</span>}
+                  <button
+                    className="cal-thought-del"
+                    title="Delete note"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (onThoughtDelete) onThoughtDelete(slot.time, lastItem.id)
+                      setEditingNote(null)
+                    }}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                  </button>
                 </div>
               )
             })}
 
             {/* Quick-note composer — appears when an empty slot is clicked.
-                Type + Enter adds a thought that persists as a thought-block. */}
-            {quickSlot && !thoughtSlots.some(s => s.time === quickSlot.time) && (() => {
+                Type + Enter adds a thought that persists as a thought-block.
+                If the clicked slot already has thoughts, the composer expands
+                to show them with inline delete/edit. */}
+            {quickSlot && (() => {
               const [h, m] = quickSlot.time.split(':').map(Number)
               const minutes = h * 60 + m
               const topOffset = (minutes / 60) * zoomLevel
+              const existing = thoughtSlots.find(s => s.time === quickSlot.time)
               const submit = () => {
                 const text = quickNoteText.trim()
                 if (!text) return
                 if (onQuickNoteAdd) onQuickNoteAdd(quickSlot.time, text)
                 setQuickNoteText('')
-                if (onQuickSlotClear) onQuickSlotClear()
+                if (!existing && onQuickSlotClear) onQuickSlotClear()
               }
               const cancel = () => {
                 setQuickNoteText('')
                 if (onQuickSlotClear) onQuickSlotClear()
               }
-              return (
-                <div
-                  className="cal-quick-slot"
-                  style={{ top: `${topOffset}px` }}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <span className="cal-quick-slot-label">{quickSlot.label}</span>
+              if (!existing) {
+                return (
                   <input
                     ref={quickNoteInputRef}
-                    className="cal-quick-slot-input"
+                    className="cal-quick-slot-inline"
+                    style={{ top: `${topOffset}px` }}
                     type="text"
                     value={quickNoteText}
                     placeholder="Jot a note — Enter to save, Esc to cancel"
                     autoFocus
+                    onClick={(e) => e.stopPropagation()}
                     onChange={(e) => setQuickNoteText(e.target.value)}
+                    onBlur={() => { if (!quickNoteText.trim()) cancel() }}
                     onKeyDown={(e) => {
                       e.stopPropagation()
                       if (e.key === 'Enter') { e.preventDefault(); submit() }
                       else if (e.key === 'Escape') { e.preventDefault(); cancel() }
                     }}
-                    onBlur={() => {
-                      // If user clicks away without typing, dismiss. If they
-                      // typed something, save it rather than lose it silently.
-                      if (quickNoteText.trim()) submit()
-                      else cancel()
-                    }}
                   />
-                </div>
-              )
+                )
+              }
+              // When clicking a slot that already has a thought, inline edit
+              // happens on the thought-block itself — no popup is rendered here.
+              return null
             })()}
 
             {/* Event blocks — collapsed: title + time only (progressive disclosure).
