@@ -446,7 +446,7 @@
   font-size: 52px;
   letter-spacing: -1.5px;
   line-height: 1.2;
-  background: linear-gradient(135deg, #a78bfa 0%, #c4b5fd 40%, #fecaca 100%);
+  background: linear-gradient(135deg, #2e1065 0%, #4c1d95 40%, #831843 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -471,7 +471,7 @@
   font-size: 32px;
   font-weight: 500;
   letter-spacing: -0.5px;
-  color: rgba(26, 26, 46, 0.28);
+  color: rgba(26, 26, 46, 0.6);
 }
 .do-claude-suggestions {
   display: grid;
