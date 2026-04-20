@@ -21,9 +21,9 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  border-left: 1px solid var(--border-light);
-  background: var(--bg-body);
+  width: 10px;
+  border-left: 1px solid rgba(0, 0, 0, 0.04);
+  background: transparent;
 }
 
 .sidebar-resize-zone {
