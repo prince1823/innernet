@@ -388,16 +388,16 @@
 
 @keyframes ls-block-flash {
   0% {
-    background: rgba(250, 204, 21, 0.55);
-    box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.45);
+    background: rgba(254, 240, 138, 0.55);
+    box-shadow: 0 0 0 3px rgba(254, 240, 138, 0.45);
   }
   60% {
-    background: rgba(250, 204, 21, 0.35);
-    box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.25);
+    background: rgba(254, 240, 138, 0.35);
+    box-shadow: 0 0 0 2px rgba(254, 240, 138, 0.25);
   }
   100% {
     background: transparent;
-    box-shadow: 0 0 0 0 rgba(250, 204, 21, 0);
+    box-shadow: 0 0 0 0 rgba(254, 240, 138, 0);
   }
 }
 
@@ -462,18 +462,18 @@
 @keyframes ai-doc-callout-border-flash {
   0% {
     box-shadow:
-      0 0 0 2px rgba(250, 204, 21, 0.95),
-      0 0 14px 2px rgba(250, 204, 21, 0.55);
+      0 0 0 2px rgba(254, 240, 138, 0.95),
+      0 0 14px 2px rgba(254, 240, 138, 0.55);
   }
   60% {
     box-shadow:
-      0 0 0 2px rgba(250, 204, 21, 0.75),
-      0 0 10px 1px rgba(250, 204, 21, 0.3);
+      0 0 0 2px rgba(254, 240, 138, 0.75),
+      0 0 10px 1px rgba(254, 240, 138, 0.3);
   }
   100% {
     box-shadow:
-      0 0 0 0 rgba(250, 204, 21, 0),
-      0 0 0 0 rgba(250, 204, 21, 0);
+      0 0 0 0 rgba(254, 240, 138, 0),
+      0 0 0 0 rgba(254, 240, 138, 0);
   }
 }
 
