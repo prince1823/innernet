@@ -1327,7 +1327,14 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
       summarize: `Summarize this text into one or two concise sentences. ${formatRule} Return only the summary — no preamble, no quotes.`,
       tone: `Rewrite this text in a ${tone || 'professional'} tone. Keep the meaning. ${formatRule} Return only the rewritten text — no preamble, no quotes.`,
     }[action] || `Improve this text. ${formatRule} Return only the rewritten text.`
-    const prompt = `${instruction}\n\nText:\n${selectedText}`
+    // Pass the full block text as context so the AI understands tone/topic,
+    // but only rewrite the selected substring. Mark the selection with
+    // [[SELECTED: … ]] so the model knows which span to transform.
+    const fullText = (editableEl.textContent || '').trim()
+    const contextBlock = fullText && fullText !== selectedText
+      ? `Surrounding paragraph (for context only — do not rewrite the whole thing):\n${fullText}\n\n`
+      : ''
+    const prompt = `${instruction}\n\n${contextBlock}Selected text to rewrite:\n${selectedText}`
 
     const stripMarkdown = (s) => (s || '')
       .replace(/```[\s\S]*?```/g, '')         // fenced code
