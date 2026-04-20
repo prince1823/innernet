@@ -8,8 +8,29 @@ const TAB_TYPES = [
   { type: 'claude', label: 'Claude', icon: 'claude' },
   { type: 'browser', label: 'Browser', icon: 'browser' },
   { type: 'terminal', label: 'Terminal', icon: 'terminal' },
-  { type: 'notes', label: 'Notes', icon: 'notes' },
 ]
+
+const NEW_TAB_URL = 'about:newtab'
+// CORS proxy used when the user toggles "proxy mode" on a tab — lets us embed
+// sites that send X-Frame-Options: DENY. Third-party, rate-limited, and breaks
+// on sites whose scripts rely on same-origin requests. Off by default.
+const PROXIES = [
+  (url) => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
+  (url) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+  (url) => 'https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(url),
+]
+
+async function fetchViaProxy(url) {
+  let lastErr
+  for (const build of PROXIES) {
+    try {
+      const r = await fetch(build(url))
+      if (!r.ok) throw new Error('status ' + r.status)
+      return await r.text()
+    } catch (e) { lastErr = e }
+  }
+  throw lastErr || new Error('all proxies failed')
+}
 
 let uid = 0
 const nextId = () => `tab-${Date.now()}-${++uid}`
@@ -21,10 +42,7 @@ function TabIcon({ kind }) {
   if (kind === 'browser') {
     return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
   }
-  if (kind === 'terminal') {
-    return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-  }
-  return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+  return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
 }
 
 function renderMarkdown(text) {
@@ -135,11 +153,51 @@ function ClaudePane({ tab, updateTab }) {
 // back/forward, reload — but those specific sites render blank. For sites
 // that allow embedding, you get full interactive browsing.
 function BrowserPane({ tab, updateTab }) {
-  const state = tab.data
+  const rawState = tab.data
+  // Backfill proxy=true for tabs created before the field existed so existing
+  // sessions don't render a blank X-Frame-Options iframe.
+  const state = rawState.proxy === undefined ? { ...rawState, proxy: true } : rawState
   const iframeRef = useRef(null)
   const [addressInput, setAddressInput] = useState(state.url)
+  const [proxyDoc, setProxyDoc] = useState('')
+  const [proxyStatus, setProxyStatus] = useState('idle') // 'idle' | 'loading' | 'error'
 
   useEffect(() => { setAddressInput(state.url) }, [state.url])
+
+  // When proxy mode is on, fetch the target HTML via CORS proxy and inject a
+  // <base href> so relative asset URLs (CSS, JS, images) resolve against the
+  // original host instead of 404-ing against corsproxy.io.
+  useEffect(() => {
+    if (!state.proxy || state.url === NEW_TAB_URL) {
+      setProxyDoc('')
+      setProxyStatus('idle')
+      return
+    }
+    let cancelled = false
+    setProxyStatus('loading')
+    setProxyDoc('<!DOCTYPE html><html><head><style>body{font-family:system-ui,sans-serif;color:#6b7280;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}.l{display:flex;align-items:center;gap:10px}.s{width:14px;height:14px;border:2px solid #e5e7eb;border-top-color:#6366f1;border-radius:50%;animation:spin 0.7s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}</style></head><body><div class="l"><div class="s"></div>Loading ' + state.url.replace(/[<>&"]/g,'') + '…</div></body></html>')
+    fetchViaProxy(state.url)
+      .then(html => {
+        if (cancelled) return
+        const baseTag = `<base href="${state.url}">`
+        let patched
+        if (/<head[^>]*>/i.test(html)) {
+          patched = html.replace(/<head([^>]*)>/i, `<head$1>${baseTag}`)
+        } else if (/<html[^>]*>/i.test(html)) {
+          patched = html.replace(/<html([^>]*)>/i, `<html$1><head>${baseTag}</head>`)
+        } else {
+          patched = `<head>${baseTag}</head>${html}`
+        }
+        setProxyDoc(patched)
+        setProxyStatus('idle')
+      })
+      .catch(() => {
+        if (cancelled) return
+        setProxyStatus('error')
+        setProxyDoc(`<!DOCTYPE html><html><body style="font-family:system-ui;color:#b91c1c;padding:28px"><h3 style="margin:0 0 8px">Couldn't load this page</h3><p style="color:#6b7280;margin:0 0 14px">The proxy couldn't reach ${state.url.replace(/[<>&"]/g,'')}.</p><p style="color:#6b7280;font-size:13px">Try toggling the shield off, or open the URL in a new window.</p></body></html>`)
+      })
+    return () => { cancelled = true }
+  }, [state.proxy, state.url])
 
   const normalizeUrl = (raw) => {
     const s = (raw || '').trim()
@@ -192,22 +250,87 @@ function BrowserPane({ tab, updateTab }) {
             spellCheck={false}
           />
         </div>
+        <button
+          className={`do-browser-open do-browser-proxy ${state.proxy ? 'active' : ''}`}
+          onClick={() => updateTab({ data: { ...state, proxy: !state.proxy } })}
+          title={state.proxy ? 'Proxy mode ON — routes through corsproxy.io to bypass embed blocks' : 'Turn on proxy mode to load sites that block embedding'}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </button>
         <button className="do-browser-open" onClick={() => window.open(state.url, '_blank', 'noopener')} title="Open in a real tab">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
         </button>
       </div>
       <div className="do-browser-viewport">
-        <iframe
-          ref={iframeRef}
-          title="browser-tab"
-          src={state.url}
-          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
-          referrerPolicy="no-referrer"
+        {state.url === NEW_TAB_URL ? (
+          <NewTabPage onSearch={navigate} />
+        ) : (
+          <>
+            {state.proxy ? (
+              <iframe
+                ref={iframeRef}
+                title="browser-tab"
+                srcDoc={proxyDoc || '<p style="font-family:system-ui;color:#6b7280;padding:24px">Preparing proxied page…</p>'}
+                sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <iframe
+                ref={iframeRef}
+                title="browser-tab"
+                src={state.url}
+                sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
+                referrerPolicy="no-referrer"
+              />
+            )}
+            <div className="do-browser-fallback">
+              <span>Site blocks embedding? Try the shield <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign:'middle'}}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> to enable proxy mode, or</span>
+              <button onClick={() => window.open(state.url, '_blank', 'noopener')}>Open in new window</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function NewTabPage({ onSearch }) {
+  const [q, setQ] = useState('')
+  // Only show shortcuts that are known to allow iframe embedding. For anything
+  // else (GitHub, HN, Google, etc.) the user can type the URL and toggle the
+  // shield icon to enable proxy mode.
+  const shortcuts = [
+    { label: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/Main_Page', color: '#1a1a2e' },
+    { label: 'DuckDuckGo', url: 'https://html.duckduckgo.com/html/', color: '#de5833' },
+    { label: 'MDN', url: 'https://developer.mozilla.org/', color: '#000000' },
+    { label: 'arXiv', url: 'https://arxiv.org', color: '#b31b1b' },
+  ]
+  return (
+    <div className="do-newtab-page">
+      <div className="do-newtab-title">New Tab</div>
+      <form
+        className="do-newtab-search"
+        onSubmit={e => { e.preventDefault(); if (q.trim()) onSearch(q.trim()) }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input
+          type="text"
+          autoFocus
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          placeholder="Search or enter a URL"
+          spellCheck={false}
         />
-        <div className="do-browser-fallback">
-          <span>If the page looks blank, the site blocks embedding. Try Wikipedia search, or click</span>
-          <button onClick={() => window.open(state.url, '_blank', 'noopener')}>Open in new window</button>
-        </div>
+      </form>
+      <div className="do-newtab-shortcuts">
+        {shortcuts.map(s => (
+          <button key={s.label} className="do-newtab-shortcut" onClick={() => onSearch(s.url)}>
+            <span className="do-newtab-shortcut-dot" style={{ background: s.color }}>
+              {s.label[0]}
+            </span>
+            <span className="do-newtab-shortcut-label">{s.label}</span>
+          </button>
+        ))}
       </div>
     </div>
   )
@@ -311,30 +434,21 @@ function TerminalPane({ tab, updateTab }) {
   )
 }
 
-// ─────────────────────────── Notes pane ───────────────────────────
-function NotesPane({ tab, updateTab }) {
-  return (
-    <div className="do-pane do-notes">
-      <textarea
-        className="do-notes-area"
-        value={tab.data.text}
-        placeholder="Scratch notes, paste anything — it stays in this tab."
-        onChange={e => updateTab({ data: { text: e.target.value } })}
-      />
-    </div>
-  )
-}
-
 // ─────────────────────────── DoPanel ───────────────────────────
-function makeTab(type) {
+// Existing browser tabs still open to Wikipedia for continuity; a *new* browser
+// tab (added via +) opens the blank New Tab page instead so the user can search
+// — the Chrome-style flow.
+function makeTab(type, opts = {}) {
   const id = nextId()
   if (type === 'claude') return { id, type, title: 'Claude', data: { messages: [] } }
   if (type === 'browser') {
-    const url = 'https://en.wikipedia.org/wiki/Main_Page'
-    return { id, type, title: deriveTitle(url), data: { url, history: [url], historyIdx: 0 } }
+    const url = opts.newTab
+      ? NEW_TAB_URL
+      : (opts.url || 'https://en.wikipedia.org/wiki/Main_Page')
+    const title = url === NEW_TAB_URL ? 'New Tab' : deriveTitle(url)
+    return { id, type, title, data: { url, history: [url], historyIdx: 0, proxy: true } }
   }
-  if (type === 'terminal') return { id, type, title: 'Terminal', data: { lines: [{ kind: 'out', text: "Innernet shell — type 'help' for commands." }], history: [] } }
-  return { id, type: 'notes', title: 'Notes', data: { text: '' } }
+  return { id, type: 'terminal', title: 'Terminal', data: { lines: [{ kind: 'out', text: "Innernet shell — type 'help' for commands." }], history: [] } }
 }
 
 export default function DoPanel() {
@@ -342,7 +456,6 @@ export default function DoPanel() {
     makeTab('claude'),
     makeTab('browser'),
     makeTab('terminal'),
-    makeTab('notes'),
   ])
   const [activeId, setActiveId] = useState(() => null)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -354,7 +467,7 @@ export default function DoPanel() {
     setTabs(prev => prev.map(t => t.id === id ? { ...t, ...patch, data: patch.data ?? t.data } : t))
   }
   const addTab = (type) => {
-    const t = makeTab(type)
+    const t = makeTab(type, type === 'browser' ? { newTab: true } : {})
     setTabs(prev => [...prev, t])
     setActiveId(t.id)
     setMenuOpen(false)
@@ -428,9 +541,6 @@ export default function DoPanel() {
         )}
         {active && active.type === 'terminal' && (
           <TerminalPane tab={active} updateTab={patch => updateTab(active.id, patch)} />
-        )}
-        {active && active.type === 'notes' && (
-          <NotesPane tab={active} updateTab={patch => updateTab(active.id, patch)} />
         )}
         {!active && (
           <div className="do-empty">
