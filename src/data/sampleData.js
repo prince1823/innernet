@@ -573,6 +573,28 @@ export const journalPages = {
 };
 
 // Activity logs for the Logs panel
+// Seed data for the "Logs" mode in Think — a realistic day of Do-window
+// activity (browser navs, terminal commands, Claude prompts). Timestamps are
+// relative: { h, m } gets resolved to today's date at that hour/minute so the
+// log stays "today" regardless of when the user opens the app.
+export const sampleDoActivity = [
+  { h: 9,  m: 12, kind: 'tab_opened',    source: 'browser',  label: 'Opened browser tab' },
+  { h: 9,  m: 13, kind: 'browser_nav',   source: 'browser',  label: 'Browsed github.com — innernet/pulls',           url: 'https://github.com/innernet/pulls' },
+  { h: 9,  m: 21, kind: 'browser_nav',   source: 'browser',  label: 'Browsed PR #42 — Supplier Taxonomy Module',     url: 'https://github.com/innernet/pull/42' },
+  { h: 9,  m: 34, kind: 'tab_opened',    source: 'terminal', label: 'Opened terminal tab' },
+  { h: 9,  m: 35, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `git checkout feature/taxonomy`',           command: 'git checkout feature/taxonomy' },
+  { h: 9,  m: 36, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `npm install`',                             command: 'npm install' },
+  { h: 9,  m: 48, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `npm test -- taxonomy`',                    command: 'npm test -- taxonomy' },
+  { h: 9,  m: 52, kind: 'tab_opened',    source: 'claude',   label: 'Opened Claude tab' },
+  { h: 9,  m: 53, kind: 'claude_prompt', source: 'claude',   label: 'Asked Claude: "Why would a 3-level taxonomy fail with circular parents?"', prompt: 'Why would a 3-level taxonomy fail with circular parents?' },
+  { h: 10, m: 4,  kind: 'browser_nav',   source: 'browser',  label: 'Browsed stackoverflow.com — adjacency list cycles', url: 'https://stackoverflow.com/questions/tagged/graph-cycles' },
+  { h: 10, m: 19, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `npm run lint`',                            command: 'npm run lint' },
+  { h: 10, m: 27, kind: 'claude_prompt', source: 'claude',   label: 'Asked Claude: "Give me a SQL query to detect cycles in a parent_id tree"', prompt: 'Give me a SQL query to detect cycles in a parent_id tree' },
+  { h: 10, m: 41, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `git commit -m "guard against circular taxonomy parents"`', command: 'git commit -m "guard against circular taxonomy parents"' },
+  { h: 10, m: 42, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `git push origin feature/taxonomy`',        command: 'git push origin feature/taxonomy' },
+  { h: 10, m: 55, kind: 'browser_nav',   source: 'browser',  label: 'Browsed linear.app — INGEST-214',               url: 'https://linear.app/innernet/issue/INGEST-214' },
+]
+
 export const activityLogs = [
   { id: 'log-1', time: '07:01', type: 'user', action: 'Opened app', session: null },
   { id: 'log-2', time: '07:02', type: 'user', action: 'Opened calendar view', session: null },

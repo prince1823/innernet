@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import hljs from 'highlight.js/lib/common'
 import 'highlight.js/styles/atom-one-light.css'
+import { logActivity } from '../utils/activityLog'
 import './DoPanel.css'
 
 const API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY
@@ -352,6 +353,7 @@ function ClaudePane({ tab, updateTab }) {
     const nextMessages = [...state.messages, userMsg]
     updateTab({ data: { ...state, messages: nextMessages } })
     setInput('')
+    logActivity('claude_prompt', { source: 'claude', label: `Asked Claude: "${text.length > 80 ? text.slice(0, 80) + '…' : text}"`, prompt: text })
     await runTurn(nextMessages, nextMessages)
   }
 
@@ -646,6 +648,7 @@ function BrowserPane({ tab, updateTab }) {
       title: deriveTitle(url),
       data: { ...state, url, history, historyIdx: history.length - 1 },
     })
+    logActivity('browser_nav', { source: 'browser', label: `Browsed ${deriveTitle(url)}`, url })
   }
 
   const goBack = () => {
@@ -848,6 +851,7 @@ function TerminalPane({ tab, updateTab }) {
       updateTab({ data: { ...state, lines: [...state.lines, { kind: 'prompt', text: '' }] } })
       return
     }
+    logActivity('terminal_cmd', { source: 'terminal', label: `Ran \`${trimmed}\``, command: trimmed })
     const [name, ...rest] = trimmed.split(/\s+/)
     const out = []
     switch (name) {
@@ -970,6 +974,7 @@ export default function DoPanel() {
     setTabs(prev => [...prev, t])
     setActiveId(t.id)
     setMenuOpen(false)
+    logActivity('tab_opened', { source: type, label: `Opened ${type} tab` })
   }
   const closeTab = (id, e) => {
     e?.stopPropagation()
