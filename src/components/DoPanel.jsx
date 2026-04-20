@@ -47,15 +47,45 @@ function TabIcon({ kind }) {
 
 function renderMarkdown(text) {
   if (!text) return ''
-  return text
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\n/g, '<br/>')
+  let s = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  // fenced code blocks
+  s = s.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) =>
+    `<pre class="do-md-pre"><code>${code.replace(/\n$/, '')}</code></pre>`)
+  // headings
+  s = s.replace(/^###### (.+)$/gm, '<h6>$1</h6>')
+  s = s.replace(/^##### (.+)$/gm, '<h5>$1</h5>')
+  s = s.replace(/^#### (.+)$/gm, '<h4>$1</h4>')
+  s = s.replace(/^### (.+)$/gm, '<h4>$1</h4>')
+  s = s.replace(/^## (.+)$/gm, '<h3>$1</h3>')
+  s = s.replace(/^# (.+)$/gm, '<h2>$1</h2>')
+  // group list items
+  s = s.replace(/(?:^|\n)((?:[ \t]*[-*] .+(?:\n|$))+)/g, (_, block) => {
+    const items = block.trim().split(/\n/).map(l => l.replace(/^[ \t]*[-*] /, '').trim()).map(x => `<li>${x}</li>`).join('')
+    return `\n<ul>${items}</ul>`
+  })
+  s = s.replace(/(?:^|\n)((?:[ \t]*\d+\. .+(?:\n|$))+)/g, (_, block) => {
+    const items = block.trim().split(/\n/).map(l => l.replace(/^[ \t]*\d+\. /, '').trim()).map(x => `<li>${x}</li>`).join('')
+    return `\n<ol>${items}</ol>`
+  })
+  // inline formatting
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  s = s.replace(/(^|[^\*])\*(?!\s)([^\*\n]+?)\*(?!\*)/g, '$1<em>$2</em>')
+  s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>')
+  s = s.replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+  // paragraphs
+  const blocks = s.split(/\n{2,}/)
+  s = blocks.map(b => {
+    const t = b.trim()
+    if (!t) return ''
+    if (/^<(h\d|ul|ol|pre|blockquote)/.test(t)) return t
+    return '<p>' + t.replace(/\n/g, '<br/>') + '</p>'
+  }).join('\n')
+  // Merge adjacent lists so consecutive numbered items don't each restart at 1
+  s = s.replace(/<\/ol>\s*<ol>/g, '').replace(/<\/ul>\s*<ul>/g, '')
+  return s
 }
 
-async function callAI(messages) {
+async function streamAI(messages, onChunk) {
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -64,11 +94,30 @@ async function callAI(messages) {
       'HTTP-Referer': window.location.origin,
       'X-Title': 'Innernet',
     },
-    body: JSON.stringify({ model: MODEL, messages, max_tokens: 800 }),
+    body: JSON.stringify({ model: MODEL, messages, max_tokens: 800, stream: true }),
   })
   if (!res.ok) throw new Error(`${res.status}`)
-  const data = await res.json()
-  return data.choices?.[0]?.message?.content || 'No response.'
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buf = ''
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buf += decoder.decode(value, { stream: true })
+    const lines = buf.split('\n')
+    buf = lines.pop() || ''
+    for (const line of lines) {
+      const l = line.trim()
+      if (!l.startsWith('data:')) continue
+      const data = l.slice(5).trim()
+      if (data === '[DONE]') return
+      try {
+        const json = JSON.parse(data)
+        const delta = json.choices?.[0]?.delta?.content
+        if (delta) onChunk(delta)
+      } catch {}
+    }
+  }
 }
 
 // ─────────────────────────── Claude pane ───────────────────────────
@@ -76,11 +125,12 @@ function ClaudePane({ tab, updateTab }) {
   const state = tab.data
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [streaming, setStreaming] = useState('')
   const scrollRef = useRef(null)
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-  }, [state.messages, loading])
+  }, [state.messages, loading, streaming])
 
   const send = async () => {
     const text = input.trim()
@@ -90,15 +140,21 @@ function ClaudePane({ tab, updateTab }) {
     updateTab({ data: { ...state, messages: nextMessages } })
     setInput('')
     setLoading(true)
+    setStreaming('')
+    let accum = ''
     try {
-      const reply = await callAI([
-        { role: 'system', content: 'You are Claude, an assistant inside the Innernet productivity app. Be concise, helpful, and technical when appropriate.' },
-        ...nextMessages,
-      ])
-      updateTab({ data: { ...state, messages: [...nextMessages, { role: 'assistant', content: reply }] } })
+      await streamAI(
+        [
+          { role: 'system', content: 'You are Claude, an assistant inside the Innernet productivity app. Be concise, helpful, and technical when appropriate. Use markdown formatting — headings, bullet lists, code blocks — for anything more than a one-liner.' },
+          ...nextMessages,
+        ],
+        (chunk) => { accum += chunk; setStreaming(accum) }
+      )
+      updateTab({ data: { ...state, messages: [...nextMessages, { role: 'assistant', content: accum || 'No response.' }] } })
     } catch (err) {
       updateTab({ data: { ...state, messages: [...nextMessages, { role: 'assistant', content: `**Error:** ${err.message}` }] } })
     } finally {
+      setStreaming('')
       setLoading(false)
     }
   }
@@ -127,7 +183,12 @@ function ClaudePane({ tab, updateTab }) {
             )}
           </div>
         ))}
-        {loading && (
+        {loading && streaming && (
+          <div className="do-claude-msg assistant">
+            <div className="do-claude-bubble assistant" dangerouslySetInnerHTML={{ __html: renderMarkdown(streaming) + '<span class="do-claude-caret"></span>' }} />
+          </div>
+        )}
+        {loading && !streaming && (
           <div className="do-claude-msg assistant">
             <div className="do-claude-bubble assistant do-claude-thinking">
               <span /><span /><span />

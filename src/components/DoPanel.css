@@ -480,6 +480,81 @@
   font-size: 12px;
   color: #4a4458;
 }
+.do-claude-bubble p { margin: 0 0 8px; }
+.do-claude-bubble p:last-child { margin-bottom: 0; }
+.do-claude-bubble h2,
+.do-claude-bubble h3,
+.do-claude-bubble h4,
+.do-claude-bubble h5,
+.do-claude-bubble h6 {
+  margin: 14px 0 6px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #1a1a2e;
+}
+.do-claude-bubble h2 { font-size: 16px; }
+.do-claude-bubble h3 { font-size: 14.5px; }
+.do-claude-bubble h4 { font-size: 13.5px; }
+.do-claude-bubble h5, .do-claude-bubble h6 { font-size: 13px; }
+.do-claude-bubble > :first-child { margin-top: 0; }
+.do-claude-bubble ul,
+.do-claude-bubble ol {
+  margin: 6px 0 8px;
+  padding-left: 20px;
+}
+.do-claude-bubble li { margin: 2px 0; }
+/* LLMs often emit every item as "1." and let the renderer renumber. Browsers
+   restart <ol> counters per element, so back-to-back "1." items show as 1,1,1.
+   Use a bubble-scoped CSS counter so numbering is continuous across every
+   <ol> inside the same response. */
+.do-claude-bubble { counter-reset: li-num; }
+.do-claude-bubble ol {
+  list-style: none;
+  padding-left: 0;
+}
+.do-claude-bubble ol > li {
+  counter-increment: li-num;
+  padding-left: 22px;
+  position: relative;
+}
+.do-claude-bubble ol > li::before {
+  content: counter(li-num) ".";
+  position: absolute;
+  left: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: #4a4458;
+}
+.do-claude-bubble .do-md-pre {
+  margin: 8px 0;
+  padding: 10px 12px;
+  background: #f4f2f7;
+  border: 1px solid rgba(26, 26, 46, 0.08);
+  border-radius: 8px;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #1a1a2e;
+}
+.do-claude-bubble .do-md-pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  color: inherit;
+  font-size: inherit;
+}
+.do-claude-bubble a { color: #6b4ae0; text-decoration: underline; text-underline-offset: 2px; }
+.do-claude-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -2px;
+  background: #1a1a2e;
+  animation: do-claude-blink 1s steps(2) infinite;
+}
+@keyframes do-claude-blink { 50% { opacity: 0; } }
 
 .do-claude-thinking { display: inline-flex; gap: 5px; align-items: center; padding: 14px; }
 .do-claude-thinking span {
