@@ -161,6 +161,7 @@ function BrowserPane({ tab, updateTab }) {
   const [addressInput, setAddressInput] = useState(state.url)
   const [proxyDoc, setProxyDoc] = useState('')
   const [proxyStatus, setProxyStatus] = useState('idle') // 'idle' | 'loading' | 'error'
+  const [retryKey, setRetryKey] = useState(0)
 
   useEffect(() => { setAddressInput(state.url) }, [state.url])
 
@@ -197,7 +198,7 @@ function BrowserPane({ tab, updateTab }) {
         setProxyDoc(`<!DOCTYPE html><html><body style="font-family:system-ui;color:#b91c1c;padding:28px"><h3 style="margin:0 0 8px">Couldn't load this page</h3><p style="color:#6b7280;margin:0 0 14px">The proxy couldn't reach ${state.url.replace(/[<>&"]/g,'')}.</p><p style="color:#6b7280;font-size:13px">Try toggling the shield off, or open the URL in a new window.</p></body></html>`)
       })
     return () => { cancelled = true }
-  }, [state.proxy, state.url])
+  }, [state.proxy, state.url, retryKey])
 
   const normalizeUrl = (raw) => {
     const s = (raw || '').trim()
@@ -267,13 +268,17 @@ function BrowserPane({ tab, updateTab }) {
         ) : (
           <>
             {state.proxy ? (
-              <iframe
-                ref={iframeRef}
-                title="browser-tab"
-                srcDoc={proxyDoc || '<p style="font-family:system-ui;color:#6b7280;padding:24px">Preparing proxied page…</p>'}
-                sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
-                referrerPolicy="no-referrer"
-              />
+              proxyStatus === 'error' ? (
+                <BrowserErrorPage url={state.url} onRetry={() => setRetryKey(k => k + 1)} onDisableProxy={() => updateTab({ data: { ...state, proxy: false } })} />
+              ) : (
+                <iframe
+                  ref={iframeRef}
+                  title="browser-tab"
+                  srcDoc={proxyDoc || '<p style="font-family:system-ui;color:#6b7280;padding:24px">Preparing proxied page…</p>'}
+                  sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
+                  referrerPolicy="no-referrer"
+                />
+              )
             ) : (
               <iframe
                 ref={iframeRef}
@@ -289,6 +294,34 @@ function BrowserPane({ tab, updateTab }) {
             </div>
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+function BrowserErrorPage({ url, onRetry, onDisableProxy }) {
+  let host = url
+  try { host = new URL(url).hostname } catch {}
+  return (
+    <div className="do-browser-error">
+      <div className="do-browser-error-card">
+        <div className="do-browser-error-icon">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/></svg>
+        </div>
+        <h3>{host} can't be reached</h3>
+        <p>Sites like GitHub, Reddit, and X actively block scraping, so the proxy can't fetch their pages. The public CORS proxies we try may also be rate-limited.</p>
+        <div className="do-browser-error-actions">
+          <button className="primary" onClick={() => window.open(url, '_blank', 'noopener')}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Open in new window
+          </button>
+          <button onClick={onRetry}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            Retry
+          </button>
+          <button onClick={onDisableProxy}>Try without proxy</button>
+        </div>
+        <div className="do-browser-error-hint">Tip: the shield works for most static sites (Wikipedia, MDN, React docs, Brave Search).</div>
       </div>
     </div>
   )
