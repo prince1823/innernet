@@ -542,10 +542,17 @@ function ClaudePane({ tab, updateTab }) {
       )}
       <div className="do-claude-input-wrap">
         <div className="do-claude-input">
+          {!input && (
+            <span className="do-claude-ph" aria-hidden="true">
+              <span className="do-claude-ph-text" key={loading ? 'loading' : placeholderIdx}>
+                {loading ? 'Claude is thinking…' : PLACEHOLDER_PROMPTS[placeholderIdx]}
+              </span>
+            </span>
+          )}
           <textarea
             ref={textareaRef}
             rows={1}
-            placeholder={loading ? 'Claude is thinking…' : PLACEHOLDER_PROMPTS[placeholderIdx]}
+            placeholder=""
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => {

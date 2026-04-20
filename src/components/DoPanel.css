@@ -794,6 +794,7 @@
   padding: 10px 24px 4px;
 }
 .do-claude-input {
+  position: relative;
   display: flex;
   align-items: flex-end;
   gap: 8px;
@@ -828,6 +829,38 @@
   overflow-y: auto;
 }
 .do-claude-input textarea::placeholder { color: rgba(26, 26, 46, 0.38); }
+
+/* Animated rotating placeholder — cross-fades between prompts while the
+   textarea is empty. The outer span pins it to the textarea row; the inner
+   span remounts on key change and animates in. */
+.do-claude-ph {
+  position: absolute;
+  left: 22px;
+  right: 56px;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  color: rgba(26, 26, 46, 0.4);
+  overflow: hidden;
+}
+.do-claude-ph-text {
+  display: inline-block;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 100%;
+  animation: do-claude-ph-in 0.55s cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+@keyframes do-claude-ph-in {
+  0%   { opacity: 0; transform: translateY(8px); filter: blur(6px); }
+  60%  { opacity: 1; filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
 .do-claude-send {
   display: inline-flex;
   align-items: center;
