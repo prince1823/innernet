@@ -1089,6 +1089,45 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
       return
     }
 
+    // ArrowUp / ArrowDown → move caret to previous / next block when the caret
+    // is on the first / last visual line of the current block. Wrapped multi-line
+    // blocks still let the browser handle intra-block line navigation naturally.
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.altKey && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+      const sel = window.getSelection()
+      if (sel && sel.rangeCount) {
+        const range = sel.getRangeAt(0)
+        const caretRect = range.getClientRects()[0] || range.getBoundingClientRect()
+        const elRect = el.getBoundingClientRect()
+        const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 20
+        // Single-line blocks: always treat caret as both first and last line.
+        const isSingleLine = elRect.height < lineHeight * 1.5
+        const caretTop = caretRect && caretRect.height ? caretRect.top : elRect.top
+        const caretBottom = caretRect && caretRect.height ? caretRect.bottom : elRect.top + lineHeight
+        const atFirstLine = isSingleLine || (caretTop - elRect.top < lineHeight * 0.75)
+        const atLastLine = isSingleLine || (elRect.bottom - caretBottom < lineHeight * 0.75)
+        const shouldJump = (e.key === 'ArrowUp' && atFirstLine) || (e.key === 'ArrowDown' && atLastLine)
+        if (shouldJump) {
+          // Walk the visible DOM (not the tree) so we skip blocks hidden by the
+          // current mode (AI children in Me mode) or collapsed ancestors.
+          const container = docBodyRef.current
+          if (container) {
+            const visible = [...container.querySelectorAll('[data-block-id] > .ls-block-content .ls-block-text')]
+            const idx = visible.indexOf(el)
+            const target = e.key === 'ArrowUp' ? visible[idx - 1] : visible[idx + 1]
+            if (target) {
+              e.preventDefault()
+              const domLen = (target.textContent || '').length
+              const offset = e.key === 'ArrowUp' ? domLen : 0
+              target.focus()
+              setCursorAtOffset(target, offset)
+              requestAnimationFrame(() => setCursorAtOffset(target, offset))
+              return
+            }
+          }
+        }
+      }
+    }
+
     if (e.key === 'Backspace') {
       const text = el.textContent || ''
       if (text !== '') return // let default handle character deletion
