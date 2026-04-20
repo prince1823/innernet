@@ -309,6 +309,12 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  animation: do-claude-greeting-in 0.7s cubic-bezier(0.22, 0.9, 0.3, 1) both;
+}
+@keyframes do-claude-greeting-in {
+  0%   { opacity: 0; filter: blur(10px); transform: translateY(12px) scale(0.985); letter-spacing: 0.5px; }
+  60%  { opacity: 1; filter: blur(0); }
+  100% { opacity: 1; filter: blur(0); transform: translateY(0) scale(1); letter-spacing: -1.5px; }
 }
 .do-claude-greeting em {
   font-style: normal;
@@ -610,14 +616,20 @@
 .do-claude-bubble a { color: #6b4ae0; text-decoration: underline; text-underline-offset: 2px; }
 .do-claude-caret {
   display: inline-block;
-  width: 2px;
+  width: 8px;
   height: 1em;
-  margin-left: 2px;
-  vertical-align: -2px;
-  background: #1a1a2e;
-  animation: do-claude-blink 1s steps(2) infinite;
+  margin-left: 3px;
+  vertical-align: -3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(251,84,43,0.15), rgba(251,84,43,0.95), rgba(232,48,139,0.95), rgba(232,48,139,0.15));
+  background-size: 300% 100%;
+  animation: do-claude-shimmer 1.4s ease-in-out infinite;
 }
-@keyframes do-claude-blink { 50% { opacity: 0; } }
+@keyframes do-claude-shimmer {
+  0% { background-position: 100% 0; opacity: 0.55; }
+  50% { opacity: 1; }
+  100% { background-position: 0 0; opacity: 0.55; }
+}
 
 .do-claude-thinking { display: inline-flex; gap: 5px; align-items: center; padding: 14px; }
 .do-claude-thinking span {
@@ -709,6 +721,83 @@
   transition: background 0.15s, border-color 0.15s, transform 0.15s;
 }
 .do-claude-regen:hover { background: #f7f7fa; border-color: rgba(26, 26, 46, 0.22); transform: translateY(-1px); }
+
+/* Error card — replaces raw red markdown with a structured retry affordance */
+.do-claude-error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 520px;
+  padding: 12px 14px;
+  background: #fff5f4;
+  border: 1px solid rgba(185, 28, 28, 0.18);
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(185, 28, 28, 0.06);
+}
+.do-claude-error-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; height: 28px;
+  flex-shrink: 0;
+  color: #b91c1c;
+  background: rgba(185, 28, 28, 0.1);
+  border-radius: 50%;
+}
+.do-claude-error-body { flex: 1; min-width: 0; }
+.do-claude-error-title {
+  font: 600 13px 'Plus Jakarta Sans', 'Inter', sans-serif;
+  color: #1a1a2e;
+}
+.do-claude-error-detail {
+  font: 400 12px 'Plus Jakarta Sans', 'Inter', sans-serif;
+  color: #6b5858;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.do-claude-error-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  background: #b91c1c;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font: 500 12px 'Plus Jakarta Sans', 'Inter', sans-serif;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+  flex-shrink: 0;
+}
+.do-claude-error-retry:hover { background: #991515; transform: translateY(-1px); }
+
+/* Jump to latest pill — appears when user has scrolled up mid-response */
+.do-claude-jump {
+  position: absolute;
+  bottom: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: #1a1a2e;
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font: 500 12px 'Plus Jakarta Sans', 'Inter', sans-serif;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(26, 26, 46, 0.2);
+  animation: do-claude-jump-in 0.22s ease-out;
+}
+.do-claude-jump:hover { background: #000; }
+@keyframes do-claude-jump-in {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
 
 @media (max-width: 640px) {
   .do-claude-suggestions { grid-template-columns: 1fr; }

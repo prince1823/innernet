@@ -140,18 +140,58 @@ async function streamAI(messages, onChunk, { signal } = {}) {
 }
 
 // ─────────────────────────── Claude pane ───────────────────────────
+const GREETINGS = [
+  { pre: 'Hello', name: 'Tanuj' },
+  { pre: 'Welcome back', name: 'Tanuj' },
+  { pre: 'Good to see you', name: 'Tanuj' },
+  { pre: "What's on your mind", name: 'Tanuj' },
+  { pre: 'Ready when you are', name: 'Tanuj' },
+  { pre: 'Let\u2019s build something', name: 'Tanuj' },
+  { pre: 'Howdy', name: 'Tanuj' },
+  { pre: 'Back at it', name: 'Tanuj' },
+  { pre: 'Good to have you', name: 'Tanuj' },
+  { pre: 'Where shall we start', name: 'Tanuj' },
+]
+
 function ClaudePane({ tab, updateTab }) {
   const state = tab.data
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [streaming, setStreaming] = useState('')
+  const [atBottom, setAtBottom] = useState(true)
   const scrollRef = useRef(null)
   const textareaRef = useRef(null)
   const abortRef = useRef(null)
-
+  const [greetingIdx, setGreetingIdx] = useState(() => Math.floor(Math.random() * GREETINGS.length))
+  const isEmpty = state.messages.length === 0
+  // Rotate through greetings every 4s while the pane is idle (empty + no
+  // loading). Stops rotating once the user sends a message.
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-  }, [state.messages, loading, streaming])
+    if (!isEmpty || loading) return
+    const id = setInterval(() => {
+      setGreetingIdx(i => (i + 1) % GREETINGS.length)
+    }, 3500)
+    return () => clearInterval(id)
+  }, [isEmpty, loading])
+
+  const scrollToBottom = (behavior = 'smooth') => {
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior })
+  }
+
+  // Only auto-scroll when the user is already near the bottom — if they've
+  // scrolled up to read earlier content mid-response, don't yank them back.
+  useEffect(() => {
+    if (atBottom) scrollToBottom('smooth')
+  }, [state.messages, loading, streaming, atBottom])
+
+  const onScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight
+    setAtBottom(distance < 60)
+  }
 
   // auto-grow the textarea to fit content, capped so it doesn't swallow the pane
   useEffect(() => {
@@ -179,10 +219,10 @@ function ClaudePane({ tab, updateTab }) {
       updateTab({ data: { ...state, messages: [...finalMessages, { role: 'assistant', content: accum || 'No response.' }] } })
     } catch (err) {
       const aborted = err.name === 'AbortError' || ctrl.signal.aborted
-      const content = aborted
-        ? (accum ? accum + '\n\n_[stopped]_' : '_[stopped]_')
-        : `**Error:** ${err.message}`
-      updateTab({ data: { ...state, messages: [...finalMessages, { role: 'assistant', content }] } })
+      const msg = aborted
+        ? { role: 'assistant', content: accum ? accum + '\n\n_[stopped]_' : '_[stopped]_' }
+        : { role: 'assistant', content: '', error: err.message || 'Something went wrong' }
+      updateTab({ data: { ...state, messages: [...finalMessages, msg] } })
     } finally {
       abortRef.current = null
       setStreaming('')
@@ -202,6 +242,16 @@ function ClaudePane({ tab, updateTab }) {
 
   const stop = () => { abortRef.current?.abort() }
 
+  const retryLast = async () => {
+    if (loading) return
+    const msgs = [...state.messages]
+    // strip trailing error/assistant messages back to the last user prompt
+    while (msgs.length && msgs[msgs.length - 1].role === 'assistant') msgs.pop()
+    if (!msgs.length || msgs[msgs.length - 1].role !== 'user') return
+    updateTab({ data: { ...state, messages: msgs } })
+    await runTurn(msgs, msgs)
+  }
+
   return (
     <div className="do-pane do-claude">
       <div className="do-claude-bg" aria-hidden="true">
@@ -213,6 +263,7 @@ function ClaudePane({ tab, updateTab }) {
       <div
         className="do-claude-messages"
         ref={scrollRef}
+        onScroll={onScroll}
         onClick={(e) => {
           const btn = e.target.closest?.('[data-copy-code]')
           if (!btn) return
@@ -225,7 +276,7 @@ function ClaudePane({ tab, updateTab }) {
       >
         {state.messages.length === 0 && (
           <div className="do-claude-hero">
-            <h1 className="do-claude-greeting">Hello <em>Tanuj</em></h1>
+            <h1 className="do-claude-greeting" key={greetingIdx}>{GREETINGS[greetingIdx].pre} <em>{GREETINGS[greetingIdx].name}</em></h1>
             <p className="do-claude-tagline">How can I help you today?</p>
           </div>
         )}
@@ -233,6 +284,20 @@ function ClaudePane({ tab, updateTab }) {
           <div key={i} className={`do-claude-msg ${m.role}`}>
             {m.role === 'user' ? (
               <div className="do-claude-bubble user">{m.content}</div>
+            ) : m.error ? (
+              <div className="do-claude-error">
+                <div className="do-claude-error-icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+                <div className="do-claude-error-body">
+                  <div className="do-claude-error-title">Something went wrong</div>
+                  <div className="do-claude-error-detail">{m.error}</div>
+                </div>
+                <button className="do-claude-error-retry" onClick={retryLast} title="Retry">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                  <span>Retry</span>
+                </button>
+              </div>
             ) : (
               <div className="do-claude-msg-col">
                 <div className="do-claude-bubble assistant" dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }} />
@@ -267,6 +332,12 @@ function ClaudePane({ tab, updateTab }) {
           </div>
         )}
       </div>
+      {!atBottom && (
+        <button className="do-claude-jump" onClick={() => { setAtBottom(true); scrollToBottom('auto') }} title="Jump to latest">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+          <span>Jump to latest</span>
+        </button>
+      )}
       <div className="do-claude-input-wrap">
         <div className="do-claude-input">
           <textarea
