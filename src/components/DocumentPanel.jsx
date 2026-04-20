@@ -27,6 +27,12 @@ function renderMd(text) {
     .replace(/\n/g, '<br/>')
 }
 
+// Checks visual emptiness — strips HTML markup (e.g. stray <br>) before trimming,
+// since contentEditable persists <br> for cleared-but-focused lines.
+function isVisuallyEmpty(s) {
+  return !s || !s.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
 const EDITS_KEY = 'innernet-journal-edits'        // legacy — read once for migration
 const TREES_KEY = 'innernet-journal-trees'        // per-date editable block trees
 const AI_INSERTS_KEY = 'innernet-journal-inserts'
@@ -534,7 +540,41 @@ function setCursorAtOffset(el, offset) {
     return
   }
 
-  // Finite offset → walk text nodes until we consume it
+  // Finite offset → walk text nodes until we consume it. We also observe the
+  // element for any subsequent content mutation (e.g. a React re-render that
+  // replaces innerHTML via dangerouslySetInnerHTML) and re-apply the caret —
+  // contentEditable loses the caret when its child text nodes are swapped.
+  const place = () => {
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null)
+    const ns = []
+    let m
+    while ((m = w.nextNode())) ns.push(m)
+    let rem = offset
+    for (const node of ns) {
+      const len = node.textContent.length
+      if (rem <= len) {
+        const range = document.createRange()
+        range.setStart(node, rem)
+        range.collapse(true)
+        sel.removeAllRanges()
+        sel.addRange(range)
+        return true
+      }
+      rem -= len
+    }
+    return false
+  }
+  if (place()) {
+    // Watch for a re-render that would wipe the caret and re-apply once.
+    const obs = new MutationObserver(() => {
+      place()
+      obs.disconnect()
+    })
+    obs.observe(el, { childList: true, characterData: true, subtree: true })
+    setTimeout(() => obs.disconnect(), 200)
+    return
+  }
+  // fallback: walk text nodes (mirrors old behavior)
   let remaining = offset
   for (const node of nodes) {
     const len = node.textContent.length
@@ -882,7 +922,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
         if (query) {
           e.preventDefault()
           const context = blockText.slice(0, atIdx).trim()
-          submitInlineAt(blockId, blockText, query, context, cursorOffset)
+          submitInlineAt(blockId, blockText, query, context, atIdx)
           return
         }
       }
@@ -1068,7 +1108,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   // Inline @-query submit: user typed `@query` directly into a block's text and pressed
   // Cmd/Ctrl+Enter. The question block keeps its `@query` verbatim; the answer lands as
   // the first child of the question block, styled as an AI card, forming a Q→A visual pair.
-  const submitInlineAt = async (blockId, blockText, query, context, cursorOffset) => {
+  const submitInlineAt = async (blockId, blockText, query, context, atIdx) => {
     // 1. Persist the question block text (includes the typed `@query`).
     applyTreeOp(tree => setBlockText(tree, blockId, blockText))
 
@@ -1090,8 +1130,9 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     setStreamingText(prev => ({ ...prev, [aiBlockId]: '' }))
     applyTreeOp(tree => prependChildren(tree, blockId, [aiBlock]))
 
-    // 3. Keep focus/cursor in the QUESTION block — the user shouldn't jump to the AI card.
-    setFocusRequest({ id: blockId, offset: cursorOffset })
+    // 3. Keep focus/cursor in the QUESTION block — place it where the `@` was typed,
+    //    so the user can continue composing at that spot after the card appears.
+    setFocusRequest({ id: blockId, offset: atIdx })
 
     // 4. Fetch.
     const prompt = `Answer this question: ${query}\n\nContext:\n${context}\n\nRespond as a single flowing paragraph, 2-3 sentences maximum. Be concise and focused. Do NOT use bullet points, numbered lists, or headings — write it as continuous prose.`
@@ -1105,22 +1146,58 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     // 6. Strip the `@query` from the parent block text — the question is preserved on
     //    the AI child as sourceQuery for the AI-mode callout, so Me mode reads cleanly.
     //    Also flip on the Implement CTA now that the card is a complete Q→A.
+    //    Compute the stripped result + cursor target ahead of the state update so we
+    //    can schedule setFocusRequest synchronously (state updaters run async in React).
+    const target = '@' + query
+    const idx = (blockText || '').lastIndexOf(target)
+    let hashTagProject = null
+    let restoredCursor = null
+    if (idx >= 0) {
+      const leftPart = blockText.slice(0, idx)
+      const rightPart = blockText.slice(idx + target.length)
+      let dehashedLeft = leftPart
+      let dehashedRight = rightPart
+      const hashMatch = (leftPart + rightPart).match(/#(\w+)/)
+      if (hashMatch) {
+        hashTagProject = hashMatch[1]
+        dehashedLeft = leftPart.replace(/#\w+/, '')
+        dehashedRight = dehashedLeft === leftPart
+          ? rightPart.replace(/#\w+/, '')
+          : rightPart
+      }
+      const stripped = (dehashedLeft + dehashedRight).replace(/\s+/g, ' ').trim()
+      const leftCollapsed = dehashedLeft.replace(/\s+/g, ' ').replace(/^\s+/, '')
+      restoredCursor = Math.min(leftCollapsed.trimEnd().length, stripped.length)
+    }
     applyTreeOp(tree => {
       const next = cloneTree(tree)
       const parentCtx = findContext(next, blockId)
       if (parentCtx) {
         const current = parentCtx.block.text || ''
-        const target = '@' + query
-        const idx = current.lastIndexOf(target)
-        if (idx >= 0) {
-          const stripped = (current.slice(0, idx) + current.slice(idx + target.length)).replace(/\s+/g, ' ').trim()
-          parentCtx.block.text = stripped
+        const tgt = '@' + query
+        const j = current.lastIndexOf(tgt)
+        if (j >= 0) {
+          const leftPart = current.slice(0, j)
+          const rightPart = current.slice(j + tgt.length)
+          let dehashedLeft = leftPart
+          let dehashedRight = rightPart
+          if (hashTagProject && !parentCtx.block.project) {
+            parentCtx.block.project = hashTagProject
+            dehashedLeft = leftPart.replace(/#\w+/, '')
+            dehashedRight = dehashedLeft === leftPart
+              ? rightPart.replace(/#\w+/, '')
+              : rightPart
+          }
+          parentCtx.block.text = (dehashedLeft + dehashedRight).replace(/\s+/g, ' ').trim()
         }
       }
       const aiCtx = findContext(next, aiBlockId)
       if (aiCtx) aiCtx.block.canImplement = true
       return next
     })
+    if (restoredCursor !== null) {
+      setFocusRequest({ id: blockId, offset: restoredCursor })
+    }
   }
 
   // Regenerate a single AI callout by re-running its original query with its stored context.
@@ -1207,7 +1284,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     // Instead we flag the line with a small "AI answered" marker so the user
     // knows something was generated from this block.
     const hideAI = notesMode === 'me'
-    const aiChildren = hideAI ? rawChildren.filter(c => c.isAI && (c.text || '').trim()) : []
+    const aiChildren = hideAI ? rawChildren.filter(c => c.isAI && !isVisuallyEmpty(c.text)) : []
     const hasAIMarker = hideAI && aiChildren.length > 0
     const mainChildren = hideAI ? rawChildren.filter(c => !c.isAI) : rawChildren
     const hasChildren = mainChildren.length > 0
@@ -1219,6 +1296,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     // text override (even when empty) instead of the source-of-truth block.text
     const isStreaming = Object.prototype.hasOwnProperty.call(streamingText, block.id)
     const rawText = isStreaming ? streamingText[block.id] : (block.text || '')
+    const hasVisibleText = !isVisuallyEmpty(rawText)
     // Extract inline #hashtags to show as project tags on the right (keep in text until Cmd+Enter commits)
     const inlineTagMatch = rawText.match(/#(\w+)/)
     const inlineProject = inlineTagMatch ? inlineTagMatch[1] : null
@@ -1234,7 +1312,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
       <div key={block.id} className={`ls-block ${depth === 0 ? 'ls-block-top' : ''} ${isCollapsed ? 'ls-block-collapsed' : ''} ${isAI ? 'ls-block-ai-child' : ''} ${highlightMeBlockId === block.id ? 'ls-block-highlight' : ''}`} data-block-id={block.id}>
         <div className={`ls-block-content ${hasAIMarker ? 'ls-block-content-has-ai' : ''}`}>
           {/* Time on top-level headings — before the bullet */}
-          {depth === 0 && block.time && (
+          {depth === 0 && block.time && hasVisibleText && (
             <span className="ls-block-time">{(() => {
               const [h, m] = block.time.split(':').map(Number)
               const ampm = h >= 12 ? 'PM' : 'AM'
@@ -1242,7 +1320,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
               return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`
             })()}</span>
           )}
-          {(rawText || '').trim() && (
+          {hasVisibleText && (
             <div className="ls-bullet-wrap">
               {hasChildren && (
                 <button
@@ -1311,7 +1389,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
               dangerouslySetInnerHTML={{ __html: renderMd(displayText) }}
             />
           )}
-          {hasAIMarker && (
+          {hasAIMarker && hasVisibleText && (
             <button
               type="button"
               className="ls-ai-marker"
@@ -1332,7 +1410,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
               </svg>
             </button>
           )}
-          {depth === 0 && effectiveProject && (
+          {depth === 0 && effectiveProject && hasVisibleText && (
             <span className="ls-block-project">#{effectiveProject}</span>
           )}
         </div>
