@@ -1123,7 +1123,13 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
         // — markdown formatting shrinks the visible text, and we want the
         // caret at the visual end, which is the length of textContent.
         const domLen = (prevTextEl.textContent || '').length
+        // Force a real focus cycle so the browser paints a visible blinking
+        // caret — programmatic focus right after an unmount sometimes lands
+        // the selection correctly but suppresses the caret until next click.
+        prevTextEl.blur()
+        prevTextEl.focus()
         setCursorAtOffset(prevTextEl, domLen)
+        requestAnimationFrame(() => setCursorAtOffset(prevTextEl, domLen))
       }
     }
   }
