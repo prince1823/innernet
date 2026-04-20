@@ -1,0 +1,8 @@
+{
+  "version": 3,
+  "sources": ["../../../src/worker.js"],
+  "sourceRoot": "/Users/princesaxena/Desktop/innernet/.wrangler/tmp/deploy-M53A6w",
+  "sourcesContent": ["export default {\n  async fetch(request, env) {\n    const url = new URL(request.url);\n    const assetResponse = await env.ASSETS.fetch(request);\n\n    if (assetResponse.status !== 404) {\n      return assetResponse;\n    }\n\n    // SPA fallback for client-side routes.\n    if (!url.pathname.includes(\".\")) {\n      const spaRequest = new Request(new URL(\"/index.html\", url), request);\n      return env.ASSETS.fetch(spaRequest);\n    }\n\n    return assetResponse;\n  },\n};\n"],
+  "mappings": ";AAAA,IAAO,iBAAQ;AAAA,EACb,MAAM,MAAM,SAAS,KAAK;AACxB,UAAM,MAAM,IAAI,IAAI,QAAQ,GAAG;AAC/B,UAAM,gBAAgB,MAAM,IAAI,OAAO,MAAM,OAAO;AAEpD,QAAI,cAAc,WAAW,KAAK;AAChC,aAAO;AAAA,IACT;AAGA,QAAI,CAAC,IAAI,SAAS,SAAS,GAAG,GAAG;AAC/B,YAAM,aAAa,IAAI,QAAQ,IAAI,IAAI,eAAe,GAAG,GAAG,OAAO;AACnE,aAAO,IAAI,OAAO,MAAM,UAAU;AAAA,IACpC;AAEA,WAAO;AAAA,EACT;AACF;",
+  "names": []
+}
