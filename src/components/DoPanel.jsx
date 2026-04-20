@@ -204,7 +204,7 @@ function BrowserPane({ tab, updateTab }) {
     if (!s) return state.url
     if (/^https?:\/\//i.test(s)) return s
     if (/^[\w-]+\.[\w.-]+/.test(s) && !/\s/.test(s)) return 'https://' + s
-    return 'https://en.wikipedia.org/wiki/Special:Search?search=' + encodeURIComponent(s)
+    return 'https://search.brave.com/search?q=' + encodeURIComponent(s)
   }
 
   const navigate = (raw) => {
@@ -307,30 +307,48 @@ function NewTabPage({ onSearch }) {
   ]
   return (
     <div className="do-newtab-page">
-      <div className="do-newtab-title">New Tab</div>
-      <form
-        className="do-newtab-search"
-        onSubmit={e => { e.preventDefault(); if (q.trim()) onSearch(q.trim()) }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input
-          type="text"
-          autoFocus
-          value={q}
-          onChange={e => setQ(e.target.value)}
-          placeholder="Search or enter a URL"
-          spellCheck={false}
-        />
-      </form>
-      <div className="do-newtab-shortcuts">
-        {shortcuts.map(s => (
-          <button key={s.label} className="do-newtab-shortcut" onClick={() => onSearch(s.url)}>
-            <span className="do-newtab-shortcut-dot" style={{ background: s.color }}>
-              {s.label[0]}
-            </span>
-            <span className="do-newtab-shortcut-label">{s.label}</span>
-          </button>
-        ))}
+      <div className="do-newtab-bg" aria-hidden="true">
+        <div className="do-newtab-blob do-newtab-blob-a" />
+        <div className="do-newtab-blob do-newtab-blob-b" />
+        <div className="do-newtab-blob do-newtab-blob-c" />
+      </div>
+      <div className="do-newtab-content">
+        <div className="do-newtab-brand">
+          <svg className="do-newtab-brand-icon" viewBox="0 0 128 128" width="44" height="44" aria-hidden="true">
+            <path fill="#fb542b" d="M64 12l26 10 8-6 20 20-10 12 6 18-10 44-20 18-20 10-20-10-20-18L14 66l6-18L10 36l20-20 8 6z"/>
+            <path fill="#fff" d="M64 36l18 6 14-6 8 8-6 10 4 14-10 24-14 12-14 8-14-8-14-12-10-24 4-14-6-10 8-8 14 6z" opacity="0.15"/>
+          </svg>
+          <div className="do-newtab-brand-text">
+            <div className="do-newtab-headline">Private search.<br/>Brave results.</div>
+            <div className="do-newtab-sub">No tracking. No profiling. Just the web, the way it should be.</div>
+          </div>
+        </div>
+        <form
+          className="do-newtab-search"
+          onSubmit={e => { e.preventDefault(); if (q.trim()) onSearch(q.trim()) }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input
+            type="text"
+            autoFocus
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            placeholder="Search the web privately with Brave, or enter a URL"
+            spellCheck={false}
+          />
+          <kbd className="do-newtab-kbd">⏎</kbd>
+        </form>
+        <div className="do-newtab-shortcuts">
+          {shortcuts.map(s => (
+            <button key={s.label} className="do-newtab-shortcut" onClick={() => onSearch(s.url)}>
+              <span className="do-newtab-shortcut-dot" style={{ background: s.color }}>
+                {s.label[0]}
+              </span>
+              <span className="do-newtab-shortcut-label">{s.label}</span>
+            </button>
+          ))}
+        </div>
+        <div className="do-newtab-foot">Powered by Brave Search · Results are independent and unfiltered</div>
       </div>
     </div>
   )

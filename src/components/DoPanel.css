@@ -400,44 +400,121 @@
 .do-newtab-page {
   position: absolute;
   inset: 0;
+  overflow: hidden;
+  background: radial-gradient(1200px 700px at 15% 10%, #fff1ec 0%, transparent 55%),
+              radial-gradient(900px 600px at 85% 15%, #f3edff 0%, transparent 55%),
+              linear-gradient(180deg, #fbfbfe 0%, #f3f4f9 100%);
+  z-index: 2;
+}
+
+.do-newtab-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.do-newtab-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.55;
+  animation: newtabFloat 16s ease-in-out infinite;
+}
+.do-newtab-blob-a {
+  width: 420px; height: 420px;
+  background: radial-gradient(circle, #fb542b 0%, transparent 65%);
+  top: -120px; left: -80px;
+  animation-delay: 0s;
+}
+.do-newtab-blob-b {
+  width: 360px; height: 360px;
+  background: radial-gradient(circle, #7c5cff 0%, transparent 65%);
+  top: 20%; right: -120px;
+  animation-delay: -5s;
+}
+.do-newtab-blob-c {
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, #ffb17a 0%, transparent 65%);
+  bottom: -80px; left: 35%;
+  animation-delay: -10s;
+  opacity: 0.4;
+}
+@keyframes newtabFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(30px, -20px) scale(1.08); }
+}
+
+.do-newtab-content {
+  position: relative;
+  z-index: 1;
+  height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: 80px 24px 40px;
-  background: #fff;
-  z-index: 2;
+  padding: 72px 24px 40px;
+  overflow-y: auto;
 }
 
-.do-newtab-title {
-  font-size: 40px;
-  font-weight: 600;
-  color: #1a1a2e;
+.do-newtab-brand {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 36px;
+  max-width: 640px;
+}
+.do-newtab-brand-icon {
+  flex-shrink: 0;
+  filter: drop-shadow(0 6px 16px rgba(251, 84, 43, 0.35));
+}
+.do-newtab-brand-text { display: flex; flex-direction: column; }
+.do-newtab-headline {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.15;
   letter-spacing: -0.5px;
-  margin-bottom: 28px;
-  background: linear-gradient(135deg, #7c5cff 0%, #2f7bff 100%);
+  color: #1a1a2e;
+  background: linear-gradient(135deg, #fb542b 0%, #7c5cff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
-
-.do-newtab-search {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  max-width: 560px;
-  padding: 12px 18px;
-  background: #fff;
-  border: 1px solid #d6d9dd;
-  border-radius: 28px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  transition: box-shadow 0.15s, border-color 0.15s;
+.do-newtab-sub {
+  font-size: 13px;
+  color: #5b6270;
+  margin-top: 6px;
+  max-width: 420px;
 }
 
+.do-newtab-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 600px;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 32px;
+  box-shadow: 0 8px 28px rgba(16, 24, 40, 0.08);
+  transition: box-shadow 0.18s, border-color 0.18s, transform 0.18s;
+}
 .do-newtab-search:focus-within {
-  border-color: #7c5cff;
-  box-shadow: 0 4px 16px rgba(124, 92, 255, 0.12);
+  border-color: #fb542b;
+  box-shadow: 0 10px 34px rgba(251, 84, 43, 0.18);
+  transform: translateY(-1px);
+}
+.do-newtab-kbd {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-family: inherit;
+  color: #8a909a;
+  background: #f3f4f9;
+  border: 1px solid #e3e5e9;
+  border-radius: 6px;
 }
 
 .do-newtab-search svg { color: #8a909a; flex-shrink: 0; }
@@ -492,4 +569,26 @@
   font-size: 11.5px;
   color: #4b5562;
   font-weight: 500;
+}
+
+.do-newtab-shortcut {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 2px 10px rgba(16, 24, 40, 0.04);
+}
+.do-newtab-shortcut:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(251, 84, 43, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(16, 24, 40, 0.08);
+}
+
+.do-newtab-foot {
+  margin-top: auto;
+  padding-top: 48px;
+  font-size: 11.5px;
+  color: #8a909a;
+  letter-spacing: 0.2px;
 }
