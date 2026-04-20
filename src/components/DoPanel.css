@@ -983,6 +983,25 @@
   .do-claude-tagline { font-size: 22px; }
 }
 
+/* Mobile: collapse Claude history sidebar into an overlay drawer */
+@media (max-width: 700px) {
+  .do-claude-sidebar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 20;
+    box-shadow: 2px 0 18px rgba(0, 0, 0, 0.12);
+  }
+  .do-claude-sidebar.open { width: min(78vw, 260px); }
+
+  .do-tab { max-width: 110px; font-size: 11px; }
+  .do-tabs { padding: 5px 4px 0; }
+
+  .do-claude-greeting { font-size: 30px; }
+  .do-claude-tagline { font-size: 18px; }
+}
+
 /* ── Browser pane ── */
 .do-browser { background: #f7f8fa; }
 .do-browser-chrome {

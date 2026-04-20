@@ -348,3 +348,106 @@
   background: var(--bg-soft);
   color: var(--text-primary);
 }
+
+/* ──────────────────────────────────────────────
+   Responsive: tablet & mobile
+   ────────────────────────────────────────────── */
+
+/* Tablet — narrow side-by-side */
+@media (max-width: 900px) {
+  .app-sidebar-calendar {
+    width: 300px !important;
+  }
+}
+
+/* Mobile — stack vertically, full-width panels */
+@media (max-width: 700px) {
+  .app {
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  .app-sidebar-calendar {
+    width: 100% !important;
+    height: auto;
+    max-height: 55vh;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  /* Sidebar divider becomes a horizontal strip */
+  .sidebar-divider {
+    width: 100%;
+    height: 28px;
+    flex-direction: row;
+    border-left: none;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .sidebar-resize-zone {
+    display: none;
+  }
+
+  .sidebar-toggle-btn {
+    width: auto;
+    height: 22px;
+    padding: 0 12px;
+    font-size: 10.5px;
+    font-weight: 700;
+    gap: 6px;
+  }
+
+  .sidebar-toggle-btn svg {
+    transform: rotate(90deg);
+  }
+
+  .sidebar-divider.collapsed {
+    width: 100%;
+    height: 28px;
+    border-right: none;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .sidebar-divider.collapsed .sidebar-toggle-btn {
+    writing-mode: horizontal-tb;
+    padding: 2px 12px;
+    height: 22px;
+  }
+
+  .sidebar-divider.collapsed .sidebar-toggle-btn svg {
+    transform: rotate(90deg);
+  }
+
+  .app-main {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .bottom-divider {
+    height: 28px;
+  }
+
+  .bottom-toggle-btn {
+    padding: 3px 14px;
+    font-size: 11px;
+  }
+
+  /* Activity sidebar (if present) stacks below */
+  .activity-divider,
+  .activity-divider.collapsed {
+    width: 100%;
+    height: 28px;
+    flex-direction: row;
+    border-left: none;
+    border-top: 1px solid var(--border-light);
+  }
+
+  .activity-resize-zone { display: none; }
+
+  .activity-divider.collapsed .activity-toggle-btn {
+    writing-mode: horizontal-tb;
+    padding: 2px 12px;
+    height: 22px;
+  }
+}
