@@ -1473,7 +1473,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
       <div key={block.id} className={`ls-block ${depth === 0 ? 'ls-block-top' : ''} ${isCollapsed ? 'ls-block-collapsed' : ''} ${isAI ? 'ls-block-ai-child' : ''} ${highlightMeBlockId === block.id ? 'ls-block-highlight' : ''}`} data-block-id={block.id}>
         <div className={`ls-block-content ${(hasAIMarker || isAIGenerating) ? 'ls-block-content-has-ai' : ''}`}>
           {/* Time on top-level headings — before the bullet */}
-          {depth === 0 && block.time && hasVisibleText && (
+          {depth === 0 && block.time && (
             <span className="ls-block-time">{(() => {
               const [h, m] = block.time.split(':').map(Number)
               const ampm = h >= 12 ? 'PM' : 'AM'
