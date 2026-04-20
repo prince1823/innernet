@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import CalendarPanel from './components/CalendarPanel'
 import DocumentPanel from './components/DocumentPanel'
-import ChatWindows from './components/ChatWindows'
+import DoPanel from './components/DoPanel'
 import { calendarTasks, featureDocItems } from './data/sampleData'
 import './App.css'
 
@@ -211,7 +211,7 @@ function App() {
         {/* Do area: Chat Windows — visible when bottomCollapsed (i.e. Think is hidden) */}
         {bottomCollapsed && (
           <div className="app-top" style={{ flex: 1 }}>
-            <ChatWindows featureWindows={featureWindows} />
+            <DoPanel />
           </div>
         )}
 
