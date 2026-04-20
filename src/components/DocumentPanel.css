@@ -1214,10 +1214,10 @@
 
 .ls-block-project {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 600;
   color: var(--purple-600, #7c3aed);
-  padding: 3px 8px;
+  padding: 2px 6px;
   background: rgba(139, 92, 246, 0.08);
   border-radius: 4px;
   margin-left: 8px;

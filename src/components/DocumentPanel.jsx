@@ -1410,9 +1410,6 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
               </svg>
             </button>
           )}
-          {depth === 0 && effectiveProject && hasVisibleText && (
-            <span className="ls-block-project">#{effectiveProject}</span>
-          )}
         </div>
 
         {showChildren && (
