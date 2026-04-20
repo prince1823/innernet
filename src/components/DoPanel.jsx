@@ -48,9 +48,13 @@ function TabIcon({ kind }) {
 function renderMarkdown(text) {
   if (!text) return ''
   let s = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  // fenced code blocks
-  s = s.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) =>
-    `<pre class="do-md-pre"><code>${code.replace(/\n$/, '')}</code></pre>`)
+  // fenced code blocks — wrap in a block that has its own copy button handled
+  // via delegated click on the messages container (see ClaudePane)
+  s = s.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+    const clean = code.replace(/\n$/, '')
+    const label = lang || 'code'
+    return `<div class="do-md-pre-wrap"><div class="do-md-pre-head"><span class="do-md-pre-lang">${label}</span><button type="button" class="do-md-copy" data-copy-code title="Copy code" aria-label="Copy code"><svg class="do-md-copy-default" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><svg class="do-md-copy-check" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button></div><pre class="do-md-pre"><code>${clean}</code></pre></div>`
+  })
   // headings
   s = s.replace(/^###### (.+)$/gm, '<h6>$1</h6>')
   s = s.replace(/^##### (.+)$/gm, '<h5>$1</h5>')
@@ -167,7 +171,19 @@ function ClaudePane({ tab, updateTab }) {
         <div className="do-claude-aurora do-claude-aurora-c" />
         <div className="do-claude-grain" />
       </div>
-      <div className="do-claude-messages" ref={scrollRef}>
+      <div
+        className="do-claude-messages"
+        ref={scrollRef}
+        onClick={(e) => {
+          const btn = e.target.closest?.('[data-copy-code]')
+          if (!btn) return
+          const wrap = btn.closest('.do-md-pre-wrap')
+          const code = wrap?.querySelector('pre code')?.innerText || ''
+          navigator.clipboard?.writeText(code)
+          btn.classList.add('copied')
+          setTimeout(() => btn.classList.remove('copied'), 1400)
+        }}
+      >
         {state.messages.length === 0 && (
           <div className="do-claude-hero">
             <h1 className="do-claude-greeting">Hello <em>Tanuj</em></h1>
@@ -179,7 +195,23 @@ function ClaudePane({ tab, updateTab }) {
             {m.role === 'user' ? (
               <div className="do-claude-bubble user">{m.content}</div>
             ) : (
-              <div className="do-claude-bubble assistant" dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }} />
+              <div className="do-claude-msg-col">
+                <div className="do-claude-bubble assistant" dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }} />
+                <button
+                  className="do-claude-msg-copy"
+                  title="Copy response"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(m.content)
+                    const el = document.querySelectorAll('.do-claude-msg-copy')[i]
+                    if (!el) return
+                    el.classList.add('copied')
+                    setTimeout(() => el.classList.remove('copied'), 1400)
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  <svg className="do-claude-msg-copy-check" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </button>
+              </div>
             )}
           </div>
         ))}
@@ -570,14 +602,31 @@ function makeTab(type, opts = {}) {
   return { id, type: 'terminal', title: 'Terminal', data: { lines: [{ kind: 'out', text: "Innernet shell — type 'help' for commands." }], history: [] } }
 }
 
+const STORAGE_KEY = 'innernet:do-panel:v1'
+
 export default function DoPanel() {
-  const [tabs, setTabs] = useState(() => [
-    makeTab('claude'),
-    makeTab('browser'),
-    makeTab('terminal'),
-  ])
-  const [activeId, setActiveId] = useState(() => null)
+  const [tabs, setTabs] = useState(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed?.tabs) && parsed.tabs.length) return parsed.tabs
+      }
+    } catch {}
+    return [makeTab('claude'), makeTab('browser'), makeTab('terminal')]
+  })
+  const [activeId, setActiveId] = useState(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) return JSON.parse(raw)?.activeId || null
+    } catch {}
+    return null
+  })
   const [menuOpen, setMenuOpen] = useState(false)
+
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ tabs, activeId })) } catch {}
+  }, [tabs, activeId])
 
   // Keep an active tab selected (first one by default)
   const effectiveActiveId = activeId && tabs.some(t => t.id === activeId) ? activeId : tabs[0]?.id
