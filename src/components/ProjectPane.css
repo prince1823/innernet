@@ -279,6 +279,78 @@
 .proj-status-save.saving { color: #b17a00; font-weight: 600; }
 .proj-status-save.saved { color: #5a8a3a; }
 
+.proj-status-term-toggle {
+  border: 1px solid #3a3222;
+  background: #3a3222;
+  color: #fdf6e3;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s, box-shadow 0.12s;
+  box-shadow: 0 1px 2px rgba(58, 50, 34, 0.2);
+}
+.proj-status-term-toggle:hover {
+  background: #524631;
+  border-color: #524631;
+}
+
+.proj-term-divider {
+  flex: 0 0 4px;
+  background: #e8dfc5;
+  cursor: row-resize;
+  transition: background 0.12s;
+  user-select: none;
+}
+.proj-term-divider:hover, .proj-term-divider:active { background: #6366f1; }
+
+.proj-term-wrap {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 80px;
+  background: #1e1e1e;
+  border-top: 1px solid #000;
+  overflow: hidden;
+}
+
+.proj-term-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
+  background: #2a2a2a;
+  border-bottom: 1px solid #000;
+}
+.proj-term-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #c5c5c5;
+  letter-spacing: 0.12em;
+}
+.proj-term-head .proj-btn-icon {
+  color: #c5c5c5;
+}
+.proj-term-head .proj-btn-icon:hover {
+  background: #3a3a3a;
+  color: #fff;
+}
+
+.proj-term-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.proj-term-body .do-terminal {
+  flex: 1;
+  min-height: 0;
+}
+
 @media (max-width: 720px) {
   .proj-sidebar { width: 180px; }
 }

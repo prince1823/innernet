@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Editor from '@monaco-editor/react'
+import { TerminalPane } from './DoPanel'
 import './ProjectPane.css'
 
 // FileSystemDirectoryHandle / FileSystemFileHandle can't be JSON-serialized,
@@ -55,8 +56,16 @@ export default function ProjectPane({ tab, updateTab }) {
   const [openFiles, setOpenFiles] = useState([])
   const [activePath, setActivePath] = useState(null)
   const [error, setError] = useState('')
+  const [termOpen, setTermOpen] = useState(false)
+  const [termHeight, setTermHeight] = useState(220)
+  const [termData, setTermData] = useState({
+    lines: [{ kind: 'out', text: "Innernet shell — type 'help' for commands." }],
+    history: [],
+  })
   const editorRef = useRef(null)
   const saveTimers = useRef(new Map())
+  const termDragRef = useRef(null)
+  const mainRef = useRef(null)
 
   const supported = typeof window !== 'undefined' && 'showDirectoryPicker' in window
 
@@ -177,6 +186,37 @@ export default function ProjectPane({ tab, updateTab }) {
     return () => { timers.forEach(id => clearTimeout(id)) }
   }, [])
 
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === '`') {
+        e.preventDefault()
+        setTermOpen(v => !v)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  const onTermDragStart = (e) => {
+    e.preventDefault()
+    const rect = mainRef.current.getBoundingClientRect()
+    termDragRef.current = { startY: e.clientY, startHeight: termHeight, containerH: rect.height }
+    const onMove = (ev) => {
+      const d = termDragRef.current
+      if (!d) return
+      const delta = d.startY - ev.clientY
+      const next = Math.max(80, Math.min(d.containerH - 120, d.startHeight + delta))
+      setTermHeight(next)
+    }
+    const onUp = () => {
+      termDragRef.current = null
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
   const active = openFiles.find(f => f.path === activePath)
 
   if (!supported) {
@@ -230,7 +270,7 @@ export default function ProjectPane({ tab, updateTab }) {
           ))}
         </div>
       </div>
-      <div className="proj-main">
+      <div className="proj-main" ref={mainRef}>
         <div className="proj-filetabs">
           {openFiles.map(f => (
             <div
@@ -271,17 +311,52 @@ export default function ProjectPane({ tab, updateTab }) {
             <div className="proj-placeholder">Select a file from the tree to start editing.</div>
           )}
         </div>
-        {active && (
-          <div className="proj-statusbar">
-            <span className="proj-status-path">{active.path}</span>
-            <span className="proj-status-right">
-              <span className={`proj-status-save ${active.dirty ? 'saving' : 'saved'}`}>
-                {active.dirty ? 'saving…' : 'saved'}
-              </span>
-              <span>{getLanguage(active.name)}</span>
-            </span>
-          </div>
+        {termOpen && (
+          <>
+            <div className="proj-term-divider" onMouseDown={onTermDragStart} />
+            <div className="proj-term-wrap" style={{ height: termHeight }}>
+              <div className="proj-term-body">
+                <TerminalPane
+                  tab={{ data: termData }}
+                  updateTab={patch => setTermData(patch.data)}
+                />
+              </div>
+            </div>
+          </>
         )}
+        <div className="proj-statusbar">
+          {active ? (
+            <>
+              <span className="proj-status-path">{active.path}</span>
+              <span className="proj-status-right">
+                <span className={`proj-status-save ${active.dirty ? 'saving' : 'saved'}`}>
+                  {active.dirty ? 'saving…' : 'saved'}
+                </span>
+                <span>{getLanguage(active.name)}</span>
+                <button
+                  className="proj-status-term-toggle"
+                  onClick={() => setTermOpen(v => !v)}
+                  title={termOpen ? 'Hide terminal (⌘`)' : 'Show terminal (⌘`)'}
+                >
+                  {termOpen ? 'hide terminal' : 'terminal'}
+                </button>
+              </span>
+            </>
+          ) : (
+            <>
+              <span />
+              <span className="proj-status-right">
+                <button
+                  className="proj-status-term-toggle"
+                  onClick={() => setTermOpen(v => !v)}
+                  title={termOpen ? 'Hide terminal (⌘`)' : 'Show terminal (⌘`)'}
+                >
+                  {termOpen ? 'hide terminal' : 'terminal'}
+                </button>
+              </span>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

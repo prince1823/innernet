@@ -841,7 +841,7 @@ function deriveTitle(url) {
 }
 
 // ─────────────────────────── Terminal pane ───────────────────────────
-function TerminalPane({ tab, updateTab }) {
+export function TerminalPane({ tab, updateTab }) {
   const state = tab.data
   const [input, setInput] = useState('')
   const logRef = useRef(null)
