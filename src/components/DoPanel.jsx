@@ -966,10 +966,24 @@ export default function DoPanel() {
     return null
   })
   const [menuOpen, setMenuOpen] = useState(false)
+  const [tabsHidden, setTabsHidden] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY))?.tabsHidden || false } catch { return false }
+  })
 
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ tabs, activeId })) } catch {}
-  }, [tabs, activeId])
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ tabs, activeId, tabsHidden })) } catch {}
+  }, [tabs, activeId, tabsHidden])
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === '\\') {
+        e.preventDefault()
+        setTabsHidden(h => !h)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // Keep an active tab selected (first one by default)
   const effectiveActiveId = activeId && tabs.some(t => t.id === activeId) ? activeId : tabs[0]?.id
@@ -1009,40 +1023,60 @@ export default function DoPanel() {
   const active = tabs.find(t => t.id === effectiveActiveId)
 
   return (
-    <div className="do-panel">
-      <div className="do-tabs">
-        <div className="do-tabs-scroll">
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              className={`do-tab do-tab-${t.type} ${t.id === effectiveActiveId ? 'active' : ''}`}
-              onClick={() => setActiveId(t.id)}
-              title={t.title}
-            >
-              <TabIcon kind={t.type} />
-              <span className="do-tab-title">{t.title}</span>
-              <span className="do-tab-close" onClick={e => closeTab(t.id, e)} title="Close tab">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </span>
+    <div className={`do-panel ${tabsHidden ? 'tabs-hidden' : ''}`}>
+      {!tabsHidden && (
+        <div className="do-tabs">
+          <div className="do-tabs-scroll">
+            {tabs.map(t => (
+              <button
+                key={t.id}
+                className={`do-tab do-tab-${t.type} ${t.id === effectiveActiveId ? 'active' : ''}`}
+                onClick={() => setActiveId(t.id)}
+                title={t.title}
+              >
+                <TabIcon kind={t.type} />
+                <span className="do-tab-title">{t.title}</span>
+                <span className="do-tab-close" onClick={e => closeTab(t.id, e)} title="Close tab">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="do-newtab-wrap">
+            <button className="do-newtab" onClick={() => setMenuOpen(o => !o)} title="New tab">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
-          ))}
-        </div>
-        <div className="do-newtab-wrap">
-          <button className="do-newtab" onClick={() => setMenuOpen(o => !o)} title="New tab">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            {menuOpen && (
+              <div className="do-newtab-menu" role="menu">
+                {TAB_TYPES.map(t => (
+                  <button key={t.type} className="do-newtab-item" onClick={() => addTab(t.type)}>
+                    <TabIcon kind={t.icon} />
+                    <span>{t.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button
+            className="do-tabs-toggle"
+            onClick={() => setTabsHidden(true)}
+            title="Hide tab bar (⌘⇧\)"
+            aria-label="Hide tab bar"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
           </button>
-          {menuOpen && (
-            <div className="do-newtab-menu" role="menu">
-              {TAB_TYPES.map(t => (
-                <button key={t.type} className="do-newtab-item" onClick={() => addTab(t.type)}>
-                  <TabIcon kind={t.icon} />
-                  <span>{t.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
-      </div>
+      )}
+      {tabsHidden && (
+        <button
+          className="do-tabs-reveal"
+          onClick={() => setTabsHidden(false)}
+          title="Show tab bar (⌘⇧\)"
+          aria-label="Show tab bar"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+      )}
 
       <div className="do-pane-wrap">
         {active && active.type === 'claude' && (
