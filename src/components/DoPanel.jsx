@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import hljs from 'highlight.js/lib/common'
 import 'highlight.js/styles/atom-one-light.css'
 import { logActivity } from '../utils/activityLog'
+import ProjectPane from './ProjectPane'
 import './DoPanel.css'
 
 const API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY
@@ -11,6 +12,7 @@ const TAB_TYPES = [
   { type: 'claude', label: 'Claude', icon: 'claude' },
   { type: 'browser', label: 'Browser', icon: 'browser' },
   { type: 'terminal', label: 'Terminal', icon: 'terminal' },
+  { type: 'project', label: 'Project', icon: 'project' },
 ]
 
 const NEW_TAB_URL = 'about:newtab'
@@ -44,6 +46,9 @@ function TabIcon({ kind }) {
   }
   if (kind === 'browser') {
     return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+  }
+  if (kind === 'project') {
+    return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
   }
   return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
 }
@@ -934,6 +939,9 @@ function makeTab(type, opts = {}) {
     const title = url === NEW_TAB_URL ? 'New Tab' : deriveTitle(url)
     return { id, type, title, data: { url, history: [url], historyIdx: 0, proxy: true } }
   }
+  if (type === 'project') {
+    return { id, type, title: 'Project', data: { rootName: null, expanded: [] } }
+  }
   return { id, type: 'terminal', title: 'Terminal', data: { lines: [{ kind: 'out', text: "Innernet shell — type 'help' for commands." }], history: [] } }
 }
 
@@ -1045,6 +1053,9 @@ export default function DoPanel() {
         )}
         {active && active.type === 'terminal' && (
           <TerminalPane tab={active} updateTab={patch => updateTab(active.id, patch)} />
+        )}
+        {active && active.type === 'project' && (
+          <ProjectPane tab={active} updateTab={patch => updateTab(active.id, patch)} />
         )}
         {!active && (
           <div className="do-empty">
