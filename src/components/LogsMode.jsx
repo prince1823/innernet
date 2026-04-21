@@ -54,6 +54,7 @@ export default function LogsMode({ selectedDate }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [sourceFilter, setSourceFilter] = useState(null)
+  const [query, setQuery] = useState('')
 
   useEffect(() => subscribeActivity(setEvents), [])
 
@@ -66,8 +67,11 @@ export default function LogsMode({ selectedDate }) {
   }, [events, selectedDate])
 
   const timeline = useMemo(() => {
-    return sourceFilter ? allDayTimeline.filter(e => e.source === sourceFilter) : allDayTimeline
-  }, [allDayTimeline, sourceFilter])
+    const q = query.trim().toLowerCase()
+    let out = sourceFilter ? allDayTimeline.filter(e => e.source === sourceFilter) : allDayTimeline
+    if (q) out = out.filter(e => (e.label || '').toLowerCase().includes(q) || (e.url || '').toLowerCase().includes(q))
+    return out
+  }, [allDayTimeline, sourceFilter, query])
 
   const paragraphs = useMemo(() => chunkByGap(timeline), [timeline])
 
@@ -111,9 +115,28 @@ export default function LogsMode({ selectedDate }) {
         </div>
       )}
 
+      {allDayTimeline.length > 0 && (
+        <div className="logs-diary-searchbar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input
+            type="text"
+            className="logs-diary-search-input"
+            placeholder="Search this day…"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+          />
+          {query && (
+            <button type="button" className="logs-diary-search-clear" onClick={() => setQuery('')} title="Clear search">×</button>
+          )}
+        </div>
+      )}
+
       {timeline.length === 0 ? (
         <div className="logs-mode-empty">
-          No activity yet. Open a tab, run a command, or ask Claude in <strong>Do</strong>.
+          {query
+            ? <>No matches for <em>"{query}"</em>.</>
+            : <>No activity yet. Open a tab, run a command, or ask Claude in <strong>Do</strong>.</>
+          }
         </div>
       ) : (
         <article className="logs-diary">

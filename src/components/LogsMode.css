@@ -149,6 +149,51 @@
   margin: 0 auto 16px;
 }
 
+/* ─── Search bar ─── */
+.logs-diary-searchbar {
+  max-width: 820px;
+  margin: 0 auto 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #fffdf7;
+  border: 1px solid #e8dfc5;
+  border-radius: 999px;
+  color: #7a6f54;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.logs-diary-searchbar:focus-within {
+  border-color: #c8b98c;
+  box-shadow: 0 0 0 3px rgba(200, 185, 140, 0.18);
+}
+.logs-diary-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: ui-sans-serif, -apple-system, sans-serif;
+  font-size: 13px;
+  color: #2a251a;
+  letter-spacing: 0.01em;
+}
+.logs-diary-search-input::placeholder {
+  color: #a89b75;
+  font-style: italic;
+}
+.logs-diary-search-clear {
+  border: none;
+  background: transparent;
+  color: #7a6f54;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  border-radius: 4px;
+  transition: background 0.12s, color 0.12s;
+}
+.logs-diary-search-clear:hover { background: #efe8d0; color: #3a3222; }
+
 /* ─── Diary / Journal ─── */
 .logs-diary {
   max-width: 820px;
