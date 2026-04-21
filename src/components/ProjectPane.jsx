@@ -56,6 +56,7 @@ export default function ProjectPane({ tab, updateTab }) {
   const [activePath, setActivePath] = useState(null)
   const [error, setError] = useState('')
   const editorRef = useRef(null)
+  const saveTimers = useRef(new Map())
 
   const supported = typeof window !== 'undefined' && 'showDirectoryPicker' in window
 
@@ -144,33 +145,37 @@ export default function ProjectPane({ tab, updateTab }) {
   }
 
   const onEditorChange = (value) => {
-    setOpenFiles(prev => prev.map(f => f.path === activePath
-      ? { ...f, content: value ?? '', dirty: true }
+    const newContent = value ?? ''
+    const path = activePath
+    const file = openFiles.find(f => f.path === path)
+    if (!file) return
+
+    setOpenFiles(prev => prev.map(f => f.path === path
+      ? { ...f, content: newContent, dirty: true }
       : f
     ))
-  }
 
-  const saveActive = async () => {
-    const file = openFiles.find(f => f.path === activePath)
-    if (!file || !file.dirty) return
-    try {
-      const writable = await file.handle.createWritable()
-      await writable.write(file.content)
-      await writable.close()
-      setOpenFiles(prev => prev.map(f => f.path === activePath ? { ...f, dirty: false } : f))
-    } catch (e) { setError(e.message) }
+    const existing = saveTimers.current.get(path)
+    if (existing) clearTimeout(existing)
+    const timer = setTimeout(async () => {
+      saveTimers.current.delete(path)
+      try {
+        const writable = await file.handle.createWritable()
+        await writable.write(newContent)
+        await writable.close()
+        setOpenFiles(prev => prev.map(f => f.path === path
+          ? { ...f, dirty: false, savedAt: Date.now() }
+          : f
+        ))
+      } catch (e) { setError(e.message) }
+    }, 400)
+    saveTimers.current.set(path, timer)
   }
 
   useEffect(() => {
-    const onKey = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-        e.preventDefault()
-        saveActive()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [openFiles, activePath]) // eslint-disable-line react-hooks/exhaustive-deps
+    const timers = saveTimers.current
+    return () => { timers.forEach(id => clearTimeout(id)) }
+  }, [])
 
   const active = openFiles.find(f => f.path === activePath)
 
@@ -270,9 +275,10 @@ export default function ProjectPane({ tab, updateTab }) {
           <div className="proj-statusbar">
             <span className="proj-status-path">{active.path}</span>
             <span className="proj-status-right">
-              {active.dirty && <span className="proj-status-dirty">unsaved</span>}
+              <span className={`proj-status-save ${active.dirty ? 'saving' : 'saved'}`}>
+                {active.dirty ? 'saving…' : 'saved'}
+              </span>
               <span>{getLanguage(active.name)}</span>
-              <span>⌘S to save</span>
             </span>
           </div>
         )}

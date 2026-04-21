@@ -276,10 +276,8 @@
   gap: 14px;
   flex-shrink: 0;
 }
-.proj-status-dirty {
-  color: #a8071a;
-  font-weight: 600;
-}
+.proj-status-save.saving { color: #b17a00; font-weight: 600; }
+.proj-status-save.saved { color: #5a8a3a; }
 
 @media (max-width: 720px) {
   .proj-sidebar { width: 180px; }
