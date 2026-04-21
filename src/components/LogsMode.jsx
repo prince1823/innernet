@@ -53,10 +53,11 @@ export default function LogsMode({ selectedDate }) {
   const [summary, setSummary] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [sourceFilter, setSourceFilter] = useState(null)
 
   useEffect(() => subscribeActivity(setEvents), [])
 
-  const timeline = useMemo(() => {
+  const allDayTimeline = useMemo(() => {
     const day = selectedDate || new Date().toISOString().slice(0, 10)
     return events
       .filter(e => e.date === day)
@@ -64,13 +65,17 @@ export default function LogsMode({ selectedDate }) {
       .sort((a, b) => a.ts - b.ts)
   }, [events, selectedDate])
 
+  const timeline = useMemo(() => {
+    return sourceFilter ? allDayTimeline.filter(e => e.source === sourceFilter) : allDayTimeline
+  }, [allDayTimeline, sourceFilter])
+
   const paragraphs = useMemo(() => chunkByGap(timeline), [timeline])
 
   const stats = useMemo(() => {
     const c = { browser: 0, terminal: 0, claude: 0 }
-    for (const e of timeline) if (c[e.source] != null) c[e.source]++
+    for (const e of allDayTimeline) if (c[e.source] != null) c[e.source]++
     return c
-  }, [timeline])
+  }, [allDayTimeline])
 
   const span = useMemo(() => {
     if (timeline.length === 0) return null
@@ -114,12 +119,22 @@ export default function LogsMode({ selectedDate }) {
         <article className="logs-diary">
           <header className="logs-diary-head">
             <span className="logs-diary-pills">
-              {Object.entries(stats).filter(([, n]) => n > 0).map(([k, n]) => (
-                <span key={k} className="logs-diary-pill" style={{ '--pill-color': SOURCE_META[k]?.color }}>
-                  <span className="logs-diary-pill-n">{n}</span>
-                  <span>{SOURCE_META[k]?.label || k}</span>
-                </span>
-              ))}
+              {Object.entries(stats).filter(([, n]) => n > 0).map(([k, n]) => {
+                const active = sourceFilter === k
+                return (
+                  <button
+                    type="button"
+                    key={k}
+                    className={`logs-diary-pill ${active ? 'active' : ''} ${sourceFilter && !active ? 'dim' : ''}`}
+                    style={{ '--pill-color': SOURCE_META[k]?.color }}
+                    onClick={() => setSourceFilter(active ? null : k)}
+                    title={active ? `Showing only ${k}. Click to clear filter.` : `Filter to ${k} only`}
+                  >
+                    <span className="logs-diary-pill-n">{n}</span>
+                    <span>{SOURCE_META[k]?.label || k}</span>
+                  </button>
+                )
+              })}
             </span>
             <button className="logs-mode-btn primary logs-diary-summary-btn" onClick={summarize} disabled={loading}>
               {loading ? 'Summarizing…' : 'AI Summary'}

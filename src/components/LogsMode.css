@@ -232,7 +232,22 @@
   border-radius: 999px;
   text-transform: lowercase;
   letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, opacity 0.12s, transform 0.12s;
 }
+.logs-diary-pill:hover {
+  background: color-mix(in srgb, var(--pill-color) 16%, #fff);
+  border-color: color-mix(in srgb, var(--pill-color) 45%, transparent);
+}
+.logs-diary-pill.active {
+  background: var(--pill-color);
+  color: #fff;
+  border-color: var(--pill-color);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--pill-color) 35%, transparent);
+}
+.logs-diary-pill.active .logs-diary-pill-n { color: #fff; }
+.logs-diary-pill.dim { opacity: 0.45; }
+.logs-diary-pill.dim:hover { opacity: 0.8; }
 .logs-diary-pill-n {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
