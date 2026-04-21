@@ -23,19 +23,6 @@
   height: 1px;
   background: linear-gradient(to right, transparent 0%, #d8ceb2 25%, #d8ceb2 75%, transparent 100%);
 }
-.doc-body .ls-page-title::after {
-  content: '❋';
-  position: absolute;
-  left: 50%;
-  bottom: -7px;
-  transform: translateX(-50%);
-  font-size: 13px;
-  color: #c8b98c;
-  background: linear-gradient(180deg, #fffdf7 0%, #fdfaf0 60%, #faf4e4 100%);
-  padding: 0 10px;
-  line-height: 1;
-}
-
 .ls-page-title-logs-meta {
   display: inline-flex;
   align-items: baseline;
