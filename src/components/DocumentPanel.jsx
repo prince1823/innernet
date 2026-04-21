@@ -1798,8 +1798,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
           </div>
         ) : (
           <h1 className="ls-page-title">
-            {notesMode !== 'logs' && formatDateHeading(selectedDate || '2026-04-09')}
-            {notesMode === 'logs' && (() => {
+            {(() => {
               const [y, m, d] = (selectedDate || '2026-04-09').split('-').map(Number)
               const dt = new Date(y, m - 1, d)
               return (

@@ -1,9 +1,9 @@
-.doc-panel.logs-active,
-.doc-body.logs-active {
+.doc-panel,
+.doc-body {
   background: linear-gradient(180deg, #fffdf7 0%, #fdfaf0 60%, #faf4e4 100%);
 }
 
-.doc-body.logs-active .ls-page-title {
+.doc-body .ls-page-title {
   display: flex;
   align-items: baseline;
   gap: 16px;
