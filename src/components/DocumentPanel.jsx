@@ -1741,9 +1741,9 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   }
 
   return (
-    <div className="doc-panel">
+    <div className={`doc-panel ${notesMode === 'logs' ? 'logs-active' : ''}`}>
       <SelectionToolbar containerRef={docBodyRef} showImprove={notesMode === 'ai'} onImprove={handleImproveSelection} />
-      <div className="doc-body" ref={docBodyRef} style={{ position: 'relative' }}>
+      <div className={`doc-body ${notesMode === 'logs' ? 'logs-active' : ''}`} ref={docBodyRef} style={{ position: 'relative' }}>
 
         {/* Granola-style Me / AI notes toggle */}
         <div className="doc-mode-toggle">
@@ -1797,7 +1797,23 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
             ))}
           </div>
         ) : (
-          <h1 className="ls-page-title">{formatDateHeading(selectedDate || '2026-04-09')}</h1>
+          <h1 className="ls-page-title">
+            {notesMode !== 'logs' && formatDateHeading(selectedDate || '2026-04-09')}
+            {notesMode === 'logs' && (() => {
+              const [y, m, d] = (selectedDate || '2026-04-09').split('-').map(Number)
+              const dt = new Date(y, m - 1, d)
+              return (
+                <span className="ls-page-title-logs-meta">
+                  <span className="ls-page-title-logs-day">
+                    {dt.toLocaleDateString('en-US', { weekday: 'long' })}
+                  </span>
+                  <span className="ls-page-title-logs-full">
+                    {dt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  </span>
+                </span>
+              )
+            })()}
+          </h1>
         )}
 
         {/* Logs mode — AI-narrated activity timeline */}

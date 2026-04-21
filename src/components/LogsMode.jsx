@@ -3,15 +3,49 @@ import { getActivity, subscribeActivity } from '../utils/activityLog'
 import { askAI } from '../utils/askAI'
 import './LogsMode.css'
 
-const KIND_META = {
-  tab_opened:    { dot: '#9c8cfc', label: 'tab' },
-  claude_prompt: { dot: '#f59e0b', label: 'claude' },
-  browser_nav:   { dot: '#42a5f5', label: 'browser' },
-  terminal_cmd:  { dot: '#26a69a', label: 'terminal' },
+const SOURCE_META = {
+  browser:  { color: '#2563eb', label: 'browser' },
+  terminal: { color: '#059669', label: 'terminal' },
+  claude:   { color: '#d97706', label: 'claude' },
 }
 
 function formatTime(ts) {
-  return new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+  return new Date(ts).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase()
+}
+
+function parseLabel(ev) {
+  const l = ev.label || ''
+  if (/^Opened .* tab$/i.test(l)) return { verb: 'opened', obj: `a new ${ev.source} tab`, mono: false }
+  if (ev.kind === 'browser_nav') {
+    const m = l.match(/^Browsed\s+(.+)$/)
+    return { verb: 'visited', obj: m ? m[1] : l, mono: false }
+  }
+  if (ev.kind === 'terminal_cmd') {
+    const m = l.match(/^Ran\s+`([^`]+)`$/)
+    return { verb: 'ran', obj: m ? m[1] : l, mono: true }
+  }
+  if (ev.kind === 'claude_prompt') {
+    const m = l.match(/^Asked Claude:\s*"(.+)"$/)
+    return { verb: 'asked', obj: m ? `"${m[1]}"` : l, mono: false, italic: true }
+  }
+  return { verb: '', obj: l, mono: false }
+}
+
+// Group events into "paragraphs" separated by gaps >= 4 minutes. Reads like
+// natural scene breaks in a journal entry.
+function chunkByGap(events, gapMin = 4) {
+  const out = []
+  let cur = null
+  for (const ev of events) {
+    if (!cur || ev.ts - cur.endTs > gapMin * 60000) {
+      cur = { startTs: ev.ts, endTs: ev.ts, items: [ev] }
+      out.push(cur)
+    } else {
+      cur.items.push(ev)
+      cur.endTs = ev.ts
+    }
+  }
+  return out
 }
 
 export default function LogsMode({ selectedDate }) {
@@ -30,40 +64,39 @@ export default function LogsMode({ selectedDate }) {
       .sort((a, b) => a.ts - b.ts)
   }, [events])
 
+  const paragraphs = useMemo(() => chunkByGap(timeline), [timeline])
+
+  const stats = useMemo(() => {
+    const c = { browser: 0, terminal: 0, claude: 0 }
+    for (const e of timeline) if (c[e.source] != null) c[e.source]++
+    return c
+  }, [timeline])
+
+  const span = useMemo(() => {
+    if (timeline.length === 0) return null
+    const first = formatTime(timeline[0].ts)
+    const last = formatTime(timeline[timeline.length - 1].ts)
+    return first === last ? first : `${first} – ${last}`
+  }, [timeline])
+
   const summarize = async () => {
     if (timeline.length === 0) {
       setError('Nothing to summarize yet — open some tabs, run commands, or ask Claude.')
       return
     }
-    setLoading(true)
-    setError('')
-    setSummary('')
-    const lines = timeline.map(t => `- ${formatTime(t.ts)} [${KIND_META[t.kind]?.label || t.kind}] ${t.label}`).join('\n')
+    setLoading(true); setError(''); setSummary('')
+    const lines = timeline.map(t => `- ${formatTime(t.ts)} [${t.source}] ${t.label}`).join('\n')
     const prompt = `You are a second-person activity narrator. Given this chronological log of what the user did in their workspace (browser tabs, Claude chats, terminal commands), write a natural-language narrative in the style: "You opened X, then browsed Y, then switched to the terminal and ran Z, then asked Claude about W…". Connect related actions causally where obvious. 3-6 sentences, prose, no bullets.\n\nLog:\n${lines}`
     try {
       const out = await askAI(prompt)
       setSummary(out || '(empty response)')
     } catch (e) {
       setError(e?.message || 'Failed to summarize')
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
   return (
     <div className="logs-mode">
-      <div className="logs-mode-header">
-        <div>
-          <h2 className="logs-mode-title">Activity Log</h2>
-          <p className="logs-mode-sub">An AI-narrated trace of what you did in Do today</p>
-        </div>
-        <div className="logs-mode-actions">
-          <button className="logs-mode-btn primary" onClick={summarize} disabled={loading}>
-            {loading ? 'Summarizing…' : 'AI Summary'}
-          </button>
-        </div>
-      </div>
-
       {error && <div className="logs-mode-error">{error}</div>}
 
       {summary && (
@@ -75,27 +108,61 @@ export default function LogsMode({ selectedDate }) {
 
       {timeline.length === 0 ? (
         <div className="logs-mode-empty">
-          No activity yet for this date. Switch to <strong>Do</strong> and open a tab, run a command, or ask Claude — events appear here.
+          No activity yet. Open a tab, run a command, or ask Claude in <strong>Do</strong>.
         </div>
       ) : (
-        <ul className="logs-mode-timeline">
-          {timeline.map((t, i) => {
-            const meta = KIND_META[t.kind] || { dot: '#999', label: t.kind }
-            return (
-              <li key={t.id || i} className="logs-mode-row">
-                <span className="logs-mode-time">{formatTime(t.ts)}</span>
-                <span className="logs-mode-dot-col">
-                  <span className="logs-mode-dot" style={{ background: meta.dot }} />
-                  {i < timeline.length - 1 && <span className="logs-mode-line" />}
-                </span>
-                <span className="logs-mode-body">
-                  <span className="logs-mode-tag" style={{ color: meta.dot }}>{meta.label}</span>
-                  <span className="logs-mode-label">{t.label}</span>
-                </span>
-              </li>
-            )
-          })}
-        </ul>
+        <article className="logs-diary">
+          <header className="logs-diary-head">
+            <div className="logs-diary-stats">
+              <span className="logs-diary-span">{span}</span>
+              <button className="logs-mode-btn primary logs-diary-summary-btn" onClick={summarize} disabled={loading}>
+                {loading ? 'Summarizing…' : 'AI Summary'}
+              </button>
+              <span className="logs-diary-pills">
+                {Object.entries(stats).filter(([, n]) => n > 0).map(([k, n]) => (
+                  <span key={k} className="logs-diary-pill" style={{ '--pill-color': SOURCE_META[k]?.color }}>
+                    <span className="logs-diary-pill-n">{n}</span>
+                    <span>{SOURCE_META[k]?.label || k}</span>
+                  </span>
+                ))}
+              </span>
+            </div>
+          </header>
+
+          <div className="logs-diary-body">
+            {paragraphs.map((p, pi) => (
+              <section key={pi} className="logs-diary-scene">
+                <aside className="logs-diary-scene-time">
+                  {formatTime(p.startTs)}
+                  {p.startTs !== p.endTs && <><br/><span>↓</span><br/>{formatTime(p.endTs)}</>}
+                </aside>
+                <p className="logs-diary-prose">
+                  {p.items.map((ev, i) => {
+                    const meta = SOURCE_META[ev.source] || { color: '#888', label: ev.source }
+                    const { verb, obj, mono, italic } = parseLabel(ev)
+                    const connector = i === 0
+                      ? (pi === 0 ? 'You ' : 'Then you ')
+                      : (i === p.items.length - 1 && p.items.length > 1 ? ', and ' : ', ')
+                    return (
+                      <span key={ev.id}>
+                        {connector}
+                        <span className="logs-diary-verb" style={{ color: meta.color }}>{verb}</span>
+                        {' '}
+                        <span
+                          className={`logs-diary-obj ${mono ? 'mono' : ''} ${italic ? 'italic' : ''}`}
+                          style={{ '--obj-color': meta.color }}
+                        >
+                          {obj}
+                        </span>
+                      </span>
+                    )
+                  })}
+                  .
+                </p>
+              </section>
+            ))}
+          </div>
+        </article>
       )}
     </div>
   )
