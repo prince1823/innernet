@@ -57,12 +57,12 @@ export default function LogsMode({ selectedDate }) {
   useEffect(() => subscribeActivity(setEvents), [])
 
   const timeline = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10)
+    const day = selectedDate || new Date().toISOString().slice(0, 10)
     return events
-      .filter(e => e.date === today)
+      .filter(e => e.date === day)
       .map(e => ({ ts: e.ts, kind: e.kind, label: e.label, source: e.source, id: e.id }))
       .sort((a, b) => a.ts - b.ts)
-  }, [events])
+  }, [events, selectedDate])
 
   const paragraphs = useMemo(() => chunkByGap(timeline), [timeline])
 
@@ -113,20 +113,17 @@ export default function LogsMode({ selectedDate }) {
       ) : (
         <article className="logs-diary">
           <header className="logs-diary-head">
-            <div className="logs-diary-stats">
-              <span className="logs-diary-span">{span}</span>
-              <button className="logs-mode-btn primary logs-diary-summary-btn" onClick={summarize} disabled={loading}>
-                {loading ? 'Summarizing…' : 'AI Summary'}
-              </button>
-              <span className="logs-diary-pills">
-                {Object.entries(stats).filter(([, n]) => n > 0).map(([k, n]) => (
-                  <span key={k} className="logs-diary-pill" style={{ '--pill-color': SOURCE_META[k]?.color }}>
-                    <span className="logs-diary-pill-n">{n}</span>
-                    <span>{SOURCE_META[k]?.label || k}</span>
-                  </span>
-                ))}
-              </span>
-            </div>
+            <span className="logs-diary-pills">
+              {Object.entries(stats).filter(([, n]) => n > 0).map(([k, n]) => (
+                <span key={k} className="logs-diary-pill" style={{ '--pill-color': SOURCE_META[k]?.color }}>
+                  <span className="logs-diary-pill-n">{n}</span>
+                  <span>{SOURCE_META[k]?.label || k}</span>
+                </span>
+              ))}
+            </span>
+            <button className="logs-mode-btn primary logs-diary-summary-btn" onClick={summarize} disabled={loading}>
+              {loading ? 'Summarizing…' : 'AI Summary'}
+            </button>
           </header>
 
           <div className="logs-diary-body">

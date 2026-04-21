@@ -572,28 +572,71 @@ export const journalPages = {
 
 };
 
-// Activity logs for the Logs panel
-// Seed data for the "Logs" mode in Think — a realistic day of Do-window
-// activity (browser navs, terminal commands, Claude prompts). Timestamps are
-// relative: { h, m } gets resolved to today's date at that hour/minute so the
-// log stays "today" regardless of when the user opens the app.
-export const sampleDoActivity = [
-  { h: 9,  m: 12, kind: 'tab_opened',    source: 'browser',  label: 'Opened browser tab' },
-  { h: 9,  m: 13, kind: 'browser_nav',   source: 'browser',  label: 'Browsed github.com — innernet/pulls',           url: 'https://github.com/innernet/pulls' },
-  { h: 9,  m: 21, kind: 'browser_nav',   source: 'browser',  label: 'Browsed PR #42 — Supplier Taxonomy Module',     url: 'https://github.com/innernet/pull/42' },
-  { h: 9,  m: 34, kind: 'tab_opened',    source: 'terminal', label: 'Opened terminal tab' },
-  { h: 9,  m: 35, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `git checkout feature/taxonomy`',           command: 'git checkout feature/taxonomy' },
-  { h: 9,  m: 36, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `npm install`',                             command: 'npm install' },
-  { h: 9,  m: 48, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `npm test -- taxonomy`',                    command: 'npm test -- taxonomy' },
-  { h: 9,  m: 52, kind: 'tab_opened',    source: 'claude',   label: 'Opened Claude tab' },
-  { h: 9,  m: 53, kind: 'claude_prompt', source: 'claude',   label: 'Asked Claude: "Why would a 3-level taxonomy fail with circular parents?"', prompt: 'Why would a 3-level taxonomy fail with circular parents?' },
-  { h: 10, m: 4,  kind: 'browser_nav',   source: 'browser',  label: 'Browsed stackoverflow.com — adjacency list cycles', url: 'https://stackoverflow.com/questions/tagged/graph-cycles' },
-  { h: 10, m: 19, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `npm run lint`',                            command: 'npm run lint' },
-  { h: 10, m: 27, kind: 'claude_prompt', source: 'claude',   label: 'Asked Claude: "Give me a SQL query to detect cycles in a parent_id tree"', prompt: 'Give me a SQL query to detect cycles in a parent_id tree' },
-  { h: 10, m: 41, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `git commit -m "guard against circular taxonomy parents"`', command: 'git commit -m "guard against circular taxonomy parents"' },
-  { h: 10, m: 42, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `git push origin feature/taxonomy`',        command: 'git push origin feature/taxonomy' },
-  { h: 10, m: 55, kind: 'browser_nav',   source: 'browser',  label: 'Browsed linear.app — INGEST-214',               url: 'https://linear.app/innernet/issue/INGEST-214' },
-]
+// Activity logs for the Logs panel — per-date seed data.
+// Each day's activity thematically mirrors the notes/meetings on that day so
+// the Logs mode reads like a continuation of what you were thinking/doing.
+export const sampleDoActivityByDate = {
+  // Apr 9 — Three-panel layout + AI integration brainstorm + sprint review
+  '2026-04-09': [
+    { h: 9,  m: 2,  kind: 'tab_opened',    source: 'browser',  label: 'Opened browser tab' },
+    { h: 9,  m: 3,  kind: 'browser_nav',   source: 'browser',  label: 'Browsed meet.google.com — standup',          url: 'https://meet.google.com/innernet-standup' },
+    { h: 9,  m: 35, kind: 'tab_opened',    source: 'terminal', label: 'Opened terminal tab' },
+    { h: 9,  m: 36, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `git checkout feature/three-panel-layout`', command: 'git checkout feature/three-panel-layout' },
+    { h: 10, m: 5,  kind: 'browser_nav',   source: 'browser',  label: 'Browsed developer.mozilla.org — CSS transform', url: 'https://developer.mozilla.org/docs/Web/CSS/transform' },
+    { h: 10, m: 18, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `npm run dev`',                          command: 'npm run dev' },
+    { h: 10, m: 32, kind: 'browser_nav',   source: 'browser',  label: 'Browsed localhost:5175 — panel preview',     url: 'http://localhost:5175' },
+    { h: 10, m: 45, kind: 'tab_opened',    source: 'claude',   label: 'Opened Claude tab' },
+    { h: 10, m: 46, kind: 'claude_prompt', source: 'claude',   label: 'Asked Claude: "Why are my panels bleeding outside the viewport on translateX?"', prompt: 'Why are my panels bleeding outside the viewport on translateX?' },
+    { h: 11, m: 10, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `git add src/components/PanelLayout.css`', command: 'git add src/components/PanelLayout.css' },
+    { h: 11, m: 11, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `git commit -m "fix panel overflow on phase toggle"`', command: 'git commit -m "fix panel overflow on phase toggle"' },
+    { h: 14, m: 33, kind: 'browser_nav',   source: 'browser',  label: 'Browsed notion.so — AI Strategy',            url: 'https://notion.so/innernet/ai-strategy' },
+    { h: 14, m: 56, kind: 'claude_prompt', source: 'claude',   label: 'Asked Claude: "Sketch a context API that merges calendar and notes for an agent"', prompt: 'Sketch a context API that merges calendar and notes for an agent' },
+    { h: 15, m: 12, kind: 'browser_nav',   source: 'browser',  label: 'Browsed docs.anthropic.com — tool use',      url: 'https://docs.anthropic.com/claude/docs/tool-use' },
+    { h: 16, m: 40, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `git push origin feature/three-panel-layout`', command: 'git push origin feature/three-panel-layout' },
+  ],
+
+  // Apr 10 — API integration + panel work continues + Colab91 sync
+  '2026-04-10': [
+    { h: 9,  m: 5,  kind: 'tab_opened',    source: 'terminal', label: 'Opened terminal tab' },
+    { h: 9,  m: 6,  kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `git pull origin main`',                 command: 'git pull origin main' },
+    { h: 9,  m: 12, kind: 'browser_nav',   source: 'browser',  label: 'Browsed github.com — innernet/api',          url: 'https://github.com/innernet/api' },
+    { h: 9,  m: 28, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `curl -X GET api.innernet.dev/events`',  command: 'curl -X GET api.innernet.dev/events' },
+    { h: 9,  m: 41, kind: 'claude_prompt', source: 'claude',   label: 'Asked Claude: "Best pattern for retry + auth refresh on fetch?"', prompt: 'Best pattern for retry + auth refresh on fetch?' },
+    { h: 10, m: 22, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `npm test -- api-client`',               command: 'npm test -- api-client' },
+    { h: 11, m: 12, kind: 'browser_nav',   source: 'browser',  label: 'Browsed localhost:5175 — panel preview',     url: 'http://localhost:5175' },
+    { h: 11, m: 34, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `git commit -m "wire panel layout to API client"`', command: 'git commit -m "wire panel layout to API client"' },
+    { h: 14, m: 2,  kind: 'browser_nav',   source: 'browser',  label: 'Browsed meet.google.com — Colab91 sync',     url: 'https://meet.google.com/colab91-sync' },
+    { h: 14, m: 48, kind: 'claude_prompt', source: 'claude',   label: 'Asked Claude: "Summarize the Colab91 product call into 3 action items"', prompt: 'Summarize the Colab91 product call into 3 action items' },
+    { h: 15, m: 10, kind: 'browser_nav',   source: 'browser',  label: 'Browsed linear.app — COLAB91 project',       url: 'https://linear.app/colab91/projects' },
+  ],
+
+  // Apr 11 — Testing & QA + docs review + staging deploy
+  '2026-04-11': [
+    { h: 10, m: 4,  kind: 'tab_opened',    source: 'terminal', label: 'Opened terminal tab' },
+    { h: 10, m: 5,  kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `npm run test:e2e`',                     command: 'npm run test:e2e' },
+    { h: 10, m: 22, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `npm run test -- --coverage`',           command: 'npm run test -- --coverage' },
+    { h: 10, m: 41, kind: 'claude_prompt', source: 'claude',   label: 'Asked Claude: "Why is this Playwright click flaky on the panel toggle?"', prompt: 'Why is this Playwright click flaky on the panel toggle?' },
+    { h: 11, m: 8,  kind: 'browser_nav',   source: 'browser',  label: 'Browsed playwright.dev — auto-waiting',      url: 'https://playwright.dev/docs/actionability' },
+    { h: 13, m: 4,  kind: 'browser_nav',   source: 'browser',  label: 'Browsed github.com — innernet/docs PR #88',  url: 'https://github.com/innernet/innernet/pull/88' },
+    { h: 13, m: 35, kind: 'claude_prompt', source: 'claude',   label: 'Asked Claude: "Tighten this README section on the context builder"', prompt: 'Tighten this README section on the context builder' },
+    { h: 15, m: 32, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `git checkout release/staging`',         command: 'git checkout release/staging' },
+    { h: 15, m: 45, kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `npm run build`',                        command: 'npm run build' },
+    { h: 16, m: 8,  kind: 'terminal_cmd',  source: 'terminal', label: 'Ran `vercel deploy --prebuilt`',             command: 'vercel deploy --prebuilt' },
+    { h: 16, m: 20, kind: 'browser_nav',   source: 'browser',  label: 'Browsed staging.innernet.dev — smoke test',  url: 'https://staging.innernet.dev' },
+  ],
+
+  // Apr 12 — Weekend planning — quiet Sunday, just a bit of thinking
+  '2026-04-12': [
+    { h: 10, m: 2,  kind: 'tab_opened',    source: 'browser',  label: 'Opened browser tab' },
+    { h: 10, m: 4,  kind: 'browser_nav',   source: 'browser',  label: 'Browsed notion.so — Weekly Plan',            url: 'https://notion.so/innernet/weekly-plan' },
+    { h: 10, m: 18, kind: 'tab_opened',    source: 'claude',   label: 'Opened Claude tab' },
+    { h: 10, m: 19, kind: 'claude_prompt', source: 'claude',   label: 'Asked Claude: "Draft me a 5-item plan for next week focused on the agent backend"', prompt: 'Draft me a 5-item plan for next week focused on the agent backend' },
+    { h: 10, m: 27, kind: 'browser_nav',   source: 'browser',  label: 'Browsed linear.app — INGEST backlog',        url: 'https://linear.app/innernet/team/INGEST' },
+  ],
+}
+
+// Back-compat: flat list (today-style). Prefer sampleDoActivityByDate.
+export const sampleDoActivity = sampleDoActivityByDate['2026-04-09']
 
 export const activityLogs = [
   { id: 'log-1', time: '07:01', type: 'user', action: 'Opened app', session: null },
