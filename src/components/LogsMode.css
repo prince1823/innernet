@@ -319,6 +319,18 @@
   border-bottom: 0;
 }
 
+a.logs-diary-obj.link {
+  color: var(--obj-color);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--obj-color) 45%, transparent);
+  transition: color 0.12s, border-color 0.12s;
+  cursor: pointer;
+}
+a.logs-diary-obj.link:hover {
+  color: color-mix(in srgb, var(--obj-color) 80%, #000);
+  border-bottom-color: var(--obj-color);
+}
+
 @media (max-width: 640px) {
   .logs-mode { padding: 20px 18px 60px; }
   .logs-diary { padding: 20px 18px 24px; }

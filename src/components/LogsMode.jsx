@@ -61,7 +61,7 @@ export default function LogsMode({ selectedDate }) {
     const day = selectedDate || new Date().toISOString().slice(0, 10)
     return events
       .filter(e => e.date === day)
-      .map(e => ({ ts: e.ts, kind: e.kind, label: e.label, source: e.source, id: e.id }))
+      .map(e => ({ ts: e.ts, kind: e.kind, label: e.label, source: e.source, id: e.id, url: e.url }))
       .sort((a, b) => a.ts - b.ts)
   }, [events, selectedDate])
 
@@ -160,12 +160,24 @@ export default function LogsMode({ selectedDate }) {
                         {connector}
                         <span className="logs-diary-verb" style={{ color: meta.color }}>{verb}</span>
                         {' '}
-                        <span
-                          className={`logs-diary-obj ${mono ? 'mono' : ''} ${italic ? 'italic' : ''}`}
-                          style={{ '--obj-color': meta.color }}
-                        >
-                          {obj}
-                        </span>
+                        {ev.url ? (
+                          <a
+                            href={ev.url}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className={`logs-diary-obj link ${mono ? 'mono' : ''} ${italic ? 'italic' : ''}`}
+                            style={{ '--obj-color': meta.color }}
+                          >
+                            {obj}
+                          </a>
+                        ) : (
+                          <span
+                            className={`logs-diary-obj ${mono ? 'mono' : ''} ${italic ? 'italic' : ''}`}
+                            style={{ '--obj-color': meta.color }}
+                          >
+                            {obj}
+                          </span>
+                        )}
                       </span>
                     )
                   })}
