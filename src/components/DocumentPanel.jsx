@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom'
 
 import { journalPages, calendarTasks } from '../data/sampleData'
 import { askAI } from '../utils/askAI'
+import LogsMode from './LogsMode'
 import './DocumentPanel.css'
 
 
@@ -1740,9 +1741,9 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   }
 
   return (
-    <div className="doc-panel">
+    <div className={`doc-panel ${notesMode === 'logs' ? 'logs-active' : ''}`}>
       <SelectionToolbar containerRef={docBodyRef} showImprove={notesMode === 'ai'} onImprove={handleImproveSelection} />
-      <div className="doc-body" ref={docBodyRef} style={{ position: 'relative' }}>
+      <div className={`doc-body ${notesMode === 'logs' ? 'logs-active' : ''}`} ref={docBodyRef} style={{ position: 'relative' }}>
 
         {/* Granola-style Me / AI notes toggle */}
         <div className="doc-mode-toggle">
@@ -1763,6 +1764,15 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             AI
+          </button>
+          <button
+            type="button"
+            className={`doc-mode-btn ${notesMode === 'logs' ? 'active' : ''}`}
+            onClick={() => setNotesMode('logs')}
+            title="Show AI-narrated activity log"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
+            Logs
           </button>
         </div>
 
@@ -1787,11 +1797,28 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
             ))}
           </div>
         ) : (
-          <h1 className="ls-page-title">{formatDateHeading(selectedDate || '2026-04-09')}</h1>
+          <h1 className="ls-page-title">
+            {(() => {
+              const [y, m, d] = (selectedDate || '2026-04-09').split('-').map(Number)
+              const dt = new Date(y, m - 1, d)
+              return (
+                <span className="ls-page-title-logs-meta">
+                  <span className="ls-page-title-logs-day">
+                    {dt.toLocaleDateString('en-US', { weekday: 'long' })}
+                  </span>
+                  <span className="ls-page-title-logs-full">
+                    {dt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  </span>
+                </span>
+              )
+            })()}
+          </h1>
         )}
 
-        {/* AI-enhanced view (read-only) when in AI mode */}
-        {notesMode === 'ai' ? (
+        {/* Logs mode — AI-narrated activity timeline */}
+        {notesMode === 'logs' ? (
+          <LogsMode selectedDate={selectedDate} />
+        ) : notesMode === 'ai' ? (
           <div className="ai-doc">
             {aiViewError && <div className="ai-doc-error">{aiViewError}</div>}
             {aiViewLoading && !displayDoc ? (

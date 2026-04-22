@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import hljs from 'highlight.js/lib/common'
 import 'highlight.js/styles/atom-one-light.css'
+import { logActivity } from '../utils/activityLog'
+import ProjectPane from './ProjectPane'
 import './DoPanel.css'
 
 const API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY
@@ -10,6 +12,7 @@ const TAB_TYPES = [
   { type: 'claude', label: 'Claude', icon: 'claude' },
   { type: 'browser', label: 'Browser', icon: 'browser' },
   { type: 'terminal', label: 'Terminal', icon: 'terminal' },
+  { type: 'project', label: 'Project', icon: 'project' },
 ]
 
 const NEW_TAB_URL = 'about:newtab'
@@ -43,6 +46,9 @@ function TabIcon({ kind }) {
   }
   if (kind === 'browser') {
     return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+  }
+  if (kind === 'project') {
+    return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
   }
   return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
 }
@@ -352,6 +358,7 @@ function ClaudePane({ tab, updateTab }) {
     const nextMessages = [...state.messages, userMsg]
     updateTab({ data: { ...state, messages: nextMessages } })
     setInput('')
+    logActivity('claude_prompt', { source: 'claude', label: `Asked Claude: "${text.length > 80 ? text.slice(0, 80) + '…' : text}"`, prompt: text })
     await runTurn(nextMessages, nextMessages)
   }
 
@@ -646,6 +653,7 @@ function BrowserPane({ tab, updateTab }) {
       title: deriveTitle(url),
       data: { ...state, url, history, historyIdx: history.length - 1 },
     })
+    logActivity('browser_nav', { source: 'browser', label: `Browsed ${deriveTitle(url)}`, url })
   }
 
   const goBack = () => {
@@ -833,7 +841,7 @@ function deriveTitle(url) {
 }
 
 // ─────────────────────────── Terminal pane ───────────────────────────
-function TerminalPane({ tab, updateTab }) {
+export function TerminalPane({ tab, updateTab }) {
   const state = tab.data
   const [input, setInput] = useState('')
   const logRef = useRef(null)
@@ -848,6 +856,7 @@ function TerminalPane({ tab, updateTab }) {
       updateTab({ data: { ...state, lines: [...state.lines, { kind: 'prompt', text: '' }] } })
       return
     }
+    logActivity('terminal_cmd', { source: 'terminal', label: `Ran \`${trimmed}\``, command: trimmed })
     const [name, ...rest] = trimmed.split(/\s+/)
     const out = []
     switch (name) {
@@ -930,6 +939,9 @@ function makeTab(type, opts = {}) {
     const title = url === NEW_TAB_URL ? 'New Tab' : deriveTitle(url)
     return { id, type, title, data: { url, history: [url], historyIdx: 0, proxy: true } }
   }
+  if (type === 'project') {
+    return { id, type, title: 'Project', data: { rootName: null, expanded: [] } }
+  }
   return { id, type: 'terminal', title: 'Terminal', data: { lines: [{ kind: 'out', text: "Innernet shell — type 'help' for commands." }], history: [] } }
 }
 
@@ -954,10 +966,24 @@ export default function DoPanel() {
     return null
   })
   const [menuOpen, setMenuOpen] = useState(false)
+  const [tabsHidden, setTabsHidden] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY))?.tabsHidden || false } catch { return false }
+  })
 
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ tabs, activeId })) } catch {}
-  }, [tabs, activeId])
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ tabs, activeId, tabsHidden })) } catch {}
+  }, [tabs, activeId, tabsHidden])
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === '\\') {
+        e.preventDefault()
+        setTabsHidden(h => !h)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // Keep an active tab selected (first one by default)
   const effectiveActiveId = activeId && tabs.some(t => t.id === activeId) ? activeId : tabs[0]?.id
@@ -970,6 +996,7 @@ export default function DoPanel() {
     setTabs(prev => [...prev, t])
     setActiveId(t.id)
     setMenuOpen(false)
+    logActivity('tab_opened', { source: type, label: `Opened ${type} tab` })
   }
   const closeTab = (id, e) => {
     e?.stopPropagation()
@@ -996,40 +1023,60 @@ export default function DoPanel() {
   const active = tabs.find(t => t.id === effectiveActiveId)
 
   return (
-    <div className="do-panel">
-      <div className="do-tabs">
-        <div className="do-tabs-scroll">
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              className={`do-tab do-tab-${t.type} ${t.id === effectiveActiveId ? 'active' : ''}`}
-              onClick={() => setActiveId(t.id)}
-              title={t.title}
-            >
-              <TabIcon kind={t.type} />
-              <span className="do-tab-title">{t.title}</span>
-              <span className="do-tab-close" onClick={e => closeTab(t.id, e)} title="Close tab">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </span>
+    <div className={`do-panel ${tabsHidden ? 'tabs-hidden' : ''}`}>
+      {!tabsHidden && (
+        <div className="do-tabs">
+          <div className="do-tabs-scroll">
+            {tabs.map(t => (
+              <button
+                key={t.id}
+                className={`do-tab do-tab-${t.type} ${t.id === effectiveActiveId ? 'active' : ''}`}
+                onClick={() => setActiveId(t.id)}
+                title={t.title}
+              >
+                <TabIcon kind={t.type} />
+                <span className="do-tab-title">{t.title}</span>
+                <span className="do-tab-close" onClick={e => closeTab(t.id, e)} title="Close tab">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="do-newtab-wrap">
+            <button className="do-newtab" onClick={() => setMenuOpen(o => !o)} title="New tab">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             </button>
-          ))}
-        </div>
-        <div className="do-newtab-wrap">
-          <button className="do-newtab" onClick={() => setMenuOpen(o => !o)} title="New tab">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            {menuOpen && (
+              <div className="do-newtab-menu" role="menu">
+                {TAB_TYPES.map(t => (
+                  <button key={t.type} className="do-newtab-item" onClick={() => addTab(t.type)}>
+                    <TabIcon kind={t.icon} />
+                    <span>{t.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button
+            className="do-tabs-toggle"
+            onClick={() => setTabsHidden(true)}
+            title="Hide tab bar (⌘⇧\)"
+            aria-label="Hide tab bar"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
           </button>
-          {menuOpen && (
-            <div className="do-newtab-menu" role="menu">
-              {TAB_TYPES.map(t => (
-                <button key={t.type} className="do-newtab-item" onClick={() => addTab(t.type)}>
-                  <TabIcon kind={t.icon} />
-                  <span>{t.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
-      </div>
+      )}
+      {tabsHidden && (
+        <button
+          className="do-tabs-reveal"
+          onClick={() => setTabsHidden(false)}
+          title="Show tab bar (⌘⇧\)"
+          aria-label="Show tab bar"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+      )}
 
       <div className="do-pane-wrap">
         {active && active.type === 'claude' && (
@@ -1040,6 +1087,9 @@ export default function DoPanel() {
         )}
         {active && active.type === 'terminal' && (
           <TerminalPane tab={active} updateTab={patch => updateTab(active.id, patch)} />
+        )}
+        {active && active.type === 'project' && (
+          <ProjectPane tab={active} updateTab={patch => updateTab(active.id, patch)} />
         )}
         {!active && (
           <div className="do-empty">
