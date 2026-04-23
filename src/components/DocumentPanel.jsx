@@ -1891,102 +1891,119 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                           const sources = (item.sources || []).map(id => meBlockById[id]).filter(Boolean)
                           if (item.kind === 'callout') {
                             const isHighlighted = highlightCalloutAiId && item.aiBlockId === highlightCalloutAiId
+                            const fullOn = item.askedOn || ''
+                            const shownOn = fullOn.length > 60 ? fullOn.slice(0, 60).trimEnd() + '…' : fullOn
                             return (
                               <li
                                 key={ii}
-                                className={`ai-doc-callout ${isHighlighted ? 'ai-doc-callout-highlight' : ''}`}
+                                className={`ai-doc-callout imsg-callout ${isHighlighted ? 'ai-doc-callout-highlight' : ''}`}
                                 contentEditable={false}
                                 ref={isHighlighted ? (el => el && el.scrollIntoView({ behavior: 'smooth', block: 'center' })) : undefined}
                               >
-                                <span className="ai-doc-callout-glyph" aria-hidden>
-                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2z"/></svg>
-                                </span>
-                                <span className="ai-doc-callout-body">
-                                  <span
-                                    className="ai-doc-callout-answer"
-                                    contentEditable={editable}
-                                    suppressContentEditableWarning
-                                    onKeyDown={e => {
-                                      if ((e.key === 'Backspace' || e.key === 'Delete') && item.aiBlockId) {
-                                        const t = e.currentTarget.textContent || ''
-                                        if (!t.trim()) {
-                                          e.preventDefault()
-                                          applyTreeOp(tree => deleteBlock(tree, item.aiBlockId))
+                                {item.askedAt && (
+                                  <div className="imsg-time" contentEditable={false}>
+                                    <span
+                                      className="imsg-time-label"
+                                      title={new Date(item.askedAt).toLocaleString()}
+                                    >
+                                      <span className="imsg-time-day">
+                                        {new Date(item.askedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                      </span>
+                                      <span className="imsg-time-sep">·</span>
+                                      <span className="imsg-time-hour">
+                                        {new Date(item.askedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                                      </span>
+                                    </span>
+                                  </div>
+                                )}
+                                {item.question && (item.text || '').trim() && (
+                                  <div className="imsg-row imsg-row-sent" contentEditable={false}>
+                                    <div className="imsg-bubble imsg-bubble-sent">
+                                      {item.question}
+                                    </div>
+                                  </div>
+                                )}
+                                <div className="imsg-row imsg-row-received">
+                                  <div className="imsg-bubble imsg-bubble-received">
+                                    <span
+                                      className="ai-doc-callout-answer imsg-answer"
+                                      contentEditable={editable}
+                                      suppressContentEditableWarning
+                                      onKeyDown={e => {
+                                        if ((e.key === 'Backspace' || e.key === 'Delete') && item.aiBlockId) {
+                                          const t = e.currentTarget.textContent || ''
+                                          if (!t.trim()) {
+                                            e.preventDefault()
+                                            applyTreeOp(tree => deleteBlock(tree, item.aiBlockId))
+                                          }
                                         }
-                                      }
-                                    }}
-                                    onInput={e => {
-                                      const t = e.currentTarget.textContent || ''
-                                      if (!t.trim() && item.aiBlockId) {
-                                        applyTreeOp(tree => deleteBlock(tree, item.aiBlockId))
-                                      }
-                                    }}
-                                    onBlur={e => {
-                                      const t = e.currentTarget.textContent || ''
-                                      if (t !== item.text) {
+                                      }}
+                                      onInput={e => {
+                                        const t = e.currentTarget.textContent || ''
                                         if (!t.trim() && item.aiBlockId) {
                                           applyTreeOp(tree => deleteBlock(tree, item.aiBlockId))
-                                          return
                                         }
-                                        updateDocNodeText({ block: bi, item: ii }, t)
-                                        if (item.aiBlockId) {
-                                          applyTreeOp(tree => setBlockText(tree, item.aiBlockId, t))
+                                      }}
+                                      onBlur={e => {
+                                        const t = e.currentTarget.textContent || ''
+                                        if (t !== item.text) {
+                                          if (!t.trim() && item.aiBlockId) {
+                                            applyTreeOp(tree => deleteBlock(tree, item.aiBlockId))
+                                            return
+                                          }
+                                          updateDocNodeText({ block: bi, item: ii }, t)
+                                          if (item.aiBlockId) {
+                                            applyTreeOp(tree => setBlockText(tree, item.aiBlockId, t))
+                                          }
                                         }
-                                      }
-                                    }}
-                                  >{item.text}</span>
-                                  {item.question && (item.text || '').trim() && (
-                                    <span className="ai-doc-callout-from">
-                                      from: {item.question}
-                                      {item.askedOn && (() => {
-                                        const full = item.askedOn
-                                        const shown = full.length > 60 ? full.slice(0, 60).trimEnd() + '…' : full
-                                        return item.askedOnId ? (
-                                          <button
-                                            type="button"
-                                            className="ai-doc-callout-on ai-doc-callout-on-clickable"
-                                            onClick={() => {
-                                              const id = item.askedOnId
-                                              setNotesMode('me')
-                                              setHighlightMeBlockId(id)
-                                              setTimeout(() => {
-                                                const el = document.querySelector(`[data-block-id="${id}"]`)
-                                                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                                              }, 40)
-                                              setTimeout(() => setHighlightMeBlockId(curr => (curr === id ? null : curr)), 2000)
-                                            }}
-                                            onMouseDown={e => e.preventDefault()}
-                                            title={full.length > 60 ? full : 'Jump to this note in Me mode'}
-                                          > on “{shown}”</button>
-                                        ) : (
-                                          <span className="ai-doc-callout-on" title={full.length > 60 ? full : undefined}> on “{shown}”</span>
-                                        )
-                                      })()}
-                                      {item.askedAt && (
-                                        <span className="ai-doc-callout-stamp" title={new Date(item.askedAt).toLocaleString()}>
-                                          {new Date(item.askedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                          <span className="ai-doc-callout-stamp-dot">·</span>
-                                          {new Date(item.askedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-                                        </span>
-                                      )}
-                                    </span>
+                                      }}
+                                    >{item.text}</span>
+                                  </div>
+                                  {item.aiBlockId && (
+                                    <button
+                                      type="button"
+                                      className={`ai-doc-callout-regen imsg-regen ${regeneratingCalloutIds.has(item.aiBlockId) ? 'is-regenerating' : ''}`}
+                                      onClick={() => regenerateCallout(item.aiBlockId)}
+                                      onMouseDown={e => e.preventDefault()}
+                                      disabled={regeneratingCalloutIds.has(item.aiBlockId)}
+                                      title="Regenerate this response"
+                                      aria-label="Regenerate response"
+                                    >
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="23 4 23 10 17 10"/>
+                                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                                      </svg>
+                                    </button>
                                   )}
-                                </span>
-                                {item.aiBlockId && (
-                                  <button
-                                    type="button"
-                                    className={`ai-doc-callout-regen ${regeneratingCalloutIds.has(item.aiBlockId) ? 'is-regenerating' : ''}`}
-                                    onClick={() => regenerateCallout(item.aiBlockId)}
-                                    onMouseDown={e => e.preventDefault()}
-                                    disabled={regeneratingCalloutIds.has(item.aiBlockId)}
-                                    title="Regenerate this response"
-                                    aria-label="Regenerate response"
-                                  >
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                                      <polyline points="23 4 23 10 17 10"/>
-                                      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-                                    </svg>
-                                  </button>
+                                </div>
+                                {fullOn && (
+                                  <div className="imsg-thread" contentEditable={false}>
+                                    <span className="imsg-thread-curve" aria-hidden>
+                                      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                                        <path d="M2 0 L2 14 Q 2 20 8 20 L 20 20" stroke="#c7ccd6" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+                                      </svg>
+                                    </span>
+                                    {item.askedOnId ? (
+                                      <button
+                                        type="button"
+                                        className="imsg-thread-quote imsg-thread-quote-clickable"
+                                        onClick={() => {
+                                          const id = item.askedOnId
+                                          setNotesMode('me')
+                                          setHighlightMeBlockId(id)
+                                          setTimeout(() => {
+                                            const el = document.querySelector(`[data-block-id="${id}"]`)
+                                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                          }, 40)
+                                          setTimeout(() => setHighlightMeBlockId(curr => (curr === id ? null : curr)), 2000)
+                                        }}
+                                        onMouseDown={e => e.preventDefault()}
+                                        title={fullOn.length > 60 ? fullOn : 'Jump to this note in Me mode'}
+                                      >{shownOn}</button>
+                                    ) : (
+                                      <span className="imsg-thread-quote" title={fullOn.length > 60 ? fullOn : undefined}>{shownOn}</span>
+                                    )}
+                                  </div>
                                 )}
                               </li>
                             )
