@@ -1916,15 +1916,35 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                     </span>
                                   </div>
                                 )}
+                                {fullOn && (
+                                  item.askedOnId ? (
+                                    <button
+                                      type="button"
+                                      className="imsg-context imsg-context-clickable"
+                                      onClick={() => {
+                                        const id = item.askedOnId
+                                        setNotesMode('me')
+                                        setHighlightMeBlockId(id)
+                                        setTimeout(() => {
+                                          const el = document.querySelector(`[data-block-id="${id}"]`)
+                                          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                        }, 40)
+                                        setTimeout(() => setHighlightMeBlockId(curr => (curr === id ? null : curr)), 2000)
+                                      }}
+                                      onMouseDown={e => e.preventDefault()}
+                                      title={fullOn.length > 60 ? fullOn : 'Jump to this note in Me mode'}
+                                    >{shownOn}</button>
+                                  ) : (
+                                    <span className="imsg-context" title={fullOn.length > 60 ? fullOn : undefined}>{shownOn}</span>
+                                  )
+                                )}
                                 {item.question && (item.text || '').trim() && (
-                                  <div className="imsg-row imsg-row-sent" contentEditable={false}>
-                                    <div className="imsg-bubble imsg-bubble-sent">
-                                      {item.question}
-                                    </div>
+                                  <div className="imsg-query" contentEditable={false}>
+                                    {item.question}
                                   </div>
                                 )}
-                                <div className="imsg-row imsg-row-received">
-                                  <div className="imsg-bubble imsg-bubble-received">
+                                <div className="imsg-response-row">
+                                  <div className="imsg-response">
                                     <span
                                       className="ai-doc-callout-answer imsg-answer"
                                       contentEditable={editable}
@@ -1976,35 +1996,6 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                     </button>
                                   )}
                                 </div>
-                                {fullOn && (
-                                  <div className="imsg-thread" contentEditable={false}>
-                                    <span className="imsg-thread-curve" aria-hidden>
-                                      <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                                        <path d="M2 0 L2 14 Q 2 20 8 20 L 20 20" stroke="#c7ccd6" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
-                                      </svg>
-                                    </span>
-                                    {item.askedOnId ? (
-                                      <button
-                                        type="button"
-                                        className="imsg-thread-quote imsg-thread-quote-clickable"
-                                        onClick={() => {
-                                          const id = item.askedOnId
-                                          setNotesMode('me')
-                                          setHighlightMeBlockId(id)
-                                          setTimeout(() => {
-                                            const el = document.querySelector(`[data-block-id="${id}"]`)
-                                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                                          }, 40)
-                                          setTimeout(() => setHighlightMeBlockId(curr => (curr === id ? null : curr)), 2000)
-                                        }}
-                                        onMouseDown={e => e.preventDefault()}
-                                        title={fullOn.length > 60 ? fullOn : 'Jump to this note in Me mode'}
-                                      >{shownOn}</button>
-                                    ) : (
-                                      <span className="imsg-thread-quote" title={fullOn.length > 60 ? fullOn : undefined}>{shownOn}</span>
-                                    )}
-                                  </div>
-                                )}
                               </li>
                             )
                           }

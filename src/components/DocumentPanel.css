@@ -488,6 +488,12 @@
   color: #1a1a2e;
   font-size: 13.5px;
   line-height: 1.5;
+  position: relative;
+}
+
+/* Per-step L connectors replace the continuous rail (see .imsg-query::before / .imsg-response::before). */
+.ai-doc-callout.imsg-callout::before {
+  content: none;
 }
 
 .imsg-callout .ai-doc-callout-glyph,
@@ -526,47 +532,111 @@
   color: #9aa1b0;
 }
 
-.imsg-row {
+/* Staircase step 1 — context (askedOn) sits at the left, no incoming connector */
+.imsg-context {
+  display: block;
+  width: fit-content;
+  max-width: min(74%, 500px);
+  margin: 2px 0 0 0;
+  padding: 5px 11px;
+  background: rgba(243, 240, 251, 0.7);
+  border: 1px solid #e3dcf7;
+  border-radius: 14px;
+  color: #8b7fb0;
+  font-size: 11px;
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: left;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  font-family: inherit;
+}
+
+button.imsg-context {
+  cursor: pointer;
+}
+
+button.imsg-context-clickable:hover {
+  background: rgba(237, 233, 254, 0.9);
+  border-color: #c4b5fd;
+  color: #7c3aed;
+}
+
+/* Staircase step 2 — query bubble, shifted right and connected up-left to context */
+.imsg-query {
+  display: block;
+  width: fit-content;
+  max-width: min(74%, 500px);
+  margin: 14px 0 0 44px;
+  padding: 8px 13px;
+  background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%);
+  color: #ffffff;
+  border-radius: 18px;
+  border-top-left-radius: 6px;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  box-shadow: 0 1px 1px rgba(17, 24, 39, 0.04);
+  position: relative;
+}
+
+.imsg-query::before {
+  content: '';
+  position: absolute;
+  left: -28px;
+  top: -12px;
+  width: 28px;
+  height: 12px;
+  border-left: 1.5px solid #c4b5fd;
+  border-bottom: 1.5px solid #c4b5fd;
+  border-bottom-left-radius: 10px;
+  pointer-events: none;
+}
+
+/* Staircase step 3 — response row is full-width; bubble itself carries the indent */
+.imsg-response-row {
   display: flex;
   align-items: flex-end;
   gap: 6px;
-  margin: 2px 0;
+  margin: 14px 0 0 0;
   width: 100%;
-}
-
-.imsg-row-sent {
-  justify-content: flex-end;
-}
-
-.imsg-row-received {
   justify-content: flex-start;
 }
 
-.imsg-bubble {
+.imsg-response {
   display: inline-block;
-  max-width: min(78%, 560px);
+  max-width: min(74%, 500px);
+  margin-left: 88px;
   padding: 8px 13px;
+  background: #eef0f4;
+  color: #1a1a2e;
+  border: 1px solid #e5e7ec;
   border-radius: 18px;
+  border-top-left-radius: 6px;
   font-size: 13.5px;
   line-height: 1.45;
   word-wrap: break-word;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   box-shadow: 0 1px 1px rgba(17, 24, 39, 0.04);
+  position: relative;
 }
 
-.imsg-bubble-sent {
-  background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%);
-  color: #ffffff;
-  border-bottom-right-radius: 6px;
-  font-weight: 500;
-}
-
-.imsg-bubble-received {
-  background: #eef0f4;
-  color: #1a1a2e;
-  border: 1px solid #e5e7ec;
-  border-bottom-left-radius: 6px;
+.imsg-response::before {
+  content: '';
+  position: absolute;
+  left: -28px;
+  top: -12px;
+  width: 28px;
+  height: 12px;
+  border-left: 1.5px solid #c4b5fd;
+  border-bottom: 1.5px solid #c4b5fd;
+  border-bottom-left-radius: 10px;
+  pointer-events: none;
 }
 
 .imsg-answer {
@@ -592,59 +662,6 @@
 .imsg-callout:hover .imsg-regen,
 .imsg-regen.is-regenerating {
   opacity: 1;
-}
-
-/* Thread: quoted "askedOn" note BELOW the response — curve flows from response down into the quote */
-.imsg-thread {
-  display: flex;
-  align-items: flex-start;
-  gap: 0;
-  margin: -2px 0 0 14px;
-  padding: 0;
-  position: relative;
-}
-
-.imsg-thread-curve {
-  display: inline-flex;
-  align-items: flex-start;
-  margin: 0 4px 0 0;
-  width: 22px;
-  height: 22px;
-  opacity: 0.85;
-  flex-shrink: 0;
-}
-
-.imsg-thread-curve svg {
-  display: block;
-  width: 22px;
-  height: 22px;
-}
-
-.imsg-thread-quote {
-  display: inline-block;
-  max-width: 70%;
-  margin-top: 10px;
-  padding: 5px 11px;
-  background: rgba(243, 240, 251, 0.7);
-  border: 1px solid #e3dcf7;
-  border-radius: 14px;
-  color: #8b7fb0;
-  font-size: 11px;
-  font-style: italic;
-  font-weight: 400;
-  line-height: 1.4;
-  text-align: left;
-}
-
-button.imsg-thread-quote-clickable {
-  cursor: pointer;
-  font-family: inherit;
-}
-
-button.imsg-thread-quote-clickable:hover {
-  background: rgba(237, 233, 254, 0.85);
-  border-color: #c4b5fd;
-  color: #7c3aed;
 }
 
 .ai-doc-body ul.ai-doc-ul li.ai-doc-callout.imsg-callout {
