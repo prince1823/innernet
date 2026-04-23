@@ -625,10 +625,10 @@
   max-width: 70%;
   margin-top: 10px;
   padding: 5px 11px;
-  background: rgba(238, 240, 244, 0.6);
-  border: 1px solid #e5e7ec;
+  background: rgba(243, 240, 251, 0.7);
+  border: 1px solid #e3dcf7;
   border-radius: 14px;
-  color: #8b93a3;
+  color: #8b7fb0;
   font-size: 11px;
   font-style: italic;
   font-weight: 400;
@@ -642,8 +642,8 @@ button.imsg-thread-quote-clickable {
 }
 
 button.imsg-thread-quote-clickable:hover {
-  background: rgba(237, 233, 254, 0.7);
-  border-color: #d8ccfb;
+  background: rgba(237, 233, 254, 0.85);
+  border-color: #c4b5fd;
   color: #7c3aed;
 }
 
