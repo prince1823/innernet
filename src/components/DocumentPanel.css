@@ -552,7 +552,7 @@
 .imsg-context {
   display: block;
   width: fit-content;
-  max-width: min(74%, 500px);
+  max-width: calc(100% - 40px);
   margin: 2px 0 0 0;
   padding: 5px 11px;
   background: rgba(243, 240, 251, 0.7);
@@ -583,8 +583,8 @@ button.imsg-context-clickable:hover {
 .imsg-query {
   display: block;
   width: fit-content;
-  max-width: min(74%, 500px);
-  margin: 14px 0 0 44px;
+  max-width: calc(100% - 100px);
+  margin: 14px 0 0 80px;
   padding: 8px 13px;
   background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%);
   color: #ffffff;
@@ -600,13 +600,13 @@ button.imsg-context-clickable:hover {
   position: relative;
 }
 
-/* Q branches off the shared rail at x=20 (Q.left - 24). Vertical overlaps the rail; horizontal hooks into Q.top-left. */
+/* Q branches off the shared rail at x=20 (Q.left - 60). Vertical overlaps the rail; horizontal hooks into Q.top-left. */
 .imsg-query::before {
   content: '';
   position: absolute;
-  left: -24px;
+  left: -60px;
   top: -14px;
-  width: 24px;
+  width: 60px;
   height: 14px;
   border-left: 1.5px solid #c4b5fd;
   border-bottom: 1.5px solid #c4b5fd;
@@ -626,8 +626,8 @@ button.imsg-context-clickable:hover {
 
 .imsg-response {
   display: inline-block;
-  max-width: min(74%, 500px);
-  margin-left: 88px;
+  max-width: calc(100% - 180px);
+  margin-left: 160px;
   padding: 8px 13px;
   background: #eef0f4;
   color: #1a1a2e;
@@ -643,13 +643,13 @@ button.imsg-context-clickable:hover {
   position: relative;
 }
 
-/* R hangs off its own Q: vertical at Q.left (x=44), horizontal over to R.left (x=88). */
+/* R hangs off its own Q: vertical at Q.left (x=80), horizontal over to R.left (x=160). */
 .imsg-response::before {
   content: '';
   position: absolute;
-  left: -44px;
+  left: -80px;
   top: -14px;
-  width: 44px;
+  width: 80px;
   height: 14px;
   border-left: 1.5px solid #c4b5fd;
   border-bottom: 1.5px solid #c4b5fd;
