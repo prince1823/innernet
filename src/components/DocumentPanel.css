@@ -579,24 +579,25 @@ button.imsg-context-clickable:hover {
   color: #7c3aed;
 }
 
-/* Staircase step 2 — query bubble, shifted right and connected up-left to context */
+/* Staircase step 2 — query, styled as a small lavender pill (was a big solid purple bubble) */
 .imsg-query {
   display: block;
   width: fit-content;
   max-width: calc(100% - 100px);
   margin: 14px 0 0 80px;
-  padding: 8px 13px;
-  background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%);
-  color: #ffffff;
-  border-radius: 18px;
-  border-top-left-radius: 6px;
-  font-size: 13.5px;
+  padding: 3px 10px;
+  background: #f4efff;
+  color: #6d28d9;
+  border: 1px solid #d9cef9;
+  border-radius: 12px;
+  border-top-left-radius: 3px;
+  font-size: 12px;
   font-weight: 500;
-  line-height: 1.45;
+  line-height: 1.4;
   word-wrap: break-word;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
-  box-shadow: 0 1px 1px rgba(17, 24, 39, 0.04);
+  box-shadow: none;
   position: relative;
 }
 
