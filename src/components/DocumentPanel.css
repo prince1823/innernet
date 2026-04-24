@@ -739,13 +739,13 @@ button.imsg-context-clickable:hover {
 .imsg-followup-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 9px;
+  gap: 3px;
+  padding: 1px 7px;
   background: transparent;
   color: #7c3aed;
   border: 1px dashed rgba(124, 58, 237, 0.35);
-  border-radius: 10px;
-  font-size: 10.5px;
+  border-radius: 8px;
+  font-size: 9px;
   font-weight: 500;
   font-family: inherit;
   letter-spacing: 0.1px;
@@ -760,9 +760,63 @@ button.imsg-context-clickable:hover {
   content: '+';
   display: inline-block;
   font-weight: 600;
+  font-size: 10px;
   opacity: 0.7;
   line-height: 1;
   transform: translateY(-0.5px);
+}
+
+/* "Ask anything" is the custom-input variant — solid accent makes it feel like a CTA
+   among the ghost chips. Uses its own glyph (✨) instead of the "+" prefix. */
+.imsg-followup-chip-ask {
+  background: rgba(124, 58, 237, 0.08);
+  border-style: solid;
+  color: #6d28d9;
+}
+
+.imsg-followup-chip-ask::before {
+  content: '✨';
+  font-size: 8px;
+  opacity: 0.85;
+  transform: translateY(0);
+}
+
+.imsg-followup-chip-ask:hover {
+  background: rgba(124, 58, 237, 0.14);
+  border-color: rgba(124, 58, 237, 0.7);
+}
+
+/* Inline input row shown when "Ask anything" is clicked — replaces the chip row
+   in place, so the rest of the callout layout stays put. */
+.imsg-ask-row {
+  align-items: stretch;
+}
+
+.imsg-ask-input {
+  flex: 1;
+  min-width: 0;
+  max-width: 420px;
+  padding: 4px 10px;
+  background: #ffffff;
+  color: #1f1b36;
+  border: 1px solid rgba(124, 58, 237, 0.45);
+  border-radius: 10px;
+  font-size: 11.5px;
+  font-family: inherit;
+  line-height: 1.4;
+  outline: none;
+  box-shadow: 0 1px 2px rgba(124, 58, 237, 0.08);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.imsg-ask-input::placeholder {
+  color: #9b95b4;
+  font-style: italic;
+}
+
+.imsg-ask-input:focus {
+  border-color: rgba(124, 58, 237, 0.8);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
 }
 
 .imsg-followup-chip:hover {

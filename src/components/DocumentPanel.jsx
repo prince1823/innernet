@@ -761,6 +761,10 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   const [highlightMeBlockId, setHighlightMeBlockId] = useState(null)
   // Track per-callout regeneration state by AI block id
   const [regeneratingCalloutIds, setRegeneratingCalloutIds] = useState(new Set())
+  // When set to an AI block id, the "Ask anything" input replaces that callout's
+  // follow-up chip row. Holds the draft text too so the field is controlled.
+  const [askInputFor, setAskInputFor] = useState(null)
+  const [askInputText, setAskInputText] = useState('')
   // Generated AI-enhanced view per date: { [date]: { sourceHash, content, generatedAt } }
   const [aiViews, setAiViews] = useState(loadAiViews)
   const [aiViewLoading, setAiViewLoading] = useState(false)
@@ -2078,20 +2082,76 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                   )}
                                 </div>
                                 {!hasNext && item.aiBlockId && item.askedOnId && (item.text || '').trim() && !regeneratingCalloutIds.has(item.aiBlockId) && (
-                                  <div className="imsg-followups" contentEditable={false}>
-                                    {['Go deeper', 'Give an example', 'Summarize'].map(suggestion => (
+                                  askInputFor === item.aiBlockId ? (
+                                    <div className="imsg-followups imsg-ask-row" contentEditable={false}>
+                                      <input
+                                        className="imsg-ask-input"
+                                        type="text"
+                                        autoFocus
+                                        placeholder="Ask anything about this thread…"
+                                        value={askInputText}
+                                        onChange={e => setAskInputText(e.target.value)}
+                                        onKeyDown={e => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault()
+                                            const q = askInputText.trim()
+                                            if (!q) return
+                                            // Build chained context from ALL prior answers in this same thread
+                                            // so the AI sees the full conversation, not just the last turn.
+                                            const priorAnswers = []
+                                            for (let k = 0; k <= ii; k++) {
+                                              const p = block.items[k]
+                                              if (p?.kind === 'callout' && (p.askedOn || '') === fullOn && (p.text || '').trim()) {
+                                                priorAnswers.push(p.text)
+                                              }
+                                            }
+                                            const chained = priorAnswers.join('\n\n')
+                                            setAskInputFor(null)
+                                            setAskInputText('')
+                                            askFollowUp(item.askedOnId, q, fullOn, chained)
+                                          } else if (e.key === 'Escape') {
+                                            e.preventDefault()
+                                            setAskInputFor(null)
+                                            setAskInputText('')
+                                          }
+                                        }}
+                                        onBlur={() => {
+                                          // Close if empty — keeps the UI tidy when user clicks away
+                                          if (!askInputText.trim()) {
+                                            setAskInputFor(null)
+                                            setAskInputText('')
+                                          }
+                                        }}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div className="imsg-followups" contentEditable={false}>
+                                      {['Go deeper', 'Give an example'].map(suggestion => (
+                                        <button
+                                          key={suggestion}
+                                          type="button"
+                                          className="imsg-followup-chip"
+                                          onClick={() => askFollowUp(item.askedOnId, suggestion, fullOn, item.text)}
+                                          onMouseDown={e => e.preventDefault()}
+                                          title={`Ask: ${suggestion.toLowerCase()}`}
+                                        >
+                                          {suggestion}
+                                        </button>
+                                      ))}
                                       <button
-                                        key={suggestion}
                                         type="button"
-                                        className="imsg-followup-chip"
-                                        onClick={() => askFollowUp(item.askedOnId, suggestion, fullOn, item.text)}
+                                        className="imsg-followup-chip imsg-followup-chip-ask"
+                                        onClick={() => {
+                                          setAskInputFor(item.aiBlockId)
+                                          setAskInputText('')
+                                        }}
                                         onMouseDown={e => e.preventDefault()}
-                                        title={`Ask: ${suggestion.toLowerCase()}`}
+                                        title="Ask a custom question with full thread context"
                                       >
-                                        {suggestion}
+                                        Ask anything
                                       </button>
-                                    ))}
-                                  </div>
+                                    </div>
+                                  )
                                 )}
                               </li>
                             )
