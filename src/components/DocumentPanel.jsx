@@ -1787,6 +1787,25 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
           sources: [],
         })
       }
+      // Group items within each section by topic so callouts sharing the same
+      // Me-block parent always appear contiguously — even if the tree walk pushed
+      // them in a non-adjacent order because other me-blocks sat between them.
+      // Without this, a second Q on the same topic rendered later (interleaved
+      // with other topics) would become a visually separate thread with its
+      // own header instead of continuing the first one.
+      //
+      // Key preference: `askedOnId` first (distinct me-blocks stay distinct even if text matches),
+      // falling back to `askedOn` text (so legacy data without ids still groups sensibly).
+      // First-appearance order of each group is preserved so the oldest thread stays on top.
+      for (const entry of byTop.values()) {
+        const groups = new Map()
+        for (const it of entry.items) {
+          const key = it.askedOnId || it.askedOn || '__ungrouped__'
+          if (!groups.has(key)) groups.set(key, [])
+          groups.get(key).push(it)
+        }
+        entry.items = Array.from(groups.values()).flat()
+      }
       const doc = []
       for (const { topText, items } of byTop.values()) {
         if (!items.length) continue
