@@ -412,6 +412,18 @@ function prependChildren(tree, parentId, newChildren) {
   return next
 }
 
+// Append new blocks to the end of a parent block's children (auto-expands if collapsed).
+// Used by follow-up chips so the new Q&A extends an existing thread chronologically.
+function appendChildren(tree, parentId, newChildren) {
+  const next = cloneTree(tree)
+  const ctx = findContext(next, parentId)
+  if (!ctx) return next
+  if (!ctx.block.children) ctx.block.children = []
+  ctx.block.children = [...ctx.block.children, ...newChildren]
+  if (ctx.block.collapsed) ctx.block.collapsed = false
+  return next
+}
+
 // Flatten an AI markdown response into a single-paragraph plain-text string.
 // The AI response always lands in one block rendered as flowing prose, so:
 //   - List markers (- * + 1. 2. …) and heading markers (# ##) are dropped
@@ -1357,6 +1369,41 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     }
   }, [trees, selectedDate, askAI])
 
+  // Ask a follow-up question on the same Me-block a previous callout was scoped to.
+  // Powers the "Go deeper / Give an example / Summarize" chips under each response:
+  // creates a new AI child under the same parent so the thread rail continues,
+  // feeding the previous answer into context so chained chips chain meaningfully.
+  const askFollowUp = useCallback(async (askedOnBlockId, question, askedOnText, previousAnswer) => {
+    if (!askedOnBlockId || !question) return
+    const aiBlockId = newBlockId()
+    const aiBlock = {
+      id: aiBlockId,
+      text: '',
+      children: [],
+      isAI: true,
+      sourceQuery: question,
+      sourceContext: askedOnText || '',
+      askedAt: Date.now(),
+    }
+    applyTreeOp(tree => appendChildren(tree, askedOnBlockId, [aiBlock]))
+    setRegeneratingCalloutIds(prev => { const next = new Set(prev); next.add(aiBlockId); return next })
+    try {
+      const baseContext = askedOnText || ''
+      const chainedContext = previousAnswer
+        ? `${baseContext}\n\nPrevious answer: ${previousAnswer}`
+        : baseContext
+      const prompt = `Answer this follow-up question: ${question}\n\nContext:\n${chainedContext}\n\nRespond as a single flowing paragraph, 2-3 sentences maximum. Be concise and focused. Do NOT use bullet points, numbered lists, or headings — write it as continuous prose.`
+      const response = await askAI(prompt, chainedContext)
+      const paraText = formatAIParagraph(response) || (response || '')
+      applyTreeOp(tree => setBlockText(tree, aiBlockId, paraText))
+      await streamBlockText(aiBlockId, paraText)
+    } catch (e) {
+      // leave empty on failure — user can delete by backspacing
+    } finally {
+      setRegeneratingCalloutIds(prev => { const next = new Set(prev); next.delete(aiBlockId); return next })
+    }
+  }, [askAI])
+
   // Selection-driven "Improve" rewrite: take the user's highlighted substring,
   // ask the AI to transform it per the chosen action, and splice the rewrite
   // back into the contentEditable element. Works across Me mode (tree-backed)
@@ -1716,7 +1763,10 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     if (pairs.length > 0) {
       const byTop = new Map()
       for (const p of pairs) {
-        if (!(p.answer || '').trim()) continue
+        // Include empty-answer pairs when they're actively regenerating — that's how the
+        // typing-dots indicator renders for a pending follow-up (block added to tree but
+        // no text yet). Otherwise skip empties so deleted/placeholder blocks don't show.
+        if (!(p.answer || '').trim() && !regeneratingCalloutIds.has(p.id)) continue
         if (!byTop.has(p.topId)) byTop.set(p.topId, { topText: p.topText, items: [] })
         byTop.get(p.topId).items.push({
           kind: 'callout',
@@ -1926,14 +1976,77 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                     <span className="imsg-context" title={fullOn.length > 60 ? fullOn : undefined}>{shownOn}</span>
                                   )
                                 )}
-                                {item.question && (item.text || '').trim() && (
-                                  <>
-                                    <div className="imsg-query" contentEditable={false}>
+                                {item.question && (
+                                  <div className="imsg-query-row" contentEditable={false}>
+                                    <div className="imsg-query">
                                       {item.question}
                                     </div>
                                     {item.askedAt && (
-                                      <div
-                                        className="imsg-meta imsg-meta-query"
+                                      <span
+                                        className="imsg-meta imsg-meta-query imsg-meta-inline"
+                                        title={new Date(item.askedAt).toLocaleString()}
+                                      >
+                                        <span className="imsg-meta-date">
+                                          {new Date(item.askedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                        </span>
+                                        <span className="imsg-meta-dot">·</span>
+                                        <span className="imsg-meta-time">
+                                          {new Date(item.askedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                                        </span>
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                                <div className="imsg-response-row">
+                                  <div className="imsg-response">
+                                    {(regeneratingCalloutIds.has(item.aiBlockId) || !(item.text || '').trim()) ? (
+                                      <span
+                                        className="imsg-typing"
+                                        contentEditable={false}
+                                        aria-label="Thinking"
+                                      >
+                                        <span className="imsg-typing-dot" />
+                                        <span className="imsg-typing-dot" />
+                                        <span className="imsg-typing-dot" />
+                                      </span>
+                                    ) : (
+                                      <span
+                                        className="ai-doc-callout-answer imsg-answer"
+                                        contentEditable={editable}
+                                        suppressContentEditableWarning
+                                        onKeyDown={e => {
+                                          if ((e.key === 'Backspace' || e.key === 'Delete') && item.aiBlockId) {
+                                            const t = e.currentTarget.textContent || ''
+                                            if (!t.trim()) {
+                                              e.preventDefault()
+                                              applyTreeOp(tree => deleteBlock(tree, item.aiBlockId))
+                                            }
+                                          }
+                                        }}
+                                        onInput={e => {
+                                          const t = e.currentTarget.textContent || ''
+                                          if (!t.trim() && item.aiBlockId) {
+                                            applyTreeOp(tree => deleteBlock(tree, item.aiBlockId))
+                                          }
+                                        }}
+                                        onBlur={e => {
+                                          const t = e.currentTarget.textContent || ''
+                                          if (t !== item.text) {
+                                            if (!t.trim() && item.aiBlockId) {
+                                              applyTreeOp(tree => deleteBlock(tree, item.aiBlockId))
+                                              return
+                                            }
+                                            updateDocNodeText({ block: bi, item: ii }, t)
+                                            if (item.aiBlockId) {
+                                              applyTreeOp(tree => setBlockText(tree, item.aiBlockId, t))
+                                            }
+                                          }
+                                        }}
+                                      >{item.text}</span>
+                                    )}
+                                    {item.askedAt && (regeneratingCalloutIds.has(item.aiBlockId) || (item.text || '').trim()) && (
+                                      <span
+                                        className="imsg-meta imsg-meta-response imsg-meta-inline"
                                         contentEditable={false}
                                         title={new Date(item.askedAt).toLocaleString()}
                                       >
@@ -1944,45 +2057,8 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                         <span className="imsg-meta-time">
                                           {new Date(item.askedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
                                         </span>
-                                      </div>
+                                      </span>
                                     )}
-                                  </>
-                                )}
-                                <div className="imsg-response-row">
-                                  <div className="imsg-response">
-                                    <span
-                                      className="ai-doc-callout-answer imsg-answer"
-                                      contentEditable={editable}
-                                      suppressContentEditableWarning
-                                      onKeyDown={e => {
-                                        if ((e.key === 'Backspace' || e.key === 'Delete') && item.aiBlockId) {
-                                          const t = e.currentTarget.textContent || ''
-                                          if (!t.trim()) {
-                                            e.preventDefault()
-                                            applyTreeOp(tree => deleteBlock(tree, item.aiBlockId))
-                                          }
-                                        }
-                                      }}
-                                      onInput={e => {
-                                        const t = e.currentTarget.textContent || ''
-                                        if (!t.trim() && item.aiBlockId) {
-                                          applyTreeOp(tree => deleteBlock(tree, item.aiBlockId))
-                                        }
-                                      }}
-                                      onBlur={e => {
-                                        const t = e.currentTarget.textContent || ''
-                                        if (t !== item.text) {
-                                          if (!t.trim() && item.aiBlockId) {
-                                            applyTreeOp(tree => deleteBlock(tree, item.aiBlockId))
-                                            return
-                                          }
-                                          updateDocNodeText({ block: bi, item: ii }, t)
-                                          if (item.aiBlockId) {
-                                            applyTreeOp(tree => setBlockText(tree, item.aiBlockId, t))
-                                          }
-                                        }
-                                      }}
-                                    >{item.text}</span>
                                   </div>
                                   {item.aiBlockId && (
                                     <button
@@ -2001,19 +2077,20 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                     </button>
                                   )}
                                 </div>
-                                {item.askedAt && (
-                                  <div
-                                    className="imsg-meta imsg-meta-response"
-                                    contentEditable={false}
-                                    title={new Date(item.askedAt).toLocaleString()}
-                                  >
-                                    <span className="imsg-meta-date">
-                                      {new Date(item.askedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                    </span>
-                                    <span className="imsg-meta-dot">·</span>
-                                    <span className="imsg-meta-time">
-                                      {new Date(item.askedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-                                    </span>
+                                {!hasNext && item.aiBlockId && item.askedOnId && (item.text || '').trim() && !regeneratingCalloutIds.has(item.aiBlockId) && (
+                                  <div className="imsg-followups" contentEditable={false}>
+                                    {['Go deeper', 'Give an example', 'Summarize'].map(suggestion => (
+                                      <button
+                                        key={suggestion}
+                                        type="button"
+                                        className="imsg-followup-chip"
+                                        onClick={() => askFollowUp(item.askedOnId, suggestion, fullOn, item.text)}
+                                        onMouseDown={e => e.preventDefault()}
+                                        title={`Ask: ${suggestion.toLowerCase()}`}
+                                      >
+                                        {suggestion}
+                                      </button>
+                                    ))}
                                   </div>
                                 )}
                               </li>
