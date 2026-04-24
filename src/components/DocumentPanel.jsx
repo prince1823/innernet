@@ -1893,14 +1893,18 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                             const isHighlighted = highlightCalloutAiId && item.aiBlockId === highlightCalloutAiId
                             const fullOn = item.askedOn || ''
                             const shownOn = fullOn.length > 60 ? fullOn.slice(0, 60).trimEnd() + '…' : fullOn
+                            const prev = ii > 0 ? block.items[ii - 1] : null
+                            const isContinuation = !!(prev && prev.kind === 'callout' && (prev.askedOn || '') === fullOn && fullOn.length > 0)
+                            const next = ii < block.items.length - 1 ? block.items[ii + 1] : null
+                            const hasNext = !!(next && next.kind === 'callout' && (next.askedOn || '') === fullOn && fullOn.length > 0)
                             return (
                               <li
                                 key={ii}
-                                className={`ai-doc-callout imsg-callout ${isHighlighted ? 'ai-doc-callout-highlight' : ''}`}
+                                className={`ai-doc-callout imsg-callout ${isContinuation ? 'imsg-callout-cont' : ''} ${hasNext ? 'imsg-has-next' : ''} ${isHighlighted ? 'ai-doc-callout-highlight' : ''}`}
                                 contentEditable={false}
                                 ref={isHighlighted ? (el => el && el.scrollIntoView({ behavior: 'smooth', block: 'center' })) : undefined}
                               >
-                                {item.askedAt && (
+                                {item.askedAt && !isContinuation && (
                                   <div className="imsg-time" contentEditable={false}>
                                     <span
                                       className="imsg-time-label"
@@ -1916,7 +1920,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                     </span>
                                   </div>
                                 )}
-                                {fullOn && (
+                                {fullOn && !isContinuation && (
                                   item.askedOnId ? (
                                     <button
                                       type="button"

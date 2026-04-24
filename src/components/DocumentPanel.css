@@ -491,9 +491,25 @@
   position: relative;
 }
 
-/* Per-step L connectors replace the continuous rail (see .imsg-query::before / .imsg-response::before). */
+/* Shared rail is drawn only when the next callout continues the same thread — otherwise Q's own L-connector
+   is the tail of the thread and no rail is needed. */
 .ai-doc-callout.imsg-callout::before {
   content: none;
+}
+
+.ai-doc-callout.imsg-callout.imsg-has-next::before {
+  content: '';
+  position: absolute;
+  left: 20px;
+  top: 70px;
+  bottom: 0;
+  width: 1.5px;
+  background: #c4b5fd;
+  pointer-events: none;
+}
+
+.ai-doc-callout.imsg-callout.imsg-callout-cont.imsg-has-next::before {
+  top: 14px;
 }
 
 .imsg-callout .ai-doc-callout-glyph,
@@ -584,13 +600,14 @@ button.imsg-context-clickable:hover {
   position: relative;
 }
 
+/* Q branches off the shared rail at x=20 (Q.left - 24). Vertical overlaps the rail; horizontal hooks into Q.top-left. */
 .imsg-query::before {
   content: '';
   position: absolute;
-  left: -28px;
-  top: -12px;
-  width: 28px;
-  height: 12px;
+  left: -24px;
+  top: -14px;
+  width: 24px;
+  height: 14px;
   border-left: 1.5px solid #c4b5fd;
   border-bottom: 1.5px solid #c4b5fd;
   border-bottom-left-radius: 10px;
@@ -626,13 +643,14 @@ button.imsg-context-clickable:hover {
   position: relative;
 }
 
+/* R hangs off its own Q: vertical at Q.left (x=44), horizontal over to R.left (x=88). */
 .imsg-response::before {
   content: '';
   position: absolute;
-  left: -28px;
-  top: -12px;
-  width: 28px;
-  height: 12px;
+  left: -44px;
+  top: -14px;
+  width: 44px;
+  height: 14px;
   border-left: 1.5px solid #c4b5fd;
   border-bottom: 1.5px solid #c4b5fd;
   border-bottom-left-radius: 10px;
@@ -667,6 +685,15 @@ button.imsg-context-clickable:hover {
 .ai-doc-body ul.ai-doc-ul li.ai-doc-callout.imsg-callout {
   list-style: none;
   margin-left: -20px;
+}
+
+/* Continuation — same context as the previous callout: drop the header, rail stays continuous. */
+.imsg-callout.imsg-callout-cont {
+  margin-top: 0;
+}
+
+.imsg-callout.imsg-callout-cont .imsg-query {
+  margin-top: 14px;
 }
 
 .ai-doc-sources {
