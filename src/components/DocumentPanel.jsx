@@ -1904,22 +1904,6 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                 contentEditable={false}
                                 ref={isHighlighted ? (el => el && el.scrollIntoView({ behavior: 'smooth', block: 'center' })) : undefined}
                               >
-                                {item.askedAt && !isContinuation && (
-                                  <div className="imsg-time" contentEditable={false}>
-                                    <span
-                                      className="imsg-time-label"
-                                      title={new Date(item.askedAt).toLocaleString()}
-                                    >
-                                      <span className="imsg-time-day">
-                                        {new Date(item.askedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                      </span>
-                                      <span className="imsg-time-sep">·</span>
-                                      <span className="imsg-time-hour">
-                                        {new Date(item.askedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-                                      </span>
-                                    </span>
-                                  </div>
-                                )}
                                 {fullOn && !isContinuation && (
                                   item.askedOnId ? (
                                     <button
@@ -1943,9 +1927,26 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                   )
                                 )}
                                 {item.question && (item.text || '').trim() && (
-                                  <div className="imsg-query" contentEditable={false}>
-                                    {item.question}
-                                  </div>
+                                  <>
+                                    <div className="imsg-query" contentEditable={false}>
+                                      {item.question}
+                                    </div>
+                                    {item.askedAt && (
+                                      <div
+                                        className="imsg-meta imsg-meta-query"
+                                        contentEditable={false}
+                                        title={new Date(item.askedAt).toLocaleString()}
+                                      >
+                                        <span className="imsg-meta-date">
+                                          {new Date(item.askedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                        </span>
+                                        <span className="imsg-meta-dot">·</span>
+                                        <span className="imsg-meta-time">
+                                          {new Date(item.askedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </>
                                 )}
                                 <div className="imsg-response-row">
                                   <div className="imsg-response">
@@ -2000,6 +2001,21 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                     </button>
                                   )}
                                 </div>
+                                {item.askedAt && (
+                                  <div
+                                    className="imsg-meta imsg-meta-response"
+                                    contentEditable={false}
+                                    title={new Date(item.askedAt).toLocaleString()}
+                                  >
+                                    <span className="imsg-meta-date">
+                                      {new Date(item.askedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                    </span>
+                                    <span className="imsg-meta-dot">·</span>
+                                    <span className="imsg-meta-time">
+                                      {new Date(item.askedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                )}
                               </li>
                             )
                           }

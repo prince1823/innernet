@@ -666,6 +666,48 @@ button.imsg-context-clickable:hover {
   padding: 0;
 }
 
+/* Date/time caption below each bubble — aligned to bubble's start edge */
+.imsg-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 2px;
+  padding: 0;
+  font-size: 8.5px;
+  font-weight: 500;
+  letter-spacing: 0.15px;
+  line-height: 1.3;
+  white-space: nowrap;
+  user-select: none;
+  color: #9b95b4;
+  font-family: inherit;
+  font-style: normal;
+}
+
+.imsg-meta-query {
+  margin-left: 84px;
+  color: #a59bc9;
+}
+
+.imsg-meta-response {
+  margin-left: 164px;
+  color: #8b85a5;
+}
+
+.imsg-meta-date {
+  font-weight: 600;
+  color: inherit;
+}
+
+.imsg-meta-dot {
+  opacity: 0.55;
+}
+
+.imsg-meta-time {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
 .imsg-answer:focus {
   background: rgba(139, 92, 246, 0.08);
   border-radius: 4px;
