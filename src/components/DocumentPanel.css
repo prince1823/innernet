@@ -725,12 +725,14 @@ button.imsg-context-clickable:hover {
 }
 
 /* Follow-up suggestion chips — rendered below the response timestamp.
-   Ghost-pill style, matching the rail lavender. Click to chain a new Q on same context. */
+   Ghost-pill style, matching the rail lavender. Click to chain a new Q on same context.
+   Bottom margin creates breathing room between these chips and the next thread's
+   context pill — otherwise a new topic's query feels crammed against the chips. */
 .imsg-followups {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  margin: 4px 0 0 160px;
+  margin: 4px 0 18px 160px;
   padding-top: 1px;
 }
 
