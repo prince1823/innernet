@@ -765,6 +765,9 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   // follow-up chip row. Holds the draft text too so the field is controlled.
   const [askInputFor, setAskInputFor] = useState(null)
   const [askInputText, setAskInputText] = useState('')
+  // Topic keys (askedOnId || askedOn text) whose full conversation is hidden —
+  // only the context pill + chevron shows; all Q/R bubbles + continuations collapse.
+  const [collapsedTopics, setCollapsedTopics] = useState(new Set())
   // Generated AI-enhanced view per date: { [date]: { sourceHash, content, generatedAt } }
   const [aiViews, setAiViews] = useState(loadAiViews)
   const [aiViewLoading, setAiViewLoading] = useState(false)
@@ -1951,36 +1954,82 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                             const isContinuation = !!(prev && prev.kind === 'callout' && (prev.askedOn || '') === fullOn && fullOn.length > 0)
                             const next = ii < block.items.length - 1 ? block.items[ii + 1] : null
                             const hasNext = !!(next && next.kind === 'callout' && (next.askedOn || '') === fullOn && fullOn.length > 0)
+                            // Topic key groups all callouts that share the same Me-block parent.
+                            // When collapsed, the thread header stays visible but every Q/R inside hides.
+                            const topicKey = item.askedOnId || fullOn
+                            const isCollapsed = !!topicKey && collapsedTopics.has(topicKey)
+                            // Count how many Q/R pairs belong to this topic — shown next to the chevron
+                            // when collapsed so the user knows what's hidden.
+                            let threadCount = 0
+                            if (!isContinuation && topicKey) {
+                              for (let k = ii; k < block.items.length; k++) {
+                                const q = block.items[k]
+                                if (q?.kind === 'callout' && (q.askedOn || '') === fullOn) threadCount++
+                                else break
+                              }
+                            }
+                            // Continuation callouts of a collapsed topic render nothing — the header
+                            // on the first callout represents the entire collapsed thread.
+                            if (isCollapsed && isContinuation) return null
+                            // When the thread is collapsed, the continuation callouts below don't render,
+                            // so the rail has nowhere to go — drop the has-next class to skip drawing it.
+                            const drawRail = hasNext && !isCollapsed
                             return (
                               <li
                                 key={ii}
-                                className={`ai-doc-callout imsg-callout ${isContinuation ? 'imsg-callout-cont' : ''} ${hasNext ? 'imsg-has-next' : ''} ${isHighlighted ? 'ai-doc-callout-highlight' : ''}`}
+                                className={`ai-doc-callout imsg-callout ${isContinuation ? 'imsg-callout-cont' : ''} ${drawRail ? 'imsg-has-next' : ''} ${isCollapsed ? 'imsg-topic-collapsed' : ''} ${isHighlighted ? 'ai-doc-callout-highlight' : ''}`}
                                 contentEditable={false}
                                 ref={isHighlighted ? (el => el && el.scrollIntoView({ behavior: 'smooth', block: 'center' })) : undefined}
                               >
                                 {fullOn && !isContinuation && (
-                                  item.askedOnId ? (
+                                  <div className="imsg-topic-header" contentEditable={false}>
                                     <button
                                       type="button"
-                                      className="imsg-context imsg-context-clickable"
+                                      className="imsg-topic-toggle"
                                       onClick={() => {
-                                        const id = item.askedOnId
-                                        setNotesMode('me')
-                                        setHighlightMeBlockId(id)
-                                        setTimeout(() => {
-                                          const el = document.querySelector(`[data-block-id="${id}"]`)
-                                          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                                        }, 40)
-                                        setTimeout(() => setHighlightMeBlockId(curr => (curr === id ? null : curr)), 2000)
+                                        setCollapsedTopics(prev => {
+                                          const nextSet = new Set(prev)
+                                          if (nextSet.has(topicKey)) nextSet.delete(topicKey)
+                                          else nextSet.add(topicKey)
+                                          return nextSet
+                                        })
                                       }}
                                       onMouseDown={e => e.preventDefault()}
-                                      title={fullOn.length > 60 ? fullOn : 'Jump to this note in Me mode'}
-                                    >{shownOn}</button>
-                                  ) : (
-                                    <span className="imsg-context" title={fullOn.length > 60 ? fullOn : undefined}>{shownOn}</span>
-                                  )
+                                      aria-label={isCollapsed ? 'Expand thread' : 'Collapse thread'}
+                                      title={isCollapsed ? 'Expand thread' : 'Collapse thread'}
+                                    >
+                                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="6 9 12 15 18 9"/>
+                                      </svg>
+                                    </button>
+                                    {item.askedOnId ? (
+                                      <button
+                                        type="button"
+                                        className="imsg-context imsg-context-clickable"
+                                        onClick={() => {
+                                          const id = item.askedOnId
+                                          setNotesMode('me')
+                                          setHighlightMeBlockId(id)
+                                          setTimeout(() => {
+                                            const el = document.querySelector(`[data-block-id="${id}"]`)
+                                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                          }, 40)
+                                          setTimeout(() => setHighlightMeBlockId(curr => (curr === id ? null : curr)), 2000)
+                                        }}
+                                        onMouseDown={e => e.preventDefault()}
+                                        title={fullOn.length > 60 ? fullOn : 'Jump to this note in Me mode'}
+                                      >{shownOn}</button>
+                                    ) : (
+                                      <span className="imsg-context" title={fullOn.length > 60 ? fullOn : undefined}>{shownOn}</span>
+                                    )}
+                                    {isCollapsed && threadCount > 0 && (
+                                      <span className="imsg-topic-count" title={`${threadCount} message${threadCount === 1 ? '' : 's'} hidden`}>
+                                        {threadCount} {threadCount === 1 ? 'msg' : 'msgs'}
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
-                                {item.question && (
+                                {!isCollapsed && item.question && (
                                   <div className="imsg-query-row" contentEditable={false}>
                                     <div className="imsg-query">
                                       {item.question}
@@ -2001,6 +2050,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                     </div>
                                   </div>
                                 )}
+                                {!isCollapsed && (
                                 <div className="imsg-response-row">
                                   <div className="imsg-response">
                                     {(regeneratingCalloutIds.has(item.aiBlockId) || !(item.text || '').trim()) ? (
@@ -2080,7 +2130,8 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                     </button>
                                   )}
                                 </div>
-                                {!hasNext && item.aiBlockId && item.askedOnId && (item.text || '').trim() && !regeneratingCalloutIds.has(item.aiBlockId) && (
+                                )}
+                                {!isCollapsed && !hasNext && item.aiBlockId && item.askedOnId && (item.text || '').trim() && !regeneratingCalloutIds.has(item.aiBlockId) && (
                                   askInputFor === item.aiBlockId ? (
                                     <div className="imsg-followups imsg-ask-row" contentEditable={false}>
                                       <input

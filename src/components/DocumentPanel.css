@@ -553,6 +553,69 @@
 }
 
 /* Staircase step 1 — context (askedOn) sits at the left, no incoming connector */
+/* Topic header — chevron + context pill + optional count badge sit on one row.
+   The chevron hugs the rail's x=20 position so clicking it feels tied to the thread. */
+.imsg-topic-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding-left: 8px;
+}
+
+.imsg-topic-toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #a59bc9;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, transform 160ms ease;
+  user-select: none;
+}
+
+.imsg-topic-toggle:hover {
+  background: rgba(124, 58, 237, 0.1);
+  color: #7c3aed;
+}
+
+.imsg-topic-toggle svg {
+  transition: transform 180ms ease;
+}
+
+/* Chevron is ▼ (down) when expanded, rotates to ▶ (right) when collapsed.
+   180ms transition gives it that satisfying "folding" feel. */
+.imsg-topic-collapsed .imsg-topic-toggle svg {
+  transform: rotate(-90deg);
+}
+
+/* Count badge — shown only when the thread is collapsed, inline after the context pill.
+   Gives a quick preview of how much is hidden without expanding. */
+.imsg-topic-count {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  background: rgba(124, 58, 237, 0.08);
+  color: #7c3aed;
+  border: 1px solid rgba(124, 58, 237, 0.18);
+  border-radius: 9px;
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  user-select: none;
+}
+
+/* Collapsed topic loses the bottom breathing room of a full thread — tighter margin
+   so a stack of collapsed topics reads like a compact outline. */
+.imsg-topic-collapsed {
+  margin-bottom: 4px;
+}
+
 .imsg-context {
   display: block;
   width: fit-content;
