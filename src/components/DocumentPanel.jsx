@@ -2064,13 +2064,12 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                       </span>
                                     )}
                                   </div>
-                                  {item.aiBlockId && (
+                                  {item.aiBlockId && !regeneratingCalloutIds.has(item.aiBlockId) && (
                                     <button
                                       type="button"
-                                      className={`ai-doc-callout-regen imsg-regen ${regeneratingCalloutIds.has(item.aiBlockId) ? 'is-regenerating' : ''}`}
+                                      className="ai-doc-callout-regen imsg-regen"
                                       onClick={() => regenerateCallout(item.aiBlockId)}
                                       onMouseDown={e => e.preventDefault()}
-                                      disabled={regeneratingCalloutIds.has(item.aiBlockId)}
                                       title="Regenerate this response"
                                       aria-label="Regenerate response"
                                     >
