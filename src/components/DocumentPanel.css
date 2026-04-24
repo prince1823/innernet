@@ -603,7 +603,9 @@ button.imsg-context-clickable:hover {
 .imsg-query-row .imsg-meta-query.imsg-meta-inline {
   margin: 0 0 0 8px;
   padding: 0;
-  color: rgba(109, 40, 217, 0.65);
+  /* Muted slate — same ink family as the pill text, dialed back so the timestamp
+     sits quietly at the end of the query without competing with the question itself. */
+  color: rgba(51, 65, 85, 0.55);
   font-size: 8.5px;
 }
 
@@ -613,9 +615,12 @@ button.imsg-context-clickable:hover {
   max-width: calc(100% - 100px);
   margin: 14px 0 0 80px;
   padding: 3px 10px;
-  background: #f4efff;
-  color: #6d28d9;
-  border: 1px solid #d9cef9;
+  /* Cream pill with slate ink — paper-and-ink feel, warm against the lavender rail
+     and cool against the gray response bubble. Deliberately non-purple to keep the
+     rail's lavender as the only cool tone in the thread's color story. */
+  background: #fdf6e3;
+  color: #334155;
+  border: 1px solid #eeddb0;
   border-radius: 12px;
   border-top-left-radius: 3px;
   font-size: 12px;
