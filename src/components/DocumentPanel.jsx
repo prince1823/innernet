@@ -1984,21 +1984,21 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                   <div className="imsg-query-row" contentEditable={false}>
                                     <div className="imsg-query">
                                       {item.question}
+                                      {item.askedAt && (
+                                        <span
+                                          className="imsg-meta imsg-meta-query imsg-meta-inline"
+                                          title={new Date(item.askedAt).toLocaleString()}
+                                        >
+                                          <span className="imsg-meta-date">
+                                            {new Date(item.askedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                          </span>
+                                          <span className="imsg-meta-dot">·</span>
+                                          <span className="imsg-meta-time">
+                                            {new Date(item.askedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                                          </span>
+                                        </span>
+                                      )}
                                     </div>
-                                    {item.askedAt && (
-                                      <span
-                                        className="imsg-meta imsg-meta-query imsg-meta-inline"
-                                        title={new Date(item.askedAt).toLocaleString()}
-                                      >
-                                        <span className="imsg-meta-date">
-                                          {new Date(item.askedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                                        </span>
-                                        <span className="imsg-meta-dot">·</span>
-                                        <span className="imsg-meta-time">
-                                          {new Date(item.askedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
-                                        </span>
-                                      </span>
-                                    )}
                                   </div>
                                 )}
                                 <div className="imsg-response-row">

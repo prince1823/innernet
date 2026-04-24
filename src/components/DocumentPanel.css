@@ -597,9 +597,14 @@ button.imsg-context-clickable:hover {
   margin: 0 0 0 80px;
 }
 
+/* Query timestamp now lives INSIDE the query pill as a trailing inline-flex span —
+   it flows after the last word of the question text and wraps along with it, so
+   long queries that span multiple lines don't orphan the timestamp onto its own line. */
 .imsg-query-row .imsg-meta-query.imsg-meta-inline {
-  margin: 0;
+  margin: 0 0 0 8px;
   padding: 0;
+  color: rgba(109, 40, 217, 0.65);
+  font-size: 8.5px;
 }
 
 .imsg-query {
