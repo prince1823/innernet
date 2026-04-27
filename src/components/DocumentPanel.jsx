@@ -794,6 +794,11 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   // When true, the AI view filters to only the starred answers — toggled by the
   // "Starred" button in the header.
   const [showStarredOnly, setShowStarredOnly] = useState(false)
+  // Compare-and-keep regen: while a regenerated answer is awaiting user decision,
+  // it lives here keyed by aiBlockId — { newText, newAskedAt, status: 'streaming'|'ready' }.
+  // The original answer is never mutated until the user clicks "Use new", so they
+  // can always back out without losing what they had. Cleared on accept or discard.
+  const [compareCallouts, setCompareCallouts] = useState({})
   // Generated AI-enhanced view per date: { [date]: { sourceHash, content, generatedAt } }
   const [aiViews, setAiViews] = useState(loadAiViews)
   const [aiViewLoading, setAiViewLoading] = useState(false)
@@ -1392,8 +1397,33 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     }
   }
 
-  // Regenerate a single AI callout by re-running its original query with its stored context.
-  // Only touches that one AI block's text — no global rewrite, no other callouts change.
+  // Stream a regenerated answer's text into the compare state (so the original
+  // bubble's text in the tree stays untouched until the user accepts).
+  const streamCompareText = (aiBlockId, fullText) => new Promise(resolve => {
+    const CHARS_PER_TICK = 4
+    const TICK_MS = 16
+    let i = 0
+    const tick = () => {
+      i = Math.min(i + CHARS_PER_TICK, fullText.length)
+      setCompareCallouts(prev => {
+        if (!prev[aiBlockId]) return prev
+        return { ...prev, [aiBlockId]: { ...prev[aiBlockId], newText: fullText.slice(0, i) } }
+      })
+      if (i < fullText.length) {
+        const t = setTimeout(tick, TICK_MS)
+        streamTimersRef.current.push(t)
+      } else {
+        resolve()
+      }
+    }
+    const t0 = setTimeout(tick, 10)
+    streamTimersRef.current.push(t0)
+  })
+
+  // Regenerate a single AI callout. The original answer is preserved untouched in
+  // the tree — the new candidate lives in compareCallouts until the user clicks
+  // "Use new" (commit) or "Keep original" (discard). This avoids ever clobbering
+  // a good answer with a worse one.
   const regenerateCallout = useCallback(async (aiBlockId) => {
     const currentTree = trees[selectedDate] || materializeTree(selectedDate, legacyEditsRef.current)
     const ctx = findContext(currentTree, aiBlockId)
@@ -1408,20 +1438,57 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
       const prompt = `Answer this question: ${query}\n\nContext:\n${context}\n\nRespond as a single flowing paragraph, 2-3 sentences maximum. Be concise and focused. Do NOT use bullet points, numbered lists, or headings — write it as continuous prose.`
       const response = await askAI(prompt, context)
       const paraText = formatAIParagraph(response) || (response || '')
-      applyTreeOp(tree => setBlockText(tree, aiBlockId, paraText))
-      applyTreeOp(tree => {
-        const next = cloneTree(tree)
-        const c = findContext(next, aiBlockId)
-        if (c) c.block.askedAt = Date.now()
-        return next
+      // Park the candidate in compare state — the tree stays untouched so the
+      // original bubble keeps rendering verbatim while the user decides.
+      setCompareCallouts(prev => ({
+        ...prev,
+        [aiBlockId]: { newText: '', newAskedAt: Date.now(), status: 'streaming' },
+      }))
+      // Drop the "thinking" state now that we have content to show.
+      setRegeneratingCalloutIds(prev => { const next = new Set(prev); next.delete(aiBlockId); return next })
+      await streamCompareText(aiBlockId, paraText)
+      setCompareCallouts(prev => {
+        if (!prev[aiBlockId]) return prev
+        return { ...prev, [aiBlockId]: { ...prev[aiBlockId], status: 'ready' } }
       })
-      await streamBlockText(aiBlockId, paraText)
     } catch (e) {
-      // swallow — leaves existing text intact
-    } finally {
+      // swallow — original is unchanged. Clear any partial compare entry.
+      setCompareCallouts(prev => {
+        if (!prev[aiBlockId]) return prev
+        const { [aiBlockId]: _, ...rest } = prev
+        return rest
+      })
       setRegeneratingCalloutIds(prev => { const next = new Set(prev); next.delete(aiBlockId); return next })
     }
   }, [trees, selectedDate, askAI])
+
+  // Commit a regenerated candidate: write its text + new askedAt into the tree
+  // and exit compare. Idempotent — silently no-ops if the entry has already
+  // been resolved (e.g. user double-clicked).
+  const acceptRegeneratedAnswer = (aiBlockId) => {
+    const cmp = compareCallouts[aiBlockId]
+    if (!cmp) return
+    applyTreeOp(tree => setBlockText(tree, aiBlockId, cmp.newText))
+    applyTreeOp(tree => {
+      const next = cloneTree(tree)
+      const c = findContext(next, aiBlockId)
+      if (c) c.block.askedAt = cmp.newAskedAt
+      return next
+    })
+    setCompareCallouts(prev => {
+      const { [aiBlockId]: _, ...rest } = prev
+      return rest
+    })
+  }
+
+  // Discard a regenerated candidate and keep the original answer.
+  const discardRegeneratedAnswer = (aiBlockId) => {
+    setCompareCallouts(prev => {
+      if (!prev[aiBlockId]) return prev
+      const { [aiBlockId]: _, ...rest } = prev
+      return rest
+    })
+  }
 
   // Ask a follow-up question on the same Me-block a previous callout was scoped to.
   // Powers the "Go deeper / Give an example / Summarize" chips under each response:
@@ -2164,6 +2231,11 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                             const streamedChars = item.aiBlockId ? streamingText[item.aiBlockId] : undefined
                             const isStreaming = typeof streamedChars === 'string' && streamedChars.length > 0
                             const isThinking = !isStreaming && (regeneratingCalloutIds.has(item.aiBlockId) || !(item.text || '').trim())
+                            // Compare-and-keep: when the user regenerated this answer, the candidate
+                            // sits in compareCallouts until they accept or discard. The original
+                            // bubble keeps rendering item.text verbatim; the new one renders below.
+                            const compare = item.aiBlockId ? compareCallouts[item.aiBlockId] : null
+                            const isComparing = !!compare
                             // Continuation callouts of a collapsed topic render nothing — the header
                             // on the first callout represents the entire collapsed thread.
                             if (isCollapsed && isContinuation) return null
@@ -2334,7 +2406,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                       </span>
                                     )}
                                   </div>
-                                  {item.aiBlockId && !regeneratingCalloutIds.has(item.aiBlockId) && !isStreaming && (
+                                  {item.aiBlockId && !regeneratingCalloutIds.has(item.aiBlockId) && !isStreaming && !isComparing && (
                                     <button
                                       type="button"
                                       className={`imsg-star ${item.starred ? 'is-starred' : ''}`}
@@ -2349,7 +2421,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                       </svg>
                                     </button>
                                   )}
-                                  {item.aiBlockId && !regeneratingCalloutIds.has(item.aiBlockId) && (
+                                  {item.aiBlockId && !regeneratingCalloutIds.has(item.aiBlockId) && !isComparing && (
                                     <button
                                       type="button"
                                       className="ai-doc-callout-regen imsg-regen"
@@ -2366,7 +2438,49 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                   )}
                                 </div>
                                 )}
-                                {!isCollapsed && !hasNext && item.aiBlockId && item.askedOnId && (item.text || '').trim() && !regeneratingCalloutIds.has(item.aiBlockId) && (
+                                {!isCollapsed && isComparing && (
+                                  <div className="imsg-compare-panel" contentEditable={false}>
+                                    <div className="imsg-compare-label">
+                                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 5 }}>
+                                        <polyline points="23 4 23 10 17 10"/>
+                                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                                      </svg>
+                                      New version
+                                    </div>
+                                    <div className="imsg-response imsg-compare-bubble">
+                                      {compare.status === 'streaming' && (compare.newText || '').length === 0 ? (
+                                        <span className="imsg-typing" aria-label="Thinking">
+                                          <span className="imsg-typing-dot" />
+                                          <span className="imsg-typing-dot" />
+                                          <span className="imsg-typing-dot" />
+                                        </span>
+                                      ) : compare.status === 'streaming' ? (
+                                        <span className="imsg-answer ls-block-text-streaming">{compare.newText}</span>
+                                      ) : (
+                                        <span className="imsg-answer">{compare.newText}</span>
+                                      )}
+                                    </div>
+                                    <div className="imsg-compare-actions">
+                                      <button
+                                        type="button"
+                                        className="imsg-compare-btn imsg-compare-btn-keep"
+                                        onClick={() => discardRegeneratedAnswer(item.aiBlockId)}
+                                        disabled={compare.status !== 'ready'}
+                                      >
+                                        Keep original
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="imsg-compare-btn imsg-compare-btn-use"
+                                        onClick={() => acceptRegeneratedAnswer(item.aiBlockId)}
+                                        disabled={compare.status !== 'ready'}
+                                      >
+                                        Use new
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                                {!isCollapsed && !hasNext && item.aiBlockId && item.askedOnId && (item.text || '').trim() && !regeneratingCalloutIds.has(item.aiBlockId) && !isComparing && (
                                   askInputFor === item.aiBlockId ? (
                                     <div className="imsg-followups imsg-ask-row" contentEditable={false}>
                                       <input

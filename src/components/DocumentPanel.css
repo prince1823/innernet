@@ -1148,6 +1148,92 @@ button.imsg-context-clickable:hover {
   box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35), 0 1px 2px rgba(245, 158, 11, 0.10);
 }
 
+/* Compare-and-keep panel: appears beneath the original bubble while a regen
+   is awaiting the user's decision. Keeps the original visible above so the
+   user can read both side-by-side (vertically stacked for readable widths). */
+.imsg-compare-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  margin-left: 32px;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, #faf5ff 0%, #f5f0ff 100%);
+  border: 1px solid #d8ccfb;
+  border-radius: 12px;
+  animation: imsg-compare-in 0.18s ease-out;
+}
+
+@keyframes imsg-compare-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.imsg-compare-label {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #7c3aed;
+  margin-bottom: 2px;
+}
+
+.imsg-compare-bubble {
+  background: #ffffff !important;
+  border: 1px solid #e3d9fa !important;
+  box-shadow: none !important;
+}
+
+.imsg-compare-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.imsg-compare-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.imsg-compare-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.imsg-compare-btn-keep {
+  background: transparent;
+  border: 1px solid #d8ccfb;
+  color: #6b7785;
+}
+
+.imsg-compare-btn-keep:hover:not(:disabled) {
+  background: #ffffff;
+  color: #1a1a2e;
+  border-color: #b8a4f0;
+}
+
+.imsg-compare-btn-use {
+  background: #7c3aed;
+  border: 1px solid #7c3aed;
+  color: #ffffff;
+}
+
+.imsg-compare-btn-use:hover:not(:disabled) {
+  background: #6d28d9;
+  border-color: #6d28d9;
+  box-shadow: 0 1px 4px rgba(124, 58, 237, 0.35);
+}
+
 .ai-doc-body ul.ai-doc-ul li.ai-doc-callout.imsg-callout {
   list-style: none;
   margin-left: -20px;
