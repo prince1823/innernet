@@ -612,7 +612,7 @@ function setCursorAtOffset(el, offset) {
 // Kept as a separate component with its own state so selection-tracking re-renders
 // don't cascade into the parent editor (re-rendering contentEditable blocks can
 // wipe the active selection).
-function SelectionToolbar({ containerRef, onImprove, showImprove }) {
+function SelectionToolbar({ containerRef, onImprove, showImprove, restrictToSelector }) {
   const [pos, setPos] = useState(null)
   const [improveOpen, setImproveOpen] = useState(false)
   const [toneOpen, setToneOpen] = useState(false)
@@ -628,6 +628,18 @@ function SelectionToolbar({ containerRef, onImprove, showImprove }) {
       const anchorEl = anchor.nodeType === 1 ? anchor : anchor.parentElement
       const container = containerRef.current
       if (!container || !anchorEl || !container.contains(anchorEl)) { setPos(null); setImproveOpen(false); setToneOpen(false); return }
+      // When a scope selector is supplied (AI mode → only on response bubbles),
+      // require both endpoints of the selection to live inside an element
+      // matching that selector — otherwise hide the toolbar entirely.
+      if (restrictToSelector) {
+        const startEl = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement
+        const endEl = range.endContainer.nodeType === 1 ? range.endContainer : range.endContainer.parentElement
+        const startScope = startEl?.closest?.(restrictToSelector)
+        const endScope = endEl?.closest?.(restrictToSelector)
+        if (!startScope || startScope !== endScope) {
+          setPos(null); setImproveOpen(false); setToneOpen(false); return
+        }
+      }
       const rect = range.getBoundingClientRect()
       if (!rect || (rect.width === 0 && rect.height === 0)) { setPos(null); setImproveOpen(false); setToneOpen(false); return }
       setPos({ top: rect.top - 8, left: rect.left + rect.width / 2 })
@@ -649,7 +661,7 @@ function SelectionToolbar({ containerRef, onImprove, showImprove }) {
       document.removeEventListener('mouseup', onMouseUp)
       document.removeEventListener('keyup', onKeyUp)
     }
-  }, [containerRef])
+  }, [containerRef, restrictToSelector])
 
   const applyFormat = (cmd) => {
     try {
@@ -1891,7 +1903,16 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
 
   return (
     <div className={`doc-panel ${notesMode === 'logs' ? 'logs-active' : ''}`}>
-      <SelectionToolbar containerRef={docBodyRef} showImprove={notesMode === 'ai'} onImprove={handleImproveSelection} />
+      <SelectionToolbar
+        containerRef={docBodyRef}
+        showImprove={notesMode === 'ai'}
+        onImprove={handleImproveSelection}
+        // In AI mode, the toolbar should appear only when text inside an AI
+        // response bubble is selected — not on headings, the asked-on pill,
+        // the question chip, or follow-up controls. Me mode keeps the
+        // unrestricted behavior so any contenteditable line still gets it.
+        restrictToSelector={notesMode === 'ai' ? '.ai-doc-callout-answer' : null}
+      />
       <div className={`doc-body ${notesMode === 'logs' ? 'logs-active' : ''}`} ref={docBodyRef} style={{ position: 'relative' }}>
 
         {/* Granola-style Me / AI notes toggle */}
@@ -2067,6 +2088,13 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                 else break
                               }
                             }
+                            // Streaming preview: while a regen is in flight, streamingText[aiBlockId]
+                            // gets filled char-by-char by streamBlockText. We surface those partial
+                            // chars in the bubble (with a blinking caret) so the user sees the answer
+                            // arrive live — not a long wait followed by an instant flip.
+                            const streamedChars = item.aiBlockId ? streamingText[item.aiBlockId] : undefined
+                            const isStreaming = typeof streamedChars === 'string' && streamedChars.length > 0
+                            const isThinking = !isStreaming && (regeneratingCalloutIds.has(item.aiBlockId) || !(item.text || '').trim())
                             // Continuation callouts of a collapsed topic render nothing — the header
                             // on the first callout represents the entire collapsed thread.
                             if (isCollapsed && isContinuation) return null
@@ -2170,7 +2198,13 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                 {!isCollapsed && (
                                 <div className="imsg-response-row">
                                   <div className="imsg-response">
-                                    {(regeneratingCalloutIds.has(item.aiBlockId) || !(item.text || '').trim()) ? (
+                                    {isStreaming ? (
+                                      <span
+                                        className="ai-doc-callout-answer imsg-answer ls-block-text-streaming"
+                                        contentEditable={false}
+                                        suppressContentEditableWarning
+                                      >{streamedChars}</span>
+                                    ) : isThinking ? (
                                       <span
                                         className="imsg-typing"
                                         contentEditable={false}
