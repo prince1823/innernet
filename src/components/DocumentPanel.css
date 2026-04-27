@@ -56,6 +56,72 @@
   flex-shrink: 0;
 }
 
+/* Starred filter — sits just below the Me/AI/Logs toggle on the right. The
+   amber tint matches the gold edge on starred bubbles so the visual link is
+   immediate: click here, see only the things wearing this color. */
+.doc-starred-filter {
+  position: absolute;
+  top: 50px;
+  right: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid #e3e5e9;
+  background: #ffffff;
+  border-radius: 999px;
+  color: #6b7785;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+  z-index: 5;
+}
+
+.doc-starred-filter:hover:not(:disabled) {
+  color: #b45309;
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
+
+.doc-starred-filter.active {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+  box-shadow: 0 1px 2px rgba(245, 158, 11, 0.18);
+}
+
+.doc-starred-filter:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.doc-starred-filter svg {
+  flex-shrink: 0;
+  color: #d97706;
+}
+
+.doc-starred-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 5px;
+  background: rgba(245, 158, 11, 0.18);
+  color: #92400e;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-starred-filter.active .doc-starred-count {
+  background: #f59e0b;
+  color: #ffffff;
+}
+
 /* ── AI enhanced doc view ── */
 .ai-doc {
   margin-top: 4px;
@@ -1025,6 +1091,61 @@ button.imsg-context-clickable:hover {
 .imsg-callout:hover .imsg-regen,
 .imsg-regen.is-regenerating {
   opacity: 1;
+}
+
+/* Star toggle — pins an answer as canonical for the topic. Outline state hides
+   on idle and surfaces on hover (like the regen button). The starred state is
+   always visible in gold so the user can spot pinned answers at a glance. */
+.imsg-star {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  color: #9aa3b2;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+}
+
+.imsg-callout:hover .imsg-star {
+  opacity: 1;
+}
+
+.imsg-star.is-starred {
+  opacity: 1;
+  color: #d97706; /* amber-600 */
+}
+
+.imsg-star:hover:not(:disabled) {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #b45309;
+  transform: scale(1.05);
+}
+
+.imsg-star.is-starred:hover {
+  background: #fef3c7;
+  border-color: #fcd34d;
+}
+
+/* Gold edge on starred bubbles. The ::before pseudo on .imsg-callout already
+   draws the lavender thread rail — we override its color when starred so the
+   pinned answer's rail glows amber, signaling "this is anchored". */
+.ai-doc-callout.imsg-callout.imsg-callout-starred::before {
+  background: linear-gradient(180deg, #f59e0b 0%, #fbbf24 100%);
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.4);
+}
+
+.ai-doc-callout.imsg-callout.imsg-callout-starred .imsg-response {
+  background: linear-gradient(180deg, #fffdf5 0%, #fefce8 100%);
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35), 0 1px 2px rgba(245, 158, 11, 0.10);
 }
 
 .ai-doc-body ul.ai-doc-ul li.ai-doc-callout.imsg-callout {

@@ -40,9 +40,17 @@ const AI_INSERTS_KEY = 'innernet-journal-inserts'
 const STAMP_VERSION_KEY = 'innernet-stamp-version'
 const STAMP_VERSION = 2  // bump to force re-stamp
 const AI_VIEWS_KEY = 'innernet-journal-ai-views'  // per-date generated AI-enhanced view
+const STARRED_KEY = 'innernet-journal-starred'    // global Set<aiBlockId> of pinned answers
 
 function loadAiViews() {
   try { return JSON.parse(localStorage.getItem(AI_VIEWS_KEY) || '{}') } catch { return {} }
+}
+
+function loadStarred() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(STARRED_KEY) || '[]')
+    return new Set(Array.isArray(arr) ? arr : [])
+  } catch { return new Set() }
 }
 
 // djb2 hash — used to invalidate the cached AI view when the source Me tree changes
@@ -780,6 +788,12 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   // Topic keys (askedOnId || askedOn text) whose full conversation is hidden —
   // only the context pill + chevron shows; all Q/R bubbles + continuations collapse.
   const [collapsedTopics, setCollapsedTopics] = useState(new Set())
+  // Global Set of starred AI block ids — survives across days and across regenerations
+  // (regen mutates the block's text but keeps the same id, so the star sticks).
+  const [starredAiIds, setStarredAiIds] = useState(loadStarred)
+  // When true, the AI view filters to only the starred answers — toggled by the
+  // "Starred" button in the header.
+  const [showStarredOnly, setShowStarredOnly] = useState(false)
   // Generated AI-enhanced view per date: { [date]: { sourceHash, content, generatedAt } }
   const [aiViews, setAiViews] = useState(loadAiViews)
   const [aiViewLoading, setAiViewLoading] = useState(false)
@@ -861,6 +875,22 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   useEffect(() => {
     try { localStorage.setItem(AI_VIEWS_KEY, JSON.stringify(aiViews)) } catch {}
   }, [aiViews])
+
+  useEffect(() => {
+    try { localStorage.setItem(STARRED_KEY, JSON.stringify(Array.from(starredAiIds))) } catch {}
+  }, [starredAiIds])
+
+  // Toggle a star on a single answer. Keyed by aiBlockId so regeneration (which
+  // keeps the id but rewrites text) preserves the pin.
+  const toggleStar = (aiBlockId) => {
+    if (!aiBlockId) return
+    setStarredAiIds(prev => {
+      const next = new Set(prev)
+      if (next.has(aiBlockId)) next.delete(aiBlockId)
+      else next.add(aiBlockId)
+      return next
+    })
+  }
 
   // Generate (or reuse cached) enhanced view when entering AI mode for a date.
   // Cache key is the hash of the stripped Me tree — edits invalidate automatically.
@@ -1822,6 +1852,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
           sourceTopId: p.topId,
           aiBlockId: p.id,
           sources: [],
+          starred: starredAiIds.has(p.id),
         })
       }
       // Group items within each section by topic so callouts sharing the same
@@ -1864,15 +1895,27 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
       const headingOverrides = (cachedAiView && cachedAiView.headingOverrides) || {}
       const doc = []
       for (const [topId, { topText, items }] of byTop.entries()) {
-        if (!items.length) continue
+        // When the "Starred" filter is on, drop unstarred items entirely. Headings
+        // with no remaining starred answers are skipped — empty thread skeletons
+        // would just be visual noise.
+        const visibleItems = showStarredOnly ? items.filter(it => it.starred) : items
+        if (!visibleItems.length) continue
         const overrideText = headingOverrides[topId]
         const headingText = (overrideText !== undefined && overrideText !== null) ? overrideText : topText
         doc.push({ type: 'h', level: 3, text: headingText, sourceTopId: topId })
-        doc.push({ type: 'ul', items })
+        doc.push({ type: 'ul', items: visibleItems })
       }
       displayDoc = doc
     }
   }
+  // Count of starred answers actually present on this date — used by the
+  // header filter button to show "Starred · N" and to disable the toggle when 0.
+  const starredOnThisDate = (() => {
+    const pairs = collectQAPairs(blocks || [])
+    let n = 0
+    for (const p of pairs) if (starredAiIds.has(p.id)) n++
+    return n
+  })()
 
   // #16 — Work out which callouts are "newly arrived" this render, so only
   // they get the slide-up/fade-in animation. First render primes the seen-set
@@ -1945,6 +1988,32 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
             Logs
           </button>
         </div>
+
+        {/* Starred filter — only relevant in AI mode. Disabled when nothing on
+            this date is starred yet so the user knows it's an empty view. */}
+        {notesMode === 'ai' && (
+          <button
+            type="button"
+            className={`doc-starred-filter ${showStarredOnly ? 'active' : ''}`}
+            onClick={() => setShowStarredOnly(v => !v)}
+            disabled={starredOnThisDate === 0}
+            title={
+              starredOnThisDate === 0
+                ? 'No starred answers yet — star a response to pin it here'
+                : showStarredOnly
+                  ? 'Show all answers'
+                  : 'Show only starred answers'
+            }
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill={showStarredOnly ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+            Starred
+            {starredOnThisDate > 0 && (
+              <span className="doc-starred-count">{starredOnThisDate}</span>
+            )}
+          </button>
+        )}
 
         {/* Page heading — date in normal mode, breadcrumb when zoomed into a block */}
         {zoomedBlockId ? (
@@ -2121,7 +2190,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                             return (
                               <li
                                 key={ii}
-                                className={`ai-doc-callout imsg-callout ${isContinuation ? 'imsg-callout-cont' : ''} ${drawRail ? 'imsg-has-next' : ''} ${isCollapsed ? 'imsg-topic-collapsed' : ''} ${isFresh ? 'imsg-callout-enter' : ''} ${isHighlighted ? 'ai-doc-callout-highlight' : ''}`}
+                                className={`ai-doc-callout imsg-callout ${isContinuation ? 'imsg-callout-cont' : ''} ${drawRail ? 'imsg-has-next' : ''} ${isCollapsed ? 'imsg-topic-collapsed' : ''} ${isFresh ? 'imsg-callout-enter' : ''} ${isHighlighted ? 'ai-doc-callout-highlight' : ''} ${item.starred ? 'imsg-callout-starred' : ''}`}
                                 style={{ '--rail-color': railColor }}
                                 contentEditable={false}
                                 ref={isHighlighted ? (el => el && el.scrollIntoView({ behavior: 'smooth', block: 'center' })) : undefined}
@@ -2265,6 +2334,21 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                                       </span>
                                     )}
                                   </div>
+                                  {item.aiBlockId && !regeneratingCalloutIds.has(item.aiBlockId) && !isStreaming && (
+                                    <button
+                                      type="button"
+                                      className={`imsg-star ${item.starred ? 'is-starred' : ''}`}
+                                      onClick={() => toggleStar(item.aiBlockId)}
+                                      onMouseDown={e => e.preventDefault()}
+                                      title={item.starred ? 'Unstar this response' : 'Star this response (pin to top of thread)'}
+                                      aria-label={item.starred ? 'Unstar response' : 'Star response'}
+                                      aria-pressed={!!item.starred}
+                                    >
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill={item.starred ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                                      </svg>
+                                    </button>
+                                  )}
                                   {item.aiBlockId && !regeneratingCalloutIds.has(item.aiBlockId) && (
                                     <button
                                       type="button"
