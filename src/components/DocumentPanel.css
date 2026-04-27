@@ -506,14 +506,48 @@
      callouts — prevents visible gaps where rails would otherwise meet end-to-end. */
   bottom: -20px;
   width: 1.5px;
-  background: #c4b5fd;
+  /* #17 — rail tint is driven by --rail-color, set per-<li> based on askedAt age.
+     Defaults to the standard lavender if the variable is missing. */
+  background: var(--rail-color, #c4b5fd);
   pointer-events: none;
+  /* Color shifts (when a thread ages past a tier) ease in smoothly rather than
+     snapping, so returning to an old thread reveals its "cooling" gracefully. */
+  transition: background 400ms ease;
 }
 
 .ai-doc-callout.imsg-callout.imsg-callout-cont.imsg-has-next::before {
   /* Continuation callout's rail starts at its own top so it overlaps the previous
      callout's extended bottom — together they form one unbroken vertical line. */
   top: 0;
+}
+
+/* #16 — Entrance animation for newly arrived callouts. JSX toggles .imsg-callout-enter
+   only on callouts whose aiBlockId wasn't present on the previous render, so existing
+   bubbles don't replay this whenever the tree re-renders. Soft 8px lift + fade, 200ms
+   ease-out — quick enough to feel like a response "dropping in", slow enough to read.
+   `animation-fill-mode: both` means the pre-frame (translated + invisible) is applied
+   before the animation starts, preventing a one-frame flash of the final state. */
+.imsg-callout.imsg-callout-enter {
+  animation: imsg-callout-in 200ms ease-out both;
+}
+
+@keyframes imsg-callout-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Respect users who opted out of motion — the class still applies but the animation
+   does nothing, so the bubble simply appears at its final position. */
+@media (prefers-reduced-motion: reduce) {
+  .imsg-callout.imsg-callout-enter {
+    animation: none;
+  }
 }
 
 .imsg-callout .ai-doc-callout-glyph,
@@ -704,10 +738,13 @@ button.imsg-context-clickable:hover {
   top: -14px;
   width: 60px;
   height: 14px;
-  border-left: 1.5px solid #c4b5fd;
-  border-bottom: 1.5px solid #c4b5fd;
+  /* L-connector color tracks the rail — #17 keeps the whole branch in lockstep
+     so fading an old thread to gray doesn't leave bright hooks behind. */
+  border-left: 1.5px solid var(--rail-color, #c4b5fd);
+  border-bottom: 1.5px solid var(--rail-color, #c4b5fd);
   border-bottom-left-radius: 10px;
   pointer-events: none;
+  transition: border-color 400ms ease;
 }
 
 /* Staircase step 3 — response row is full-width; bubble itself carries the indent */
@@ -747,10 +784,12 @@ button.imsg-context-clickable:hover {
   top: -14px;
   width: 80px;
   height: 14px;
-  border-left: 1.5px solid #c4b5fd;
-  border-bottom: 1.5px solid #c4b5fd;
+  /* Matches the query hook so both branches of the L share the rail's age-tint. */
+  border-left: 1.5px solid var(--rail-color, #c4b5fd);
+  border-bottom: 1.5px solid var(--rail-color, #c4b5fd);
   border-bottom-left-radius: 10px;
   pointer-events: none;
+  transition: border-color 400ms ease;
 }
 
 .imsg-answer {

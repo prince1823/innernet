@@ -781,6 +781,11 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
   const aiStreamTimersRef = useRef([])
   const legacyEditsRef = useRef(loadLegacyEdits())
   const docBodyRef = useRef(null)
+  // Tracks which AI block ids we've already rendered at least once. On a fresh render,
+  // any id NOT in this set is "newly arrived" and gets the entrance animation. The set
+  // is primed on first mount with all pre-existing ids so page-load doesn't animate a
+  // wall of old bubbles. Mutated in useEffect (after each render) — never during render.
+  const seenAiIdsRef = useRef(null)
 
   // Streaming state for AI responses
   // streamingText: blockId → partial text override (takes priority over block.text while streaming)
@@ -1796,7 +1801,17 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
       //
       // Key preference: `askedOnId` first (distinct me-blocks stay distinct even if text matches),
       // falling back to `askedOn` text (so legacy data without ids still groups sensibly).
-      // First-appearance order of each group is preserved so the oldest thread stays on top.
+      //
+      // Ordering (per user request — "new query and response entry should shown below
+      // the entry already available in serial order with time"):
+      //   • Within each same-topic group, items are sorted by askedAt ASC so a follow-up
+      //     always sits after its predecessors in chronological order.
+      //   • Groups themselves are ordered by their earliest askedAt, so a brand-new
+      //     me-block asked today lands below an older thread, while a follow-up to an
+      //     older thread stays inside its original group (the group's "first asked"
+      //     stamp is unchanged, so its position doesn't shift).
+      // Missing askedAt defaults to 0, keeping legacy pairs at the top where they'd
+      // naturally fall.
       for (const entry of byTop.values()) {
         const groups = new Map()
         for (const it of entry.items) {
@@ -1804,7 +1819,15 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
           if (!groups.has(key)) groups.set(key, [])
           groups.get(key).push(it)
         }
-        entry.items = Array.from(groups.values()).flat()
+        for (const arr of groups.values()) {
+          arr.sort((a, b) => (a.askedAt || 0) - (b.askedAt || 0))
+        }
+        const sortedGroups = Array.from(groups.values()).sort((a, b) => {
+          const aFirst = a[0]?.askedAt || 0
+          const bFirst = b[0]?.askedAt || 0
+          return aFirst - bFirst
+        })
+        entry.items = sortedGroups.flat()
       }
       const doc = []
       for (const { topText, items } of byTop.values()) {
@@ -1815,6 +1838,33 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
       displayDoc = doc
     }
   }
+
+  // #16 — Work out which callouts are "newly arrived" this render, so only
+  // they get the slide-up/fade-in animation. First render primes the seen-set
+  // with every existing id so a page refresh doesn't animate a wall of old
+  // bubbles at once; subsequent renders diff against it.
+  const allAiIdsThisRender = []
+  if (displayDoc) {
+    for (const block of displayDoc) {
+      if (block.type !== 'ul') continue
+      for (const it of block.items) {
+        if (it.kind === 'callout' && it.aiBlockId) allAiIdsThisRender.push(it.aiBlockId)
+      }
+    }
+  }
+  if (seenAiIdsRef.current === null) {
+    // First render: everything present is treated as already-seen → no animation.
+    seenAiIdsRef.current = new Set(allAiIdsThisRender)
+  }
+  const freshAiIds = new Set()
+  for (const id of allAiIdsThisRender) {
+    if (!seenAiIdsRef.current.has(id)) freshAiIds.add(id)
+  }
+  // After this render commits, fold the current ids into the seen-set so a re-render
+  // doesn't replay the animation on these same elements.
+  useEffect(() => {
+    for (const id of allAiIdsThisRender) seenAiIdsRef.current.add(id)
+  })
 
   return (
     <div className={`doc-panel ${notesMode === 'logs' ? 'logs-active' : ''}`}>
@@ -1993,10 +2043,28 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                             // When the thread is collapsed, the continuation callouts below don't render,
                             // so the rail has nowhere to go — drop the has-next class to skip drawing it.
                             const drawRail = hasNext && !isCollapsed
+                            // #16 — entrance animation: only fires on newly arrived callouts,
+                            // never on re-renders of existing ones (freshAiIds is diffed against
+                            // seenAiIdsRef each render; first render primes it so the page load
+                            // doesn't animate history).
+                            const isFresh = item.aiBlockId && freshAiIds.has(item.aiBlockId)
+                            // #17 — rail color by thread health. Fresh threads stay on the bright
+                            // lavender we use everywhere; older threads drift toward a warmer
+                            // lavender and then a cool gray so at a glance you can tell what's
+                            // recent from what's archive. Uses `askedAt` (ms timestamp).
+                            let railColor = '#c4b5fd' // default: fresh lavender
+                            if (item.askedAt) {
+                              const ageMs = Date.now() - item.askedAt
+                              const DAY = 86400000
+                              if (ageMs > 30 * DAY) railColor = '#c7c8cd'       // stale gray (> 30d)
+                              else if (ageMs > 7 * DAY) railColor = '#a78bfa'   // warmer lavender (7–30d)
+                              // else: under a week → keep bright lavender
+                            }
                             return (
                               <li
                                 key={ii}
-                                className={`ai-doc-callout imsg-callout ${isContinuation ? 'imsg-callout-cont' : ''} ${drawRail ? 'imsg-has-next' : ''} ${isCollapsed ? 'imsg-topic-collapsed' : ''} ${isHighlighted ? 'ai-doc-callout-highlight' : ''}`}
+                                className={`ai-doc-callout imsg-callout ${isContinuation ? 'imsg-callout-cont' : ''} ${drawRail ? 'imsg-has-next' : ''} ${isCollapsed ? 'imsg-topic-collapsed' : ''} ${isFresh ? 'imsg-callout-enter' : ''} ${isHighlighted ? 'ai-doc-callout-highlight' : ''}`}
+                                style={{ '--rail-color': railColor }}
                                 contentEditable={false}
                                 ref={isHighlighted ? (el => el && el.scrollIntoView({ behavior: 'smooth', block: 'center' })) : undefined}
                               >
