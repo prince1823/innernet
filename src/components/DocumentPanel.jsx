@@ -1766,6 +1766,26 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     })
   }
 
+  // AI-side heading override: store the user's edit keyed by sourceTopId so it
+  // survives the live re-derivation of displayDoc from Me-mode blocks. Editing
+  // the AI heading no longer mutates Me-mode (decoupled), and editing the Me
+  // block's text won't overwrite a heading the user already customized in AI mode.
+  // Empty string clears the override (falls back to the live Me-block text).
+  const updateAiHeadingOverride = (topId, newText) => {
+    if (!topId) return
+    setAiViews(prev => {
+      const cur = prev[selectedDate] || {}
+      const overrides = { ...(cur.headingOverrides || {}) }
+      const trimmed = (newText || '').trim()
+      if (trimmed) overrides[topId] = newText
+      else delete overrides[topId]
+      return {
+        ...prev,
+        [selectedDate]: { ...cur, headingOverrides: overrides, edited: true, generatedAt: Date.now() },
+      }
+    })
+  }
+
   // Build the AI view directly from user Q&A pairs — no content regeneration.
   // Each new question appended in Me mode shows up here as an additional callout
   // under the same top-level heading, without touching any existing responses.
@@ -1829,10 +1849,13 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
         })
         entry.items = sortedGroups.flat()
       }
+      const headingOverrides = (cachedAiView && cachedAiView.headingOverrides) || {}
       const doc = []
-      for (const { topText, items } of byTop.values()) {
+      for (const [topId, { topText, items }] of byTop.entries()) {
         if (!items.length) continue
-        doc.push({ type: 'h', level: 3, text: topText })
+        const overrideText = headingOverrides[topId]
+        const headingText = (overrideText !== undefined && overrideText !== null) ? overrideText : topText
+        doc.push({ type: 'h', level: 3, text: headingText, sourceTopId: topId })
         doc.push({ type: 'ul', items })
       }
       displayDoc = doc
@@ -1990,7 +2013,14 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
                         suppressContentEditableWarning
                         onBlur={e => {
                           const t = e.currentTarget.textContent || ''
-                          if (t !== block.text) updateDocNodeText({ block: bi }, t)
+                          if (t === block.text) return
+                          // Live-derived headings (one per Q&A topic) carry a sourceTopId.
+                          // Persist edits to the per-topId override so they survive the
+                          // re-derivation from Me-mode blocks on the next render — and
+                          // don't propagate back into Me mode. Static doc headings (legacy
+                          // generated content) still go through the index-keyed path.
+                          if (block.sourceTopId) updateAiHeadingOverride(block.sourceTopId, t)
+                          else updateDocNodeText({ block: bi }, t)
                         }}
                       >{block.text}</Tag>
                     )
