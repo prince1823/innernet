@@ -399,8 +399,14 @@ function computeOverlapLayout(events) {
   return layout
 }
 
-export default function CalendarPanel({ selectedDate, setSelectedDate, selectedEvent, setSelectedEvent, onSlotClick, onQuickNoteAdd, onThoughtDelete, onThoughtUpdate, onQuickSlotClear, quickSlot, thoughts = {}, onDatePanelOpen, userEvents = {}, onScheduleEvent, onEventUpdate, eventOverrides = {} }) {
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 3, 9))
+export default function CalendarPanel({ selectedDate, setSelectedDate, selectedEvent, setSelectedEvent, onSlotClick, onQuickNoteAdd, onThoughtDelete, onThoughtUpdate, onQuickSlotClear, quickSlot, thoughts = {}, onDatePanelOpen, userEvents = {}, onScheduleEvent, onEventUpdate, eventOverrides = {}, googleConnected = false, googleSyncing = false, googleError = null, onGoogleConnect, onGoogleRefresh }) {
+  const [currentDate, setCurrentDate] = useState(() => {
+    if (selectedDate) {
+      const [y, m, d] = selectedDate.split('-').map(Number)
+      return new Date(y, m - 1, d)
+    }
+    return new Date()
+  })
   const [showMiniCal, setShowMiniCal] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(56) // pixels per hour; continuous 24..240
   // Semantic zoom: 0 = normal grid (pixel zoom), 1 = schedule list, 2 = detail view
@@ -432,6 +438,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const [editingNote, setEditingNote] = useState(null) // { id, text }
   const gridRef = useRef(null)
   const panelRef = useRef(null)
+  const scheduleViewRef = useRef(null)
   const pullAccum = useRef(0)
   const pullTimer = useRef(null)
   const closeTimeoutRef = useRef(null)
@@ -460,8 +467,9 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   const labelStride = zoomLevel < 32 ? 2 : 1
 
   const dateStr = formatDateStr(currentDate)
-  const TODAY_STR = '2026-04-09'
-  const NOW_MIN = 10 * 60 + 10 // hardcoded 'now' at 10:10 to match cal-now-line
+  const now = new Date()
+  const TODAY_STR = formatDateStr(now)
+  const NOW_MIN = now.getHours() * 60 + now.getMinutes()
   const isToday = dateStr === TODAY_STR
   const dayRelation = dateStr < TODAY_STR ? 'past' : dateStr > TODAY_STR ? 'future' : 'today'
   const nowPx = (NOW_MIN / 60) * zoomLevel
@@ -540,7 +548,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
   }
   const goToToday = () => {
     setDayTransition('next')
-    setCurrentDate(new Date(2026, 3, 9))
+    setCurrentDate(new Date())
     setTimeout(() => setDayTransition(null), 300)
   }
 
@@ -584,7 +592,13 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
       setViewMode(1)
     } else if (viewMode === 1) {
       setViewMode(2)
-      setDetailIndex(0)
+      // Jump to the event nearest the currently viewed date, not the first
+      // event in the whole dataset — otherwise this always lands on the
+      // earliest mock date regardless of what day is actually selected.
+      const flat = scheduleData.flatEvents
+      let idx = flat.findIndex(ev => ev._date >= dateStr)
+      if (idx === -1) idx = Math.max(0, flat.length - 1)
+      setDetailIndex(idx)
     }
   }
   const zoomOut = () => {
@@ -594,6 +608,20 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
       setViewMode(0)
     }
   }
+
+  // Entering the Schedule list should open scrolled to the current date's
+  // group (or the nearest one after it if today has no events) — not the
+  // top of the list, which is always the earliest mock date.
+  useEffect(() => {
+    if (viewMode !== 1) return
+    const container = scheduleViewRef.current
+    if (!container) return
+    const groups = scheduleData.groups
+    let idx = groups.findIndex(g => g.date >= dateStr)
+    if (idx === -1) idx = groups.length - 1
+    const target = container.children[idx]
+    target?.scrollIntoView({ block: 'start' })
+  }, [viewMode, dateStr, scheduleData.groups])
 
   // Cmd/Ctrl + wheel: continuous zoom anchored on the cursor position.
   // The point in time under the cursor stays under the cursor as zoom changes.
@@ -1009,6 +1037,33 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
           )}
         </div>
         <div className="cal-header-right">
+          <button
+            className={`cal-gcal-btn ${googleConnected ? 'connected' : ''} ${googleError ? 'error' : ''}`}
+            onClick={onGoogleConnect}
+            disabled={googleSyncing}
+            title={googleError ? googleError : googleConnected ? 'Google Calendar connected — click to disconnect' : 'Connect Google Calendar'}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={googleSyncing ? 'spin' : ''}>
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+          </button>
+          {googleConnected && (
+            <button
+              className="cal-gcal-refresh-btn"
+              onClick={onGoogleRefresh}
+              disabled={googleSyncing}
+              title="Refresh from Google Calendar now"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={googleSyncing ? 'spin' : ''}>
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </button>
+          )}
           <div className="cal-zoom-btns">
             <button className="cal-zoom-btn" onClick={zoomOut} disabled={viewMode === 0} title="Zoom out — less detail">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -1415,7 +1470,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
               const cellDate = cell.inMonth ? formatDateStr(new Date(currentDate.getFullYear(), currentDate.getMonth(), cell.day)) : null
               const hasEvents = cellDate && ((calendarTasks[cellDate]?.length > 0) || (userEvents?.[cellDate]?.length > 0))
               const isSelected = cellDate === dateStr
-              const isTodayCell = cellDate === '2026-04-09'
+              const isTodayCell = cellDate === TODAY_STR
               return (
                 <button
                   key={i}
@@ -1436,7 +1491,7 @@ export default function CalendarPanel({ selectedDate, setSelectedDate, selectedE
 
       {/* ── VIEW MODE 1: Schedule List ── */}
       {viewMode === 1 && (
-        <div className="cal-schedule-view">
+        <div className="cal-schedule-view" ref={scheduleViewRef}>
           {scheduleData.groups.map(group => {
             const d = new Date(group.date + 'T00:00:00')
             const dayLabel = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })

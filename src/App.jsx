@@ -1,22 +1,101 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import CalendarPanel from './components/CalendarPanel'
 import DocumentPanel from './components/DocumentPanel'
 import DoPanel from './components/DoPanel'
+import SyncStatus from './components/SyncStatus'
 import { calendarTasks, featureDocItems } from './data/sampleData'
+import {
+  isGoogleConnected,
+  connectGoogleCalendar,
+  disconnectGoogleCalendar,
+  fetchGoogleEvents,
+  mapGoogleEventsByDate,
+  createGoogleEvent,
+} from './services/googleCalendar'
+import { isUnlocked, getState, putState } from './services/api'
 import './App.css'
 
+const CALENDAR_STORAGE_KEY = 'innernet:calendar-state:v1'
+
+function loadCalendarState() {
+  try {
+    const raw = localStorage.getItem(CALENDAR_STORAGE_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch {}
+  return { userEvents: {}, eventOverrides: {}, thoughts: {} }
+}
+
+function getTodayStr() {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
 function App() {
-  const [selectedDate, setSelectedDate] = useState('2026-04-09')
+  const [selectedDate, setSelectedDate] = useState(getTodayStr())
   const [selectedEvent, setSelectedEvent] = useState(null)
   const [sidebarWidth, setSidebarWidth] = useState(340)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [thoughts, setThoughts] = useState({})
+  const initialCalendarState = useState(loadCalendarState)[0]
+  const [thoughts, setThoughts] = useState(initialCalendarState.thoughts)
   const [quickSlot, setQuickSlot] = useState(null)
   // User-created events from the natural-language scheduler — keyed by date
   // string, same shape as calendarTasks. Merged with static data in the panel.
-  const [userEvents, setUserEvents] = useState({})
+  const [userEvents, setUserEvents] = useState(initialCalendarState.userEvents)
   // Overrides from drag-to-reschedule / resize — { [eventId]: { time, endTime } }
-  const [eventOverrides, setEventOverrides] = useState({})
+  const [eventOverrides, setEventOverrides] = useState(initialCalendarState.eventOverrides)
+
+  // ── Persistence: localStorage always (fast, same-browser), Worker/KV when
+  // the sync secret is unlocked (cross-device, source of truth once synced).
+  const [apiUnlocked, setApiUnlocked] = useState(isUnlocked())
+  const [apiSyncing, setApiSyncing] = useState(false)
+  const [calendarSynced, setCalendarSynced] = useState(false)
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CALENDAR_STORAGE_KEY, JSON.stringify({ userEvents, eventOverrides, thoughts }))
+    } catch {}
+  }, [userEvents, eventOverrides, thoughts])
+
+  const pullCalendarFromApi = useCallback(async () => {
+    setApiSyncing(true)
+    try {
+      const remote = await getState('calendar')
+      if (remote) {
+        if (remote.userEvents) setUserEvents(remote.userEvents)
+        if (remote.eventOverrides) setEventOverrides(remote.eventOverrides)
+        if (remote.thoughts) setThoughts(remote.thoughts)
+      }
+    } catch {
+      // Locked, offline, or server error — local state stands as-is.
+    } finally {
+      setCalendarSynced(true)
+      setApiSyncing(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (apiUnlocked) pullCalendarFromApi()
+  }, [apiUnlocked, pullCalendarFromApi])
+
+  // Push to the Worker (debounced) once the initial pull has landed, so a
+  // local-only edit made before unlocking doesn't get silently clobbered.
+  useEffect(() => {
+    if (!apiUnlocked || !calendarSynced) return
+    const t = setTimeout(() => {
+      putState('calendar', { userEvents, eventOverrides, thoughts }).catch(() => {})
+    }, 800)
+    return () => clearTimeout(t)
+  }, [apiUnlocked, calendarSynced, userEvents, eventOverrides, thoughts])
+
+  // Google Calendar sync — events fetched from the user's real calendar,
+  // kept separate from userEvents so a re-sync can cleanly replace them.
+  const [googleEvents, setGoogleEvents] = useState({})
+  const [googleConnected, setGoogleConnected] = useState(false)
+  const [googleSyncing, setGoogleSyncing] = useState(false)
+  const [googleError, setGoogleError] = useState(null)
 
   // Bottom panel state
   const [bottomCollapsed, setBottomCollapsed] = useState(false)
@@ -31,7 +110,7 @@ function App() {
 
   // Auto-select first event of the day
   useEffect(() => {
-    const dayEvents = [...(calendarTasks[selectedDate] || []), ...(userEvents[selectedDate] || [])]
+    const dayEvents = [...(calendarTasks[selectedDate] || []), ...(userEvents[selectedDate] || []), ...(googleEvents[selectedDate] || [])]
     if (dayEvents.length > 0) {
       setSelectedEvent(dayEvents[0])
     } else {
@@ -39,6 +118,28 @@ function App() {
     }
     setQuickSlot(null)
   }, [selectedDate])
+
+  // ── Google Calendar ──
+  useEffect(() => {
+    setGoogleConnected(isGoogleConnected())
+  }, [])
+
+  const syncGoogleEvents = useCallback(async () => {
+    setGoogleSyncing(true)
+    setGoogleError(null)
+    try {
+      const now = new Date()
+      const timeMin = new Date(now); timeMin.setDate(timeMin.getDate() - 30)
+      const timeMax = new Date(now); timeMax.setDate(timeMax.getDate() + 90)
+      const items = await fetchGoogleEvents(timeMin.toISOString(), timeMax.toISOString())
+      setGoogleEvents(mapGoogleEventsByDate(items))
+      setGoogleConnected(true)
+    } catch (err) {
+      setGoogleError(err.message)
+    } finally {
+      setGoogleSyncing(false)
+    }
+  }, [])
 
   // Called when the search box parses a "schedule …" intent. Only appends the
   // event to userEvents — intentionally does NOT navigate away from the
@@ -49,7 +150,71 @@ function App() {
       ...prev,
       [date]: [...(prev[date] || []), event],
     }))
-  }, [])
+    if (googleConnected) {
+      createGoogleEvent(date, event)
+        .then(() => {
+          // It now exists on Google too — drop the local optimistic copy
+          // and re-sync so the confirmed Google-sourced version takes over
+          // instead of both sitting in state under different ids.
+          setUserEvents(prev => ({
+            ...prev,
+            [date]: (prev[date] || []).filter(e => e.id !== event.id),
+          }))
+          syncGoogleEvents()
+        })
+        .catch(err => setGoogleError(err.message))
+    }
+  }, [googleConnected, syncGoogleEvents])
+
+  const handleGoogleConnect = useCallback(async () => {
+    if (googleConnected) {
+      disconnectGoogleCalendar()
+      setGoogleConnected(false)
+      setGoogleEvents({})
+      return
+    }
+    try {
+      await connectGoogleCalendar()
+      setGoogleConnected(true)
+    } catch (err) {
+      setGoogleError(err.message)
+    }
+  }, [googleConnected])
+
+  // Keep synced with edits/deletes made directly in Google Calendar: sync
+  // immediately on connect, then on an interval and whenever the tab regains
+  // focus (there's no backend for push/webhook updates, so polling is it).
+  useEffect(() => {
+    if (!googleConnected) return
+    syncGoogleEvents()
+    const interval = setInterval(syncGoogleEvents, 2 * 60 * 1000)
+    const onFocus = () => syncGoogleEvents()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [googleConnected, syncGoogleEvents])
+
+  // Merge live Google events on top of app-native userEvents for rendering.
+  // A locally-created event that was also pushed to Google (see
+  // handleScheduleEvent) can briefly — or, for events created before this
+  // dedup existed, indefinitely — exist in both userEvents and googleEvents
+  // under different ids. Drop the local copy whenever a Google-sourced event
+  // matches it on date/time/title so it doesn't render twice.
+  const mergedUserEvents = useMemo(() => {
+    const merged = {}
+    const allDates = new Set([...Object.keys(userEvents), ...Object.keys(googleEvents)])
+    allDates.forEach(date => {
+      const own = userEvents[date] || []
+      const google = googleEvents[date] || []
+      const dedupedOwn = own.filter(ev =>
+        !google.some(g => g.time === ev.time && g.endTime === ev.endTime && g.title === ev.title)
+      )
+      merged[date] = [...dedupedOwn, ...google]
+    })
+    return merged
+  }, [userEvents, googleEvents])
 
   // Called when an event is dragged or resized to update its time/endTime
   const handleEventUpdate = useCallback((eventId, date, newTime, newEndTime) => {
@@ -183,6 +348,14 @@ function App() {
 
   return (
     <div className="app">
+      <SyncStatus
+        unlocked={apiUnlocked}
+        syncing={apiSyncing}
+        onUnlock={() => {
+          setApiUnlocked(true)
+          window.dispatchEvent(new Event('innernet:unlocked'))
+        }}
+      />
       {/* Left: Calendar sidebar */}
       {!sidebarCollapsed && (
         <aside className="app-sidebar-calendar" style={{ width: `${sidebarWidth}px` }}>
@@ -198,10 +371,15 @@ function App() {
             onQuickSlotClear={clearQuickSlot}
             quickSlot={quickSlot}
             thoughts={thoughts}
-            userEvents={userEvents}
+            userEvents={mergedUserEvents}
             onScheduleEvent={handleScheduleEvent}
             onEventUpdate={handleEventUpdate}
             eventOverrides={eventOverrides}
+            googleConnected={googleConnected}
+            googleSyncing={googleSyncing}
+            googleError={googleError}
+            onGoogleConnect={handleGoogleConnect}
+            onGoogleRefresh={syncGoogleEvents}
           />
         </aside>
       )}

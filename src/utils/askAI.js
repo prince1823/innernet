@@ -1,9 +1,11 @@
-const API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY
+import { getApiSecret } from '../services/api'
+
+const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 export async function askAI(prompt, context = '') {
-  if (!API_KEY || API_KEY === 'your-key-here') {
-    // Fallback: return mock response if no key configured
-    return `**AI Suggestion:** Based on this requirement, consider breaking it into smaller tasks. Start with the data model, then build the UI, and finally wire up the API integration.`
+  const secret = getApiSecret()
+  if (!secret) {
+    return `**AI unavailable:** Unlock sync (bottom-right corner) to enable AI features — the API key now lives server-side only, so it needs the sync secret to authorize requests.`
   }
 
   const systemPrompt = `You are a helpful AI assistant embedded in a productivity app called Innernet. The user is working on feature documentation. Give concise, actionable suggestions. Use markdown formatting (bold, code, bullets). Keep responses under 100 words.`
@@ -27,13 +29,11 @@ export async function askAI(prompt, context = '') {
   console.groupEnd()
 
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const res = await fetch(`${API_BASE}/api/ai/chat`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': window.location.origin,
-        'X-Title': 'Innernet',
+        'X-App-Secret': secret,
       },
       body: JSON.stringify({
         model: 'openai/gpt-4o-mini',

@@ -1387,6 +1387,20 @@ button.imsg-context-clickable:hover {
   padding: 20px 4px;
 }
 
+.ls-empty-clickable {
+  cursor: text;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.ls-empty-clickable:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.ls-empty-clickable:hover .ls-empty-text {
+  color: #999;
+}
+
 .ls-empty-text {
   color: #bbb;
   font-size: 14px;

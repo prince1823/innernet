@@ -45,6 +45,28 @@ function capitalizeWord(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1) : s
 }
 
+function minutesToTimeStr(total) {
+  const h = Math.max(0, Math.min(23, Math.floor(total / 60)))
+  const m = total % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+// Finds the first working-hours (9am-6pm) gap of at least `durationMin` on
+// `dateStr`, skipping over existing events. Returns a "HH:MM" start time, or
+// null if the day has no gap that large left.
+function findFirstFreeSlot(dateStr, durationMin, userEvents) {
+  const dayEvents = [...(calendarTasks[dateStr] || []), ...((userEvents && userEvents[dateStr]) || [])].sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time))
+  const DAY_START = 9 * 60, DAY_END = 18 * 60
+  let cursor = DAY_START
+  for (const ev of dayEvents) {
+    const s = timeToMinutes(ev.time), e = timeToMinutes(ev.endTime)
+    if (s > cursor && s - cursor >= durationMin) return minutesToTimeStr(cursor)
+    cursor = Math.max(cursor, e)
+  }
+  if (DAY_END - cursor >= durationMin) return minutesToTimeStr(cursor)
+  return null
+}
+
 function formatDuration(mins) {
   if (mins < 60) return `${mins}m`
   const h = Math.floor(mins / 60)
@@ -227,7 +249,13 @@ function runTimeQuery(parsed, currentDateStr, userEvents = {}) {
 // ── Component ───────────────────────────────────────────────────────────
 
 export default function CommandBar({ onScheduleEvent, existingEvents = {}, userEvents = {}, dateStr, onJumpToDate, onSearchResults, searchQuery: externalSearchQuery, onSearchQueryChange }) {
-  const TODAY_STR = '2026-04-09'
+  const TODAY_STR = (() => {
+    const now = new Date()
+    const y = now.getFullYear()
+    const m = String(now.getMonth() + 1).padStart(2, '0')
+    const d = String(now.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  })()
   const [query, setQuery] = useState('')
   const [mode, setMode] = useState('search') // 'search' | 'ai'
   const [messages, setMessages] = useState([])
@@ -391,14 +419,31 @@ export default function CommandBar({ onScheduleEvent, existingEvents = {}, userE
   }
 
   const handleCreate = () => {
-    if (!pendingEvent || !pendingEvent.date || !pendingEvent.time) return
+    if (!pendingEvent) return
+    if (!pendingEvent.date) {
+      setMessages(prev => [...prev, { role: 'error', content: 'This event needs a date before it can be created — try typing e.g. "move to Friday".' }])
+      return
+    }
     const duration = pendingEvent.duration || 60
-    const endTime = addMinutesToTimeStr(pendingEvent.time, duration)
+    // No time specified — auto-pick the first open working-hours slot on that
+    // date instead of blocking on the user to type one.
+    let time = pendingEvent.time
+    let autoPicked = false
+    if (!time) {
+      time = findFirstFreeSlot(pendingEvent.date, duration, userEvents)
+      if (!time) {
+        const dayLabel = new Date(pendingEvent.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' })
+        setMessages(prev => [...prev, { role: 'error', content: `No open ${duration}-min slot on ${dayLabel} between 9 AM–6 PM — try typing e.g. "make it 2pm" or pick another day.` }])
+        return
+      }
+      autoPicked = true
+    }
+    const endTime = addMinutesToTimeStr(time, duration)
     const title = pendingEvent.title ||
       (pendingEvent.attendees?.length ? `Meeting with ${pendingEvent.attendees.join(', ')}` : pendingEvent.eventType || 'Event')
     const newEvent = {
       id: `AI-${Date.now().toString(36)}`,
-      title, time: pendingEvent.time, endTime, colorIndex: 4, tags: [],
+      title, time, endTime, colorIndex: 4, tags: [],
       attendees: pendingEvent.attendees || [], userCreated: true,
       location: pendingEvent.location || null, description: pendingEvent.description || null,
     }
@@ -408,7 +453,7 @@ export default function CommandBar({ onScheduleEvent, existingEvents = {}, userE
     const successId = Date.now()
     setMessages(prev => [...prev, {
       role: 'success', id: successId, title,
-      timeRange: `${formatTimeDisplay(pendingEvent.time)} – ${formatTimeDisplay(endTime)}`,
+      timeRange: `${formatTimeDisplay(time)} – ${formatTimeDisplay(endTime)}${autoPicked ? ' (first open slot)' : ''}`,
       dateLabel, date: pendingEvent.date,
     }])
     setPendingEvent(null)

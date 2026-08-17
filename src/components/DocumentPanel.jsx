@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom'
 
 import { journalPages, calendarTasks } from '../data/sampleData'
 import { askAI } from '../utils/askAI'
+import { isUnlocked, getState, putState } from '../services/api'
 import LogsMode from './LogsMode'
 import './DocumentPanel.css'
 
@@ -873,6 +874,32 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     try { localStorage.setItem(TREES_KEY, JSON.stringify(trees)) } catch {}
   }, [trees])
 
+  // Cross-device sync for notes, mirroring the calendar's sync in App.jsx:
+  // pull once the sync secret is unlocked, then push (debounced) after that
+  // initial pull so a local-only edit doesn't get clobbered by an empty remote.
+  const [notesSynced, setNotesSynced] = useState(false)
+  const pullNotesFromApi = useCallback(async () => {
+    try {
+      const remote = await getState('notes')
+      if (remote) setTrees(remote)
+    } catch {
+      // Locked, offline, or server error — local state stands as-is.
+    } finally {
+      setNotesSynced(true)
+    }
+  }, [])
+  useEffect(() => {
+    if (isUnlocked()) pullNotesFromApi()
+    const onUnlock = () => pullNotesFromApi()
+    window.addEventListener('innernet:unlocked', onUnlock)
+    return () => window.removeEventListener('innernet:unlocked', onUnlock)
+  }, [pullNotesFromApi])
+  useEffect(() => {
+    if (!isUnlocked() || !notesSynced) return
+    const t = setTimeout(() => { putState('notes', trees).catch(() => {}) }, 800)
+    return () => clearTimeout(t)
+  }, [trees, notesSynced])
+
   useEffect(() => {
     try { localStorage.setItem(AI_INSERTS_KEY, JSON.stringify(atInserts)) } catch {}
   }, [atInserts])
@@ -1004,6 +1031,19 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
       return { ...prev, [selectedDate]: fn(current) }
     })
   }, [selectedDate])
+
+  // Creates the first block on a date with no notes yet — the empty-state
+  // placeholder has nothing to click into otherwise, since insertSiblingAfter
+  // and friends all require an existing block to anchor on.
+  const handleAddFirstBlock = useCallback(() => {
+    const newId = newBlockId()
+    const now = new Date()
+    const hh = now.getHours().toString().padStart(2, '0')
+    const mm = now.getMinutes().toString().padStart(2, '0')
+    const newBlock = { id: newId, text: '', children: [], time: `${hh}:${mm}` }
+    applyTreeOp(tree => [...tree, newBlock])
+    setFocusRequest({ id: newId, offset: 0 })
+  }, [applyTreeOp])
 
   // Force contentEditable on AI insert elements and attach blur save handler
   useEffect(() => {
@@ -2612,8 +2652,8 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
         ) : rootBlocks.length > 0 ? (
           rootBlocks.map(block => renderBlock(block, 0))
         ) : (
-          <div className="ls-empty">
-            <span className="ls-empty-text">No entries for this date yet</span>
+          <div className="ls-empty ls-empty-clickable" onClick={handleAddFirstBlock}>
+            <span className="ls-empty-text">Click to add a note</span>
           </div>
         )}
       </div>

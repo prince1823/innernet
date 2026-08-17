@@ -1,7 +1,15 @@
 name = "innernet"
 main = "src/worker.js"
 compatibility_date = "2026-04-10"
+account_id = "54cd3025809f1236231df961a17bee09"
 
 [assets]
 directory = "./dist"
 binding = "ASSETS"
+
+[[kv_namespaces]]
+binding = "INNERNET_KV"
+id = "cc2cc28b0b7a48d0a8c06bddc87e1036"
+
+[vars]
+GOOGLE_CLIENT_ID = "814902763791-m2se97olcqt4p9h4eeej3tpri0407agh.apps.googleusercontent.com"

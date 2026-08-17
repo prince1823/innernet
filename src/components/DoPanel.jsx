@@ -2,40 +2,17 @@ import { useState, useRef, useEffect } from 'react'
 import hljs from 'highlight.js/lib/common'
 import 'highlight.js/styles/atom-one-light.css'
 import { logActivity } from '../utils/activityLog'
+import { getApiSecret } from '../services/api'
 import ProjectPane from './ProjectPane'
 import './DoPanel.css'
 
-const API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY
+const API_BASE = import.meta.env.VITE_API_BASE || ''
 const MODEL = 'openai/gpt-4o-mini'
 
 const TAB_TYPES = [
   { type: 'claude', label: 'Claude', icon: 'claude' },
-  { type: 'browser', label: 'Browser', icon: 'browser' },
-  { type: 'terminal', label: 'Terminal', icon: 'terminal' },
   { type: 'project', label: 'Project', icon: 'project' },
 ]
-
-const NEW_TAB_URL = 'about:newtab'
-// CORS proxy used when the user toggles "proxy mode" on a tab — lets us embed
-// sites that send X-Frame-Options: DENY. Third-party, rate-limited, and breaks
-// on sites whose scripts rely on same-origin requests. Off by default.
-const PROXIES = [
-  (url) => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
-  (url) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
-  (url) => 'https://api.codetabs.com/v1/proxy/?quest=' + encodeURIComponent(url),
-]
-
-async function fetchViaProxy(url) {
-  let lastErr
-  for (const build of PROXIES) {
-    try {
-      const r = await fetch(build(url))
-      if (!r.ok) throw new Error('status ' + r.status)
-      return await r.text()
-    } catch (e) { lastErr = e }
-  }
-  throw lastErr || new Error('all proxies failed')
-}
 
 let uid = 0
 const nextId = () => `tab-${Date.now()}-${++uid}`
@@ -43,9 +20,6 @@ const nextId = () => `tab-${Date.now()}-${++uid}`
 function TabIcon({ kind }) {
   if (kind === 'claude') {
     return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-  }
-  if (kind === 'browser') {
-    return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
   }
   if (kind === 'project') {
     return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
@@ -110,13 +84,13 @@ function renderMarkdown(text) {
 }
 
 async function streamAI(messages, onChunk, { signal } = {}) {
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const secret = getApiSecret()
+  if (!secret) throw new Error('Unlock sync (bottom-right corner) to enable AI — the API key now lives server-side only.')
+  const res = await fetch(`${API_BASE}/api/ai/chat`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${API_KEY}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': window.location.origin,
-      'X-Title': 'Innernet',
+      'X-App-Secret': secret,
     },
     body: JSON.stringify({ model: MODEL, messages, max_tokens: 800, stream: true }),
     signal,
@@ -193,16 +167,16 @@ const PLACEHOLDER_PROMPTS = [
 ]
 
 const GREETINGS = [
-  { pre: 'Hello', name: 'Tanuj' },
-  { pre: 'Welcome back', name: 'Tanuj' },
-  { pre: 'Good to see you', name: 'Tanuj' },
-  { pre: "What's on your mind", name: 'Tanuj' },
-  { pre: 'Ready when you are', name: 'Tanuj' },
-  { pre: 'Let\u2019s build something', name: 'Tanuj' },
-  { pre: 'Howdy', name: 'Tanuj' },
-  { pre: 'Back at it', name: 'Tanuj' },
-  { pre: 'Good to have you', name: 'Tanuj' },
-  { pre: 'Where shall we start', name: 'Tanuj' },
+  'Hello',
+  'Welcome back',
+  'Good to see you',
+  "What's on your mind",
+  'Ready when you are',
+  'Let\u2019s build something',
+  'Howdy',
+  'Back at it',
+  'Good to have you',
+  'Where shall we start',
 ]
 
 function ClaudePane({ tab, updateTab }) {
@@ -485,7 +459,7 @@ function ClaudePane({ tab, updateTab }) {
       >
         {state.messages.length === 0 && (
           <div className="do-claude-hero">
-            <h1 className="do-claude-greeting" key={greetingIdx}>{GREETINGS[greetingIdx].pre} <em>{GREETINGS[greetingIdx].name}</em></h1>
+            <h1 className="do-claude-greeting" key={greetingIdx}>{GREETINGS[greetingIdx]}</h1>
             <p className="do-claude-tagline">How can I help you today?</p>
           </div>
         )}
@@ -585,262 +559,9 @@ function ClaudePane({ tab, updateTab }) {
   )
 }
 
-// ─────────────────────────── Browser pane ───────────────────────────
-// Many popular sites (wikipedia.org, google.com) send X-Frame-Options that
-// prevent iframe embedding. The pane still works like a browser — URL bar,
-// back/forward, reload — but those specific sites render blank. For sites
-// that allow embedding, you get full interactive browsing.
-function BrowserPane({ tab, updateTab }) {
-  const rawState = tab.data
-  // Backfill proxy=true for tabs created before the field existed so existing
-  // sessions don't render a blank X-Frame-Options iframe.
-  const state = rawState.proxy === undefined ? { ...rawState, proxy: true } : rawState
-  const iframeRef = useRef(null)
-  const [addressInput, setAddressInput] = useState(state.url)
-  const [proxyDoc, setProxyDoc] = useState('')
-  const [proxyStatus, setProxyStatus] = useState('idle') // 'idle' | 'loading' | 'error'
-  const [retryKey, setRetryKey] = useState(0)
-
-  useEffect(() => { setAddressInput(state.url) }, [state.url])
-
-  // When proxy mode is on, fetch the target HTML via CORS proxy and inject a
-  // <base href> so relative asset URLs (CSS, JS, images) resolve against the
-  // original host instead of 404-ing against corsproxy.io.
-  useEffect(() => {
-    if (!state.proxy || state.url === NEW_TAB_URL) {
-      setProxyDoc('')
-      setProxyStatus('idle')
-      return
-    }
-    let cancelled = false
-    setProxyStatus('loading')
-    setProxyDoc('<!DOCTYPE html><html><head><style>body{font-family:system-ui,sans-serif;color:#6b7280;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}.l{display:flex;align-items:center;gap:10px}.s{width:14px;height:14px;border:2px solid #e5e7eb;border-top-color:#6366f1;border-radius:50%;animation:spin 0.7s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}</style></head><body><div class="l"><div class="s"></div>Loading ' + state.url.replace(/[<>&"]/g,'') + '…</div></body></html>')
-    fetchViaProxy(state.url)
-      .then(html => {
-        if (cancelled) return
-        const baseTag = `<base href="${state.url}">`
-        let patched
-        if (/<head[^>]*>/i.test(html)) {
-          patched = html.replace(/<head([^>]*)>/i, `<head$1>${baseTag}`)
-        } else if (/<html[^>]*>/i.test(html)) {
-          patched = html.replace(/<html([^>]*)>/i, `<html$1><head>${baseTag}</head>`)
-        } else {
-          patched = `<head>${baseTag}</head>${html}`
-        }
-        setProxyDoc(patched)
-        setProxyStatus('idle')
-      })
-      .catch(() => {
-        if (cancelled) return
-        setProxyStatus('error')
-        setProxyDoc(`<!DOCTYPE html><html><body style="font-family:system-ui;color:#b91c1c;padding:28px"><h3 style="margin:0 0 8px">Couldn't load this page</h3><p style="color:#6b7280;margin:0 0 14px">The proxy couldn't reach ${state.url.replace(/[<>&"]/g,'')}.</p><p style="color:#6b7280;font-size:13px">Try toggling the shield off, or open the URL in a new window.</p></body></html>`)
-      })
-    return () => { cancelled = true }
-  }, [state.proxy, state.url, retryKey])
-
-  const normalizeUrl = (raw) => {
-    const s = (raw || '').trim()
-    if (!s) return state.url
-    if (/^https?:\/\//i.test(s)) return s
-    if (/^[\w-]+\.[\w.-]+/.test(s) && !/\s/.test(s)) return 'https://' + s
-    return 'https://search.brave.com/search?q=' + encodeURIComponent(s)
-  }
-
-  const navigate = (raw) => {
-    const url = normalizeUrl(raw)
-    const history = [...state.history.slice(0, state.historyIdx + 1), url]
-    updateTab({
-      title: deriveTitle(url),
-      data: { ...state, url, history, historyIdx: history.length - 1 },
-    })
-    logActivity('browser_nav', { source: 'browser', label: `Browsed ${deriveTitle(url)}`, url })
-  }
-
-  const goBack = () => {
-    if (state.historyIdx <= 0) return
-    const idx = state.historyIdx - 1
-    updateTab({ title: deriveTitle(state.history[idx]), data: { ...state, url: state.history[idx], historyIdx: idx } })
-  }
-  const goForward = () => {
-    if (state.historyIdx >= state.history.length - 1) return
-    const idx = state.historyIdx + 1
-    updateTab({ title: deriveTitle(state.history[idx]), data: { ...state, url: state.history[idx], historyIdx: idx } })
-  }
-  const reload = () => { if (iframeRef.current) iframeRef.current.src = state.url }
-
-  return (
-    <div className="do-pane do-browser">
-      <div className="do-browser-chrome">
-        <button className="do-browser-btn" onClick={goBack} disabled={state.historyIdx <= 0} title="Back">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-        </button>
-        <button className="do-browser-btn" onClick={goForward} disabled={state.historyIdx >= state.history.length - 1} title="Forward">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
-        <button className="do-browser-btn" onClick={reload} title="Reload">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-        </button>
-        <div className="do-browser-url">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          <input
-            type="text"
-            value={addressInput}
-            onChange={e => setAddressInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') navigate(addressInput) }}
-            spellCheck={false}
-          />
-        </div>
-        <button
-          className={`do-browser-open do-browser-proxy ${state.proxy ? 'active' : ''}`}
-          onClick={() => updateTab({ data: { ...state, proxy: !state.proxy } })}
-          title={state.proxy ? 'Proxy mode ON — routes through corsproxy.io to bypass embed blocks' : 'Turn on proxy mode to load sites that block embedding'}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        </button>
-        <button className="do-browser-open" onClick={() => window.open(state.url, '_blank', 'noopener')} title="Open in a real tab">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-        </button>
-      </div>
-      <div className="do-browser-viewport">
-        {state.url === NEW_TAB_URL ? (
-          <NewTabPage onSearch={navigate} />
-        ) : (
-          <>
-            {state.proxy ? (
-              proxyStatus === 'error' ? (
-                <BrowserErrorPage url={state.url} onRetry={() => setRetryKey(k => k + 1)} onDisableProxy={() => updateTab({ data: { ...state, proxy: false } })} />
-              ) : (
-                <iframe
-                  ref={iframeRef}
-                  title="browser-tab"
-                  srcDoc={proxyDoc || '<p style="font-family:system-ui;color:#6b7280;padding:24px">Preparing proxied page…</p>'}
-                  sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
-                  referrerPolicy="no-referrer"
-                />
-              )
-            ) : (
-              <iframe
-                ref={iframeRef}
-                title="browser-tab"
-                src={state.url}
-                sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
-                referrerPolicy="no-referrer"
-              />
-            )}
-            <div className="do-browser-fallback">
-              <span>Site blocks embedding? Try the shield <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{verticalAlign:'middle'}}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> to enable proxy mode, or</span>
-              <button onClick={() => window.open(state.url, '_blank', 'noopener')}>Open in new window</button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function BrowserErrorPage({ url, onRetry, onDisableProxy }) {
-  let host = url
-  try { host = new URL(url).hostname } catch {}
-  return (
-    <div className="do-browser-error">
-      <div className="do-browser-error-card">
-        <div className="do-browser-error-icon">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/></svg>
-        </div>
-        <h3>{host} can't be reached</h3>
-        <p>Sites like GitHub, Reddit, and X actively block scraping, so the proxy can't fetch their pages. The public CORS proxies we try may also be rate-limited.</p>
-        <div className="do-browser-error-actions">
-          <button className="primary" onClick={() => window.open(url, '_blank', 'noopener')}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            Open in new window
-          </button>
-          <button onClick={onRetry}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-            Retry
-          </button>
-          <button onClick={onDisableProxy}>Try without proxy</button>
-        </div>
-        <div className="do-browser-error-hint">Tip: the shield works for most static sites (Wikipedia, MDN, React docs, Brave Search).</div>
-      </div>
-    </div>
-  )
-}
-
-function NewTabPage({ onSearch }) {
-  const [q, setQ] = useState('')
-  // Only show shortcuts that are known to allow iframe embedding. For anything
-  // else (GitHub, HN, Google, etc.) the user can type the URL and toggle the
-  // shield icon to enable proxy mode.
-  const shortcuts = [
-    { label: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/Main_Page', color: '#1a1a2e' },
-    { label: 'DuckDuckGo', url: 'https://html.duckduckgo.com/html/', color: '#de5833' },
-    { label: 'MDN', url: 'https://developer.mozilla.org/', color: '#000000' },
-    { label: 'arXiv', url: 'https://arxiv.org', color: '#b31b1b' },
-  ]
-  return (
-    <div className="do-newtab-page">
-      <div className="do-newtab-bg" aria-hidden="true">
-        <div className="do-newtab-blob do-newtab-blob-a" />
-        <div className="do-newtab-blob do-newtab-blob-b" />
-        <div className="do-newtab-blob do-newtab-blob-c" />
-      </div>
-      <div className="do-newtab-content">
-        <div className="do-newtab-brand">
-          <svg className="do-newtab-brand-icon" viewBox="0 0 128 128" width="44" height="44" aria-hidden="true">
-            <path fill="#fb542b" d="M64 12l26 10 8-6 20 20-10 12 6 18-10 44-20 18-20 10-20-10-20-18L14 66l6-18L10 36l20-20 8 6z"/>
-            <path fill="#fff" d="M64 36l18 6 14-6 8 8-6 10 4 14-10 24-14 12-14 8-14-8-14-12-10-24 4-14-6-10 8-8 14 6z" opacity="0.15"/>
-          </svg>
-          <div className="do-newtab-brand-text">
-            <div className="do-newtab-headline">Private search.<br/>Brave results.</div>
-            <div className="do-newtab-sub">No tracking. No profiling. Just the web, the way it should be.</div>
-          </div>
-        </div>
-        <form
-          className="do-newtab-search"
-          onSubmit={e => { e.preventDefault(); if (q.trim()) onSearch(q.trim()) }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input
-            type="text"
-            autoFocus
-            value={q}
-            onChange={e => setQ(e.target.value)}
-            placeholder="Search the web privately with Brave, or enter a URL"
-            spellCheck={false}
-          />
-          <kbd className="do-newtab-kbd">⏎</kbd>
-        </form>
-        <div className="do-newtab-shortcuts">
-          {shortcuts.map(s => (
-            <button key={s.label} className="do-newtab-shortcut" onClick={() => onSearch(s.url)}>
-              <span className="do-newtab-shortcut-dot" style={{ background: s.color }}>
-                {s.label[0]}
-              </span>
-              <span className="do-newtab-shortcut-label">{s.label}</span>
-            </button>
-          ))}
-        </div>
-        <div className="do-newtab-foot">Powered by Brave Search · Results are independent and unfiltered</div>
-      </div>
-    </div>
-  )
-}
-
-function deriveTitle(url) {
-  try {
-    const u = new URL(url)
-    if (u.hostname.includes('wikipedia.org')) {
-      const last = decodeURIComponent(u.pathname.split('/').pop() || '')
-      if (last && last !== 'Main_Page') return last.replace(/_/g, ' ').slice(0, 24)
-      return 'Wikipedia'
-    }
-    return u.hostname.replace(/^www\./, '').slice(0, 24)
-  } catch {
-    return 'Browser'
-  }
-}
-
-// ─────────────────────────── Terminal pane ───────────────────────────
+// Mock in-app shell — not a real terminal, just a toy command set. Used as
+// the Project pane's embedded terminal (⌘`); no longer offered as a
+// standalone top-level tab type.
 export function TerminalPane({ tab, updateTab }) {
   const state = tab.data
   const [input, setInput] = useState('')
@@ -926,23 +647,12 @@ export function TerminalPane({ tab, updateTab }) {
 }
 
 // ─────────────────────────── DoPanel ───────────────────────────
-// Existing browser tabs still open to Wikipedia for continuity; a *new* browser
-// tab (added via +) opens the blank New Tab page instead so the user can search
-// — the Chrome-style flow.
-function makeTab(type, opts = {}) {
+function makeTab(type) {
   const id = nextId()
   if (type === 'claude') return { id, type, title: 'Claude', data: { messages: [], conversationId: `conv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` } }
-  if (type === 'browser') {
-    const url = opts.newTab
-      ? NEW_TAB_URL
-      : (opts.url || 'https://en.wikipedia.org/wiki/Main_Page')
-    const title = url === NEW_TAB_URL ? 'New Tab' : deriveTitle(url)
-    return { id, type, title, data: { url, history: [url], historyIdx: 0, proxy: true } }
-  }
   if (type === 'project') {
     return { id, type, title: 'Project', data: { rootName: null, expanded: [] } }
   }
-  return { id, type: 'terminal', title: 'Terminal', data: { lines: [{ kind: 'out', text: "Innernet shell — type 'help' for commands." }], history: [] } }
 }
 
 const STORAGE_KEY = 'innernet:do-panel:v1'
@@ -956,7 +666,7 @@ export default function DoPanel() {
         if (Array.isArray(parsed?.tabs) && parsed.tabs.length) return parsed.tabs
       }
     } catch {}
-    return [makeTab('claude'), makeTab('browser'), makeTab('terminal')]
+    return [makeTab('claude')]
   })
   const [activeId, setActiveId] = useState(() => {
     try {
@@ -992,7 +702,7 @@ export default function DoPanel() {
     setTabs(prev => prev.map(t => t.id === id ? { ...t, ...patch, data: patch.data ?? t.data } : t))
   }
   const addTab = (type) => {
-    const t = makeTab(type, type === 'browser' ? { newTab: true } : {})
+    const t = makeTab(type)
     setTabs(prev => [...prev, t])
     setActiveId(t.id)
     setMenuOpen(false)
@@ -1081,12 +791,6 @@ export default function DoPanel() {
       <div className="do-pane-wrap">
         {active && active.type === 'claude' && (
           <ClaudePane tab={active} updateTab={patch => updateTab(active.id, patch)} />
-        )}
-        {active && active.type === 'browser' && (
-          <BrowserPane tab={active} updateTab={patch => updateTab(active.id, patch)} />
-        )}
-        {active && active.type === 'terminal' && (
-          <TerminalPane tab={active} updateTab={patch => updateTab(active.id, patch)} />
         )}
         {active && active.type === 'project' && (
           <ProjectPane tab={active} updateTab={patch => updateTab(active.id, patch)} />

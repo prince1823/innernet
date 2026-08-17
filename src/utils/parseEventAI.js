@@ -1,4 +1,6 @@
-const API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY
+import { getApiSecret } from '../services/api'
+
+const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 const SYSTEM_PROMPT = `You are a calendar scheduling assistant. Given a user message about creating/scheduling an event, extract structured event data and return ONLY valid JSON (no markdown, no explanation).
 
@@ -39,8 +41,9 @@ If they say "add Priya", return:
 Return the full updated value for array fields (not just the addition). Only return JSON, no other text.`
 
 export async function parseEventWithAI(userMessage, todayStr, pendingEvent = null) {
-  if (!API_KEY || API_KEY === 'your-key-here') {
-    return { error: 'No API key configured. Set VITE_OPENROUTER_API_KEY in your .env file.' }
+  const secret = getApiSecret()
+  if (!secret) {
+    return { error: 'Unlock sync (bottom-right corner) to enable AI scheduling — the API key now lives server-side only.' }
   }
 
   const systemContent = pendingEvent
@@ -55,13 +58,11 @@ export async function parseEventWithAI(userMessage, todayStr, pendingEvent = nul
   ]
 
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const res = await fetch(`${API_BASE}/api/ai/chat`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': window.location.origin,
-        'X-Title': 'Innernet',
+        'X-App-Secret': secret,
       },
       body: JSON.stringify({
         model: 'openai/gpt-4o-mini',

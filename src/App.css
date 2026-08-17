@@ -451,3 +451,80 @@
     height: 22px;
   }
 }
+
+/* ── Sync status (bottom-right corner, clear of the calendar's own
+   bottom-left search/schedule controls) ── */
+.sync-status-wrap {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  z-index: 50;
+}
+
+.sync-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 12px;
+  font-size: 10.5px;
+  font-weight: 500;
+  border: 1px solid var(--border-light, #e0e0e0);
+  background: var(--bg-white, #fff);
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.sync-status.synced { cursor: default; color: #2e7d32; border-color: #a5d6a7; background: #f1f8f1; }
+
+.sync-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #9aa0a6;
+  flex-shrink: 0;
+}
+
+.sync-status.synced .sync-dot { background: #2e7d32; }
+.sync-dot.pulsing { animation: sync-pulse 1s ease-in-out infinite; }
+
+@keyframes sync-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.sync-unlock-popover {
+  position: absolute;
+  bottom: 30px;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: var(--bg-white, #fff);
+  border: 1px solid var(--border-light, #e0e0e0);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  width: 180px;
+}
+
+.sync-unlock-popover input {
+  padding: 5px 7px;
+  border: 1px solid var(--border-light, #dadce0);
+  border-radius: 5px;
+  font-size: 11.5px;
+  font-family: inherit;
+}
+
+.sync-unlock-popover button {
+  padding: 5px 8px;
+  border: none;
+  border-radius: 5px;
+  background: var(--purple-600, #7c3aed);
+  color: #fff;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.sync-unlock-error { font-size: 10.5px; color: #c62828; }
