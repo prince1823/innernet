@@ -1563,7 +1563,7 @@ export default function DocumentPanel({ selectedDate, onAskAI, activeAgentFeatur
     } finally {
       setRegeneratingCalloutIds(prev => { const next = new Set(prev); next.delete(aiBlockId); return next })
     }
-  }, [askAI])
+  }, [applyTreeOp])
 
   // Selection-driven "Improve" rewrite: take the user's highlighted substring,
   // ask the AI to transform it per the chosen action, and splice the rewrite
